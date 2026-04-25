@@ -183,7 +183,7 @@ export default function DashboardClientsPage() {
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl border border-white/10 bg-gray-900/60 p-4">
                       <p className="text-xs text-gray-500 uppercase tracking-[0.18em]">Joined</p>
-                      <p className="mt-2 text-sm text-gray-200">{new Date(client.created_at).toLocaleDateString()}</p>
+                      <p className="mt-2 text-sm text-gray-200">{client.created_at ? new Date(client.created_at).toLocaleDateString() : "Unknown"}</p>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-gray-900/60 p-4">
                       <p className="text-xs text-gray-500 uppercase tracking-[0.18em]">Contact</p>

@@ -1,209 +1,145 @@
-'use client';
+import * as React from "react";
+import { redirect } from "next/navigation";
+import { ShieldAlert, User2 } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/shell";
+import { Badge } from "@/components/ui/badge";
+import {
+  createServerSupabase,
+  getCurrentProfile,
+  getSessionUser,
+} from "@/lib/supabase/server";
+import { ProfileForm } from "./profile-form";
+import { PasswordForm } from "./password-form";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabaseBrowser } from '@/lib/supabase';
-import { Settings, Bell, Lock, AlertTriangle } from 'lucide-react';
+/**
+ * /dashboard/settings — operator profile management.
+ * --------------------------------------------------
+ * Server-rendered shell + two client forms (profile + password) wired
+ * to Server Actions. Anything role-gated stays read-only here; admins
+ * promote/demote users from /admin/users.
+ */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    email_notifications: true,
-    marketing_emails: false,
-    two_factor_enabled: false,
-  });
-  const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const router = useRouter();
+export default async function SettingsPage() {
+  const user = await getSessionUser();
+  if (!user) redirect("/auth/login?next=/dashboard/settings");
 
-  useEffect(() => {
-    async function checkAuth() {
-      const { data: userData } = await supabaseBrowser.auth.getUser();
-      if (!userData.user) {
-        router.push('/auth/login');
-      }
-    }
+  const profile = await getCurrentProfile();
 
-    checkAuth();
-  }, [router]);
-
-  const handleToggleSetting = (key: keyof typeof settings) => {
-    setSettings((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
-  const handleSaveSettings = async () => {
-    try {
-      setIsSaving(true);
-      setMessage(null);
-      
-      // In a real app, save these to a settings table
-      // For now, just save to localStorage
-      localStorage.setItem('app_settings', JSON.stringify(settings));
-      
-      setMessage({ type: 'success', text: 'Settings saved successfully!' });
-      setTimeout(() => setMessage(null), 3000);
-    } catch (err) {
-      console.error('Error saving settings:', err);
-      setMessage({ type: 'error', text: 'Failed to save settings' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await supabaseBrowser.auth.signOut();
-      router.push('/');
-    } catch (err) {
-      console.error('Error logging out:', err);
-      setMessage({ type: 'error', text: 'Failed to logout' });
-    }
-  };
+  // Last sign-in for the audit panel — pulled directly from Supabase auth.
+  const supabase = await createServerSupabase();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const lastSignIn = sessionData.session?.user.last_sign_in_at ?? null;
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white">Settings</h1>
-        <p className="text-gray-400 mt-2">Manage your preferences and account settings</p>
-      </div>
+    <>
+      <PageHeader
+        eyebrow="Operator"
+        title="Settings"
+        description="Account identity and credentials. Anything sensitive triggers a re-auth before it sticks."
+      />
 
-      {/* Success/Error Message */}
-      {message && (
-        <div
-          className={`px-4 py-3 rounded-lg ${
-            message.type === 'success'
-              ? 'bg-green-500/10 border border-green-500 text-green-400'
-              : 'bg-red-500/10 border border-red-500 text-red-400'
-          }`}
-        >
-          {message.text}
+      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-6">
+          <Section icon={User2} eyebrow="Identity" title="Profile">
+            <ProfileForm
+              initial={{
+                full_name: profile?.full_name ?? "",
+                company_name: profile?.company_name ?? "",
+                phone: profile?.phone ?? "",
+              }}
+            />
+          </Section>
+
+          <Section
+            icon={ShieldAlert}
+            eyebrow="Credential rotation"
+            title="Password"
+          >
+            <PasswordForm />
+          </Section>
         </div>
-      )}
 
-      {/* Notification Settings */}
-      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Bell className="text-cyan-400" size={24} />
-          <h2 className="text-xl font-semibold text-white">Notifications</h2>
-        </div>
-
-        <div className="space-y-4">
-          {/* Email Notifications */}
-          <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg">
-            <div>
-              <p className="font-medium text-white">Email Notifications</p>
-              <p className="text-sm text-gray-400 mt-1">Receive email updates about your projects</p>
-            </div>
+        <aside className="rounded-sm border-hairline border-white/[0.06] bg-surface p-5">
+          <p className="text-eyebrow text-foreground-subtle">Account</p>
+          <dl className="mt-3 space-y-3 text-xs">
+            <Row label="Email">
+              <span className="font-mono text-foreground">{user.email}</span>
+            </Row>
+            <Row label="Role">
+              <Badge tone={profile?.role === "admin" ? "admin" : "neutral"}>
+                {profile?.role === "admin" ? "Admin" : "Operator"}
+              </Badge>
+            </Row>
+            <Row label="Verified">
+              <Badge tone={profile?.is_verified ? "secure" : "warn"}>
+                {profile?.is_verified ? "Yes" : "Pending"}
+              </Badge>
+            </Row>
+            <Row label="Last sign-in">
+              <span className="font-mono text-foreground-muted">
+                {lastSignIn
+                  ? new Date(lastSignIn).toLocaleString()
+                  : "—"}
+              </span>
+            </Row>
+            <Row label="User ID">
+              <span className="break-all font-mono text-[10px] text-foreground-subtle">
+                {user.id}
+              </span>
+            </Row>
+          </dl>
+          <form action="/auth/signout" method="post" className="mt-5">
             <button
-              onClick={() => handleToggleSetting('email_notifications')}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                settings.email_notifications
-                  ? 'bg-cyan-500'
-                  : 'bg-gray-600'
-              }`}
+              type="submit"
+              className="w-full rounded-sm border-hairline border-threat/40 bg-threat/10 py-2 text-xs font-medium uppercase tracking-[0.14em] text-threat transition-colors hover:bg-threat/15"
             >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  settings.email_notifications
-                    ? 'translate-x-7'
-                    : 'translate-x-1'
-                }`}
-              />
+              Sign out
             </button>
-          </div>
-
-          {/* Marketing Emails */}
-          <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg">
-            <div>
-              <p className="font-medium text-white">Marketing Emails</p>
-              <p className="text-sm text-gray-400 mt-1">Receive updates about new services and features</p>
-            </div>
-            <button
-              onClick={() => handleToggleSetting('marketing_emails')}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                settings.marketing_emails
-                  ? 'bg-cyan-500'
-                  : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  settings.marketing_emails
-                    ? 'translate-x-7'
-                    : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
+          </form>
+        </aside>
       </div>
+    </>
+  );
+}
 
-      {/* Security Settings */}
-      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Lock className="text-cyan-400" size={24} />
-          <h2 className="text-xl font-semibold text-white">Security</h2>
-        </div>
-
-        <div className="space-y-4">
-          {/* Two-Factor Authentication */}
-          <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg">
-            <div>
-              <p className="font-medium text-white">Two-Factor Authentication</p>
-              <p className="text-sm text-gray-400 mt-1">Add an extra layer of security to your account</p>
-            </div>
-            <button
-              onClick={() => handleToggleSetting('two_factor_enabled')}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                settings.two_factor_enabled
-                  ? 'bg-cyan-500'
-                  : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  settings.two_factor_enabled
-                    ? 'translate-x-7'
-                    : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          {/* Change Password */}
-          <button className="w-full p-4 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors text-left">
-            <p className="font-medium text-white">Change Password</p>
-            <p className="text-sm text-gray-400 mt-1">Update your password regularly for security</p>
-          </button>
-        </div>
+function Section({
+  icon: Icon,
+  eyebrow,
+  title,
+  children,
+}: {
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-sm border-hairline border-white/[0.06] bg-surface">
+      <div className="flex items-center gap-2 border-b-[0.5px] border-white/[0.06] px-5 py-4">
+        <Icon size={12} strokeWidth={1.75} className="text-foreground-subtle" />
+        <p className="text-eyebrow text-foreground-subtle">{eyebrow}</p>
+        <span className="ml-auto text-sm font-medium text-foreground">
+          {title}
+        </span>
       </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
 
-      {/* Danger Zone */}
-      <div className="bg-gray-800/50 border border-red-500/30 rounded-lg p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <AlertTriangle className="text-red-400" size={24} />
-          <h2 className="text-xl font-semibold text-red-400">Danger Zone</h2>
-        </div>
-
-        <button
-          onClick={handleLogout}
-          className="w-full px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500 text-red-400 rounded-lg transition-colors font-medium"
-        >
-          Log Out
-        </button>
-      </div>
-
-      {/* Save Button */}
-      <button
-        onClick={handleSaveSettings}
-        disabled={isSaving}
-        className="w-full px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors font-medium"
-      >
-        {isSaving ? 'Saving...' : 'Save Settings'}
-      </button>
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-foreground-subtle">{label}</dt>
+      <dd className="text-right">{children}</dd>
     </div>
   );
 }

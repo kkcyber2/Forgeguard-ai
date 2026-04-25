@@ -1,70 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 
-// Input validation and sanitization
-function sanitizeInput(input: string): string {
-  return input
-    .trim()
-    .replace(/[<>]/g, '') // Remove potential HTML tags
-    .slice(0, 1000); // Limit length
-}
+const contactFormSchema = z.object({
+  name: z.string().min(2).max(100),
+  email: z.string().email().max(254),
+  subject: z.string().min(5).max(200),
+  message: z.string().min(10).max(5000),
+});
 
-function validateEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email) && email.length <= 254;
-}
+type ContactFormData = z.infer<typeof contactFormSchema>;
 
-function validateContactForm(data: any) {
-  const errors: string[] = [];
-
-  if (!data.name || typeof data.name !== 'string' || data.name.length < 2 || data.name.length > 100) {
-    errors.push('Name must be between 2 and 100 characters');
-  }
-
-  if (!data.email || !validateEmail(data.email)) {
-    errors.push('Valid email is required');
-  }
-
-  if (!data.subject || typeof data.subject !== 'string' || data.subject.length < 5 || data.subject.length > 200) {
-    errors.push('Subject must be between 5 and 200 characters');
-  }
-
-  if (!data.message || typeof data.message !== 'string' || data.message.length < 10 || data.message.length > 5000) {
-    errors.push('Message must be between 10 and 5000 characters');
-  }
-
-  return errors;
+function sanitizeContactData(data: ContactFormData): ContactFormData {
+  return {
+    name: data.name.trim().slice(0, 100),
+    email: data.email.trim().toLowerCase().slice(0, 254),
+    subject: data.subject.trim().slice(0, 200),
+    message: data.message.trim()
+      .replace(/<[^>]*>/g, '')
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .slice(0, 5000),
+  };
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate input
-    const validationErrors = validateContactForm(body);
-    if (validationErrors.length > 0) {
+    const parseResult = contactFormSchema.safeParse(body);
+    if (!parseResult.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: validationErrors },
+        { error: 'Validation failed', details: parseResult.error.flatten() },
         { status: 400 }
       );
     }
 
-    // Sanitize inputs
-    const sanitizedData: Database['public']['Tables']['contact_submissions']['Insert'] = {
-      name: sanitizeInput(body.name),
-      email: sanitizeInput(body.email),
-      subject: sanitizeInput(body.subject),
-      message: sanitizeInput(body.message),
-    };
+    const sanitized = sanitizeContactData(parseResult.data);
 
-    // Create Supabase client
     const supabase = await createSupabaseServerClient();
 
-    // Insert into database
     const { error } = await supabase
       .from('contact_submissions' as any)
-      .insert([sanitizedData] as any);
+      .insert([sanitized] as any);
 
     if (error) {
       console.error('Database error:', error);

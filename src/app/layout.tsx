@@ -1,111 +1,88 @@
-// =====================================================
-// Root Layout
-// =====================================================
+import type { Metadata, Viewport } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import { assertPublicEnv } from "@/lib/env";
+import "./globals.css";
 
-import type { Metadata, Viewport } from 'next';
-import { Inter, Space_Grotesk } from 'next/font/google';
-import { validateEnvironmentVariables, logEnvironmentStatus } from '@/lib/env';
-import './globals.css';
+/**
+ * Root layout. Server Component.
+ * No Supabase client created here — server components that need auth
+ * should import from @/lib/supabase/server and create a request-scoped
+ * client. Never instantiate a Supabase client at module scope.
+ */
 
-// Validate environment variables on server startup
-validateEnvironmentVariables();
-logEnvironmentStatus();
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ['latin'],
-  variable: '--font-space-grotesk',
-  display: 'swap',
-});
+// Fail fast on boot if public env is misconfigured.
+assertPublicEnv();
 
 export const metadata: Metadata = {
-  title: 'ForgeGuard AI | AI Red Teaming & Secure AI/ML Agency',
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://forgeguard.ai",
+  ),
+  title: {
+    default: "ForgeGuard AI — Adversarial Red-Teaming for LLMs",
+    template: "%s · ForgeGuard AI",
+  },
   description:
-    'Forging Secure AI | Red Teaming LLMs | Hardening Agents Against Real Attacks. Expert AI security services by Konain Sultan Khan.',
+    "Continuous red-teaming, runtime guardrails, and prompt-injection defense for production LLM deployments. Engineered for security teams.",
   keywords: [
-    'AI security',
-    'red teaming',
-    'LLM security',
-    'prompt injection',
-    'AI safety',
-    'machine learning security',
-    'secure AI agents',
-    'AI audit',
-    'Konain Sultan Khan',
+    "LLM security",
+    "AI red teaming",
+    "prompt injection",
+    "AI guardrails",
+    "adversarial testing",
+    "agent security",
+    "ForgeGuard",
   ],
-  authors: [{ name: 'Konain Sultan Khan' }],
-  creator: 'Konain Sultan Khan',
-  publisher: 'ForgeGuard AI',
-  robots: 'index, follow',
+  authors: [{ name: "ForgeGuard AI" }],
   openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: 'https://forgeguard.ai',
-    siteName: 'ForgeGuard AI',
-    title: 'ForgeGuard AI | AI Red Teaming & Secure AI/ML Agency',
+    type: "website",
+    siteName: "ForgeGuard AI",
+    title: "ForgeGuard AI — Adversarial Red-Teaming for LLMs",
     description:
-      'Forging Secure AI | Red Teaming LLMs | Hardening Agents Against Real Attacks',
-    images: [
-      {
-        url: '/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'ForgeGuard AI',
-      },
-    ],
+      "Continuous red-teaming and runtime guardrails for production LLM deployments.",
+    images: ["/og.png"],
   },
   twitter: {
-    card: 'summary_large_image',
-    title: 'ForgeGuard AI | AI Red Teaming & Secure AI/ML Agency',
+    card: "summary_large_image",
+    title: "ForgeGuard AI",
     description:
-      'Forging Secure AI | Red Teaming LLMs | Hardening Agents Against Real Attacks',
-    images: ['/og-image.jpg'],
-    creator: '@konainsultan',
+      "Adversarial red-teaming and runtime guardrails for production LLM deployments.",
+    images: ["/og.png"],
   },
-  icons: {
-    icon: [
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-    ],
-    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
-    other: [
-      {
-        rel: 'mask-icon',
-        url: '/safari-pinned-tab.svg',
-        color: '#00f0ff',
-      },
-    ],
+  robots: {
+    index: true,
+    follow: true,
   },
-  manifest: '/manifest.json',
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a0a',
-  width: 'device-width',
+  themeColor: "#050505",
+  width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
-  colorScheme: 'dark',
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${spaceGrotesk.variable} dark`}
+      className={`${GeistSans.variable} ${GeistMono.variable} dark`}
       suppressHydrationWarning
     >
-      <body className="bg-background text-foreground antialiased neural-bg min-h-screen">
-        {children}
+      <body className="bg-background text-foreground antialiased selection:bg-acid/25">
+        {/* Ambient grain — single fixed layer for the entire app */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-0 opacity-[0.04] mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
+          }}
+        />
+        <div className="relative z-10">{children}</div>
       </body>
     </html>
   );

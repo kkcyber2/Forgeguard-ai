@@ -217,7 +217,7 @@ export default function ProfilePage() {
 
       {/* Account Created Date */}
       <p className="text-sm text-gray-500">
-        Account created on {new Date(profile.created_at).toLocaleDateString()}
+        Account created on {profile.created_at ? new Date(profile.created_at).toLocaleDateString() : "Unknown"}
       </p>
     </div>
   );

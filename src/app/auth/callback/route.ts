@@ -1,64 +1,26 @@
-// =====================================================
-// Auth Callback Route (OAuth)
-// =====================================================
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerSupabase } from "@/lib/supabase/server";
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import type { Database } from '@/types/supabase';
-
+/**
+ * OAuth / magic-link callback.
+ * Exchanges the short-lived `code` param for a session cookie, then
+ * redirects to the requested `next` path (safelisted to same-origin).
+ */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const code = searchParams.get("code");
+  const nextParam = searchParams.get("next") ?? "/dashboard";
+  const next = nextParam.startsWith("/") ? nextParam : "/dashboard";
 
-  if (code) {
-    let response = NextResponse.next({
-      request: {
-        headers: request.headers,
-      },
-    });
-
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value;
-          },
-          set(name: string, value: string, options: Record<string, unknown>) {
-            request.cookies.set({ name, value, ...options });
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            });
-            response.cookies.set({ name, value, ...options });
-          },
-          remove(name: string, options: Record<string, unknown>) {
-            request.cookies.set({ name, value: '', ...options });
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            });
-            response.cookies.set({ name, value: '', ...options });
-          },
-        },
-      }
-    );
-
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
-
-    console.error('Auth callback error:', error);
+  if (!code) {
+    return NextResponse.redirect(`${origin}/auth/login?error=missing_code`);
   }
 
-  // Return to login with error
-  return NextResponse.redirect(
-    `${origin}/auth/login?error=auth_callback_failed`
-  );
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    console.error("[auth:callback] exchange failed:", error.message);
+    return NextResponse.redirect(`${origin}/auth/login?error=exchange_failed`);
+  }
+  return NextResponse.redirect(`${origin}${next}`);
 }

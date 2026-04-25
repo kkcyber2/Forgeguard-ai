@@ -1,103 +1,80 @@
+import { z } from "zod";
+
 /**
- * Environment Variable Validation
- * Checks that all required environment variables are set and provides helpful error messages
+ * Environment validation.
+ * -----------------------
+ * Public env (NEXT_PUBLIC_*) is validated at boot from the root layout.
+ * Server-only secrets are validated lazily the first time they're read,
+ * so public pages don't crash if an admin secret is missing.
+ *
+ * SECURITY RULE: do not re-export server-only values. Only export typed
+ * getters, so it's impossible to accidentally reference `process.env.GROQ_API_KEY`
+ * from a client component and ship it in the bundle.
  */
 
-export function validateEnvironmentVariables() {
-  const requiredVars = [
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'GROQ_API_KEY',
-  ];
+// ---- Public env (safe to expose to the browser) ----------------------------
+const PublicEnvSchema = z.object({
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
+  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+});
 
-  const optionalVars = [
-    'SUPABASE_SERVICE_ROLE_KEY',
-    'NEXT_PUBLIC_APP_URL',
-    'NEXT_PUBLIC_APP_NAME',
-    'RATE_LIMIT_REQUESTS_PER_MINUTE',
-    'ADMIN_EMAIL',
-  ];
+let publicCache: z.infer<typeof PublicEnvSchema> | null = null;
 
-  const missing: string[] = [];
-  const warnings: string[] = [];
-
-  // Check required variables
-  for (const variable of requiredVars) {
-    const value = process.env[variable];
-    if (!value || value.includes('your-')) {
-      missing.push(variable);
-    }
+export function assertPublicEnv(): z.infer<typeof PublicEnvSchema> {
+  if (publicCache) return publicCache;
+  const parsed = PublicEnvSchema.safeParse({
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  });
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => `  · ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(
+      `[forgeguard:env] Public environment is invalid:\n${issues}\n` +
+        `Check your .env.local against .env.example.`,
+    );
   }
-
-  // Check optional variables
-  for (const variable of optionalVars) {
-    const value = process.env[variable];
-    if (!value || value.includes('your-')) {
-      warnings.push(variable);
-    }
-  }
-
-  // Provide detailed error message if required vars are missing
-  if (missing.length > 0) {
-    const errorMessage = `
-🔴 MISSING REQUIRED ENVIRONMENT VARIABLES
-
-The following environment variables are required to run ForgeGuard AI:
-${missing.map((v) => `  ❌ ${v}`).join('\n')}
-
-📋 SETUP INSTRUCTIONS:
-
-1. Copy .env.example to .env.local
-2. Get your credentials from:
-   - Supabase: https://app.supabase.com/project/_/settings/api
-   - Groq: https://console.groq.com/keys
-3. Update .env.local with your credentials
-4. Restart the development server
-
-For more information, see the QUICKSTART.md file.
-    `;
-    console.error(errorMessage);
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-  }
-
-  // Warn about missing optional variables
-  if (warnings.length > 0 && process.env.NODE_ENV === 'development') {
-    const warningMessage = `
-⚠️  OPTIONAL ENVIRONMENT VARIABLES NOT SET
-
-The following optional environment variables are not configured:
-${warnings.map((v) => `  ⚠️  ${v}`).join('\n')}
-
-These features will have limited functionality until configured.
-Check .env.example for their purposes.
-    `;
-    console.warn(warningMessage);
-  }
-
-  return {
-    isValid: missing.length === 0,
-    missing,
-    warnings,
-  };
+  publicCache = parsed.data;
+  return publicCache;
 }
 
-/**
- * Log environment configuration status
- * Safe to call - only logs public variables (non-secrets)
- */
-export function logEnvironmentStatus() {
-  const config = {
-    'Supabase URL': process.env.NEXT_PUBLIC_SUPABASE_URL ? '✓ Configured' : '❌ Missing',
-    'Supabase Anon Key': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✓ Configured' : '❌ Missing',
-    'Groq API Key': process.env.GROQ_API_KEY ? '✓ Configured' : '❌ Missing',
-    'App URL': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-    'App Name': process.env.NEXT_PUBLIC_APP_NAME || 'ForgeGuard AI',
-    'Node Environment': process.env.NODE_ENV,
-  };
+export const publicEnv = new Proxy({} as z.infer<typeof PublicEnvSchema>, {
+  get(_t, prop: string) {
+    return assertPublicEnv()[prop as keyof z.infer<typeof PublicEnvSchema>];
+  },
+});
 
-  console.log('\n📊 ForgeGuard AI Configuration Status:');
-  Object.entries(config).forEach(([key, value]) => {
-    console.log(`  ${key}: ${value}`);
+// ---- Server-only env (NEVER import from a client component) ---------------
+const ServerEnvSchema = z.object({
+  GROQ_API_KEY: z.string().min(10),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+  ADMIN_EMAIL: z.string().email().optional(),
+});
+
+let serverCache: z.infer<typeof ServerEnvSchema> | null = null;
+
+export function getServerEnv(): z.infer<typeof ServerEnvSchema> {
+  if (typeof window !== "undefined") {
+    throw new Error(
+      "[forgeguard:env] getServerEnv() called from the browser. This is a security bug. " +
+        "Only import this helper from server components, route handlers, or server actions.",
+    );
+  }
+  if (serverCache) return serverCache;
+  const parsed = ServerEnvSchema.safeParse({
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
   });
-  console.log('');
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => `  · ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(`[forgeguard:env] Server environment is invalid:\n${issues}`);
+  }
+  serverCache = parsed.data;
+  return serverCache;
 }

@@ -82,7 +82,7 @@ function analyzePrompt(prompt: string): {
   ];
 
   let threatScore = 0;
-  let detectedPatterns: string[] = [];
+  const detectedPatterns: string[] = [];
 
   injectionPatterns.forEach((pattern) => {
     if (lowerPrompt.includes(pattern)) {

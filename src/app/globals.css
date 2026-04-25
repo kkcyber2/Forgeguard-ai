@@ -2,11 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+/* ==========================================================================
+   ForgeGuard AI — Global Styles
+   Strict monochrome base. No rounded bubbly surfaces, no gradient confetti.
+   ========================================================================== */
 
 @layer base {
+  :root {
+    color-scheme: dark;
+  }
+
   * {
-    @apply box-border m-0 p-0;
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01", "ss02", "ss03";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   html {
@@ -14,154 +30,167 @@
   }
 
   body {
-    @apply font-sans bg-background text-foreground leading-relaxed overflow-x-hidden;
+    min-height: 100vh;
+    background-color: #050505;
+    /* Hairline grid bed — draws from tailwind.config bg tokens so it stays in sync. */
+    background-image:
+      radial-gradient(ellipse 60% 40% at 50% -10%, rgba(209, 255, 0, 0.035), transparent 70%),
+      linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+    background-attachment: fixed;
+    overflow-x: hidden;
   }
 
+  /* Typography defaults */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-semibold leading-tight;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+
+  code, pre, kbd {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+  }
+
+  /* Selection — acid, reserved */
+  ::selection {
+    background: rgba(209, 255, 0, 0.25);
+    color: #ECEDF0;
+  }
+
+  /* Scrollbars — dark, hairline */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #050505;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1C1D21;
+    border: 2px solid #050505;
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #35363C;
+  }
+
+  /* Focus rings — acid hairline, never blue */
+  :focus-visible {
+    outline: 1px solid rgba(209, 255, 0, 0.6);
+    outline-offset: 2px;
+  }
+
+  /* Kill bubbly autofill */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #0A0A0B inset;
+    -webkit-text-fill-color: #ECEDF0;
+    caret-color: #ECEDF0;
   }
 }
 
 @layer components {
-  /* Glass morphism */
+  /* Noise overlay — used by marketing shells */
+  .noise {
+    position: relative;
+    isolation: isolate;
+  }
+  .noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* Monochrome glass panel — hairline border, faint inner light, no heavy blur */
   .glass {
-    @apply bg-card/80 backdrop-blur-xl border border-border;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)) padding-box,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)) border-box;
+    border: 0.5px solid transparent;
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
   }
 
-  .glass-light {
-    @apply bg-white/5 backdrop-blur-xl border border-border;
+  /* Hairline divider */
+  .divider-x {
+    height: 0.5px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      transparent 100%
+    );
   }
 
-  /* Section spacing */
-  .section {
-    @apply py-20 px-4 md:py-24 md:px-8 lg:py-32 lg:px-16;
+  /* Caret blink for terminal demo */
+  .caret-blink::after {
+    content: "▋";
+    color: #D1FF00;
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink {
+    50% { opacity: 0; }
   }
 
-  /* Container */
-  .container-custom {
-    @apply max-w-7xl mx-auto w-full;
+  /* Scan-line overlay */
+  .scanlines {
+    position: relative;
+    overflow: hidden;
+  }
+  .scanlines::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02) 0px,
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index: 1;
   }
 
-  /* Button styles */
-  .btn-primary {
-    @apply bg-gradient-to-r from-cyan to-cyan/80 text-background font-semibold px-6 py-3 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(0,240,255,0.4)];
-  }
-
-  .btn-outline {
-    @apply bg-transparent text-cyan font-semibold px-6 py-3 rounded-lg border border-cyan transition-all hover:bg-cyan hover:text-background hover:shadow-[0_0_20px_rgba(0,240,255,0.4)];
-  }
-
-  .btn-danger {
-    @apply bg-gradient-to-r from-red to-red/80 text-white font-semibold px-6 py-3 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(255,0,51,0.4)];
-  }
-
-  /* Card styles */
-  .card {
-    @apply bg-card border border-border rounded-xl p-6 transition-all hover:border-border-hover hover:bg-card-hover;
-  }
-
-  /* Input styles */
-  .input {
-    @apply bg-gray-900 border border-border rounded-lg px-4 py-3 text-foreground transition-all focus:outline-none focus:border-cyan focus:shadow-[0_0_10px_rgba(0,240,255,0.3)] w-full;
-  }
-
-  .input::placeholder {
-    @apply text-gray-500;
+  /* Marquee track */
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee 38s linear infinite;
   }
 }
 
 @layer utilities {
-  /* Neon glow effects */
-  .glow-cyan {
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.5),
-                0 0 20px rgba(0, 240, 255, 0.5),
-                0 0 40px rgba(0, 240, 255, 0.5);
+  .text-balance {
+    text-wrap: balance;
   }
-
-  .glow-red {
-    box-shadow: 0 0 10px rgba(255, 0, 51, 0.5),
-                0 0 20px rgba(255, 0, 51, 0.5),
-                0 0 40px rgba(255, 0, 51, 0.5);
+  .text-pretty {
+    text-wrap: pretty;
   }
-
-  .text-glow-cyan {
-    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5),
-                 0 0 20px rgba(0, 240, 255, 0.5);
-  }
-
-  .text-glow-red {
-    text-shadow: 0 0 10px rgba(255, 0, 51, 0.5),
-                 0 0 20px rgba(255, 0, 51, 0.5);
-  }
-
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-gradient-to-r from-cyan to-red bg-clip-text text-transparent;
-  }
-
-  /* Neural network background pattern */
-  .neural-bg {
-    background-image: 
-      radial-gradient(circle at 20% 80%, rgba(0, 240, 255, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(255, 0, 51, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(0, 240, 255, 0.02) 0%, transparent 30%);
-  }
-
-  /* Grid pattern */
-  .grid-pattern {
-    background-image: 
-      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
-  }
-
-  /* Hide scrollbar */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  /* Line clamp */
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* Responsive typography */
-  .text-hero {
-    font-size: clamp(2.5rem, 8vw, 5rem);
-  }
-
-  .text-section {
-    font-size: clamp(2rem, 5vw, 3.5rem);
+  /* Hairline border, cross-browser */
+  .border-hairline {
+    border-width: 0.5px;
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-gray-900;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-700 rounded;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-600;
-}
-
-/* Selection */
-::selection {
-  @apply bg-cyan text-background;
+/* Reduced motion — respect user system preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

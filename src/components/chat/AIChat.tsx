@@ -1,5 +1,5 @@
 // =====================================================
-// AI Chat Assistant Component
+// AI Chat Assistant Component with Real API
 // =====================================================
 
 'use client';
@@ -9,121 +9,88 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, X, Send, Bot, User, Sparkles } from 'lucide-react';
 import { useChatStore } from '@/lib/store';
 
-// Pre-defined responses for demo (in production, this would use Vercel AI SDK + Groq)
-const knowledgeBase = {
-  greetings: [
-    "Hello! I'm ForgeGuard AI's virtual assistant. How can I help you with AI security today?",
-    'Hi there! Ready to discuss securing your AI systems?',
-    'Welcome! Ask me anything about AI red teaming and security.',
-  ],
-  services: {
-    'red teaming':
-      'Our AI Red Teaming service starts at $1,500 and includes comprehensive prompt injection testing, jailbreak attempts, data extraction tests, and a detailed security report. The typical duration is 1-2 weeks.',
-    'llm security audit':
-      'We conduct thorough LLM security audits to identify vulnerabilities in your AI systems. This includes testing for adversarial inputs, safety filter bypasses, and more.',
-    'secure agents':
-      'Our Secure AI Agents service builds production-ready AI automation with security-first architecture. Starting at $2,500 with 2-4 weeks delivery time.',
-    'ml model hardening':
-      'We help secure your ML deployments with adversarial training, model encryption, and secure API deployment. Starting at $3,000.',
-    'prompt engineering':
-      'Expert prompt engineering that balances capability with security. We design prompt systems that deliver excellent results while minimizing injection risks. Starting at $800.',
-    consultation:
-      'I offer one-on-one consultation on AI security strategy, architecture review, and best practices at $200/hour.',
-  },
-  pricing:
-    'Our services start at $800 for prompt engineering, $1,500 for red teaming, $2,500 for secure agents, and $3,000 for ML model hardening. Consultation is $200/hour.',
-  contact:
-    'You can reach Konain at konain@forgeguard.ai or through the contact form on this website. Response time is typically within 24 hours.',
-  location:
-    "ForgeGuard AI is based in Karachi, Pakistan, but we work with clients worldwide. All services are available remotely.",
-  experience:
-    'Konain Sultan Khan is a 17-year-old self-taught AI security specialist with expertise in red teaming, Kali Linux, and modern AI/ML frameworks. He has completed Harvard CS50 and has conducted 50+ security audits.',
-  projects:
-    'Check out our featured projects: PromptGuard (injection detector), RedTeamLLM (automated testing framework), and SecureAgent (hardened AI assistant). All are available on GitHub.',
-  default:
-    "I understand you're interested in AI security. Could you provide more details about what you're looking for? I can help with red teaming, security audits, secure AI development, or general consultation.",
-};
-
-function generateResponse(input: string): string {
-  const lowerInput = input.toLowerCase();
-
-  // Check for greetings
-  if (/^(hi|hello|hey|greetings)/i.test(lowerInput)) {
-    return knowledgeBase.greetings[
-      Math.floor(Math.random() * knowledgeBase.greetings.length)
-    ];
-  }
-
-  // Check for service inquiries
-  for (const [key, response] of Object.entries(knowledgeBase.services)) {
-    if (lowerInput.includes(key)) {
-      return response;
-    }
-  }
-
-  // Check for pricing
-  if (lowerInput.includes('price') || lowerInput.includes('cost') || lowerInput.includes('how much')) {
-    return knowledgeBase.pricing;
-  }
-
-  // Check for contact
-  if (lowerInput.includes('contact') || lowerInput.includes('email') || lowerInput.includes('reach')) {
-    return knowledgeBase.contact;
-  }
-
-  // Check for location
-  if (lowerInput.includes('location') || lowerInput.includes('where') || lowerInput.includes('based')) {
-    return knowledgeBase.location;
-  }
-
-  // Check for experience/about
-  if (lowerInput.includes('experience') || lowerInput.includes('who') || lowerInput.includes('about') || lowerInput.includes('background')) {
-    return knowledgeBase.experience;
-  }
-
-  // Check for projects
-  if (lowerInput.includes('project') || lowerInput.includes('portfolio') || lowerInput.includes('github')) {
-    return knowledgeBase.projects;
-  }
-
-  return knowledgeBase.default;
-}
-
 export default function AIChat() {
   const { isOpen, messages, toggleChat, addMessage, setTyping } = useChatStore();
   const [input, setInput] = useState('');
+  const [isStreamingReady, setIsStreamingReady] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !isStreamingReady) return;
 
-    // Add user message
+    const userMessage = input.trim();
     addMessage({
       id: Date.now().toString(),
       role: 'user',
-      content: input,
+      content: userMessage,
       created_at: new Date().toISOString(),
     });
 
     setInput('');
     setTyping(true);
+    setIsStreamingReady(false);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const response = generateResponse(input);
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            ...messages.filter(m => m.role !== 'system'),
+            { role: 'user', content: userMessage }
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Chat service unavailable');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Failed to initialize streaming');
+
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      const assistantMsgId = (Date.now() + 1).toString();
+      addMessage({
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        created_at: new Date().toISOString(),
+      });
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        fullResponse += chunk;
+
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage?.id === assistantMsgId) {
+          lastMessage.content = fullResponse;
+        }
+      }
+
+      setTyping(false);
+    } catch (error) {
+      console.error('Chat error:', error);
       addMessage({
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: 'Sorry, I encountered an error. Please try again.',
         created_at: new Date().toISOString(),
       });
       setTyping(false);
-    }, 1000 + Math.random() * 1000);
+    } finally {
+      setIsStreamingReady(true);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -142,7 +109,7 @@ export default function AIChat() {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
         onClick={toggleChat}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-cyan to-blue-500 flex items-center justify-center shadow-lg shadow-cyan/30 hover:shadow-cyan/50 transition-shadow"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gray-900 hover:bg-gray-800 flex items-center justify-center shadow-lg transition-colors"
       >
         <AnimatePresence mode="wait">
           {isOpen ? (
@@ -152,7 +119,7 @@ export default function AIChat() {
               animate={{ rotate: 0, opacity: 1 }}
               exit={{ rotate: 90, opacity: 0 }}
             >
-              <X className="w-6 h-6 text-background" />
+              <X className="w-6 h-6 text-white" />
             </motion.div>
           ) : (
             <motion.div
@@ -162,8 +129,8 @@ export default function AIChat() {
               exit={{ rotate: -90, opacity: 0 }}
               className="relative"
             >
-              <MessageSquare className="w-6 h-6 text-background" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red animate-pulse" />
+              <MessageSquare className="w-6 h-6 text-white" />
+              <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 animate-pulse" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -179,34 +146,33 @@ export default function AIChat() {
             transition={{ duration: 0.2 }}
             className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-3rem)]"
           >
-            <div className="glass rounded-2xl overflow-hidden shadow-2xl border border-cyan/20">
+            <div className="rounded-2xl overflow-hidden shadow-2xl border border-gray-200 bg-white">
               {/* Header */}
-              <div className="bg-gradient-to-r from-cyan/20 to-blue-500/20 p-4 flex items-center justify-between">
+              <div className="bg-gray-900 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-cyan/20 flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-cyan" />
+                  <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">ForgeGuard AI</h4>
+                    <h4 className="font-semibold text-white">ForgeGuard AI</h4>
                     <p className="text-xs text-gray-400">AI Security Assistant</p>
                   </div>
                 </div>
                 <button
                   onClick={toggleChat}
-                  className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  className="p-2 rounded-lg hover:bg-gray-800 transition-colors"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4 text-white" />
                 </button>
               </div>
 
               {/* Messages */}
-              <div className="h-80 overflow-auto p-4 space-y-4">
+              <div className="h-80 overflow-auto p-4 space-y-4 bg-white">
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center">
                     <Bot className="w-12 h-12 mb-3 opacity-50" />
                     <p className="text-sm">
-                      Ask me about AI security services, pricing, or how I can help
-                      secure your AI systems.
+                      Ask me about AI security, red teaming, secure AI deployment, or our services.
                     </p>
                   </div>
                 )}
@@ -223,21 +189,21 @@ export default function AIChat() {
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                         message.role === 'user'
-                          ? 'bg-cyan/20'
-                          : 'bg-gradient-to-r from-cyan to-blue-500'
+                          ? 'bg-gray-900'
+                          : 'bg-gray-900'
                       }`}
                     >
                       {message.role === 'user' ? (
-                        <User className="w-4 h-4 text-cyan" />
+                        <User className="w-4 h-4 text-white" />
                       ) : (
-                        <Sparkles className="w-4 h-4 text-background" />
+                        <Sparkles className="w-4 h-4 text-white" />
                       )}
                     </div>
                     <div
                       className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
                         message.role === 'user'
-                          ? 'bg-cyan text-background'
-                          : 'bg-white/5'
+                          ? 'bg-gray-900 text-white'
+                          : 'bg-gray-100 text-gray-900'
                       }`}
                     >
                       {message.content}
@@ -251,10 +217,10 @@ export default function AIChat() {
                     animate={{ opacity: 1 }}
                     className="flex gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan to-blue-500 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-background" />
+                    <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-white" />
                     </div>
-                    <div className="bg-white/5 rounded-2xl px-4 py-3">
+                    <div className="bg-gray-100 rounded-2xl px-4 py-3">
                       <div className="flex gap-1">
                         <motion.div
                           animate={{ y: [0, -4, 0] }}
@@ -280,7 +246,7 @@ export default function AIChat() {
               </div>
 
               {/* Input */}
-              <div className="p-4 border-t border-border">
+              <div className="p-4 border-t border-gray-200 bg-white">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -288,12 +254,13 @@ export default function AIChat() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Type your message..."
-                    className="flex-1 bg-gray-900 border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-cyan transition-colors"
+                    disabled={!isStreamingReady}
+                    className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-gray-900 focus:bg-white transition-colors disabled:opacity-50"
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!input.trim()}
-                    className="px-4 py-2 rounded-xl bg-cyan text-background hover:bg-cyan/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!input.trim() || !isStreamingReady}
+                    className="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-4 h-4" />
                   </button>

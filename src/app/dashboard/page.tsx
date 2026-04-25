@@ -1,434 +1,306 @@
-// =====================================================
-// Dashboard Overview Page
-// =====================================================
-
-'use client';
-
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import * as React from "react";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Activity, Plus, Radar, ShieldCheck, Terminal } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/shell";
+import { SectionCard, SectionLink } from "@/components/dashboard/section-card";
+import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
+import { ScanCard } from "@/components/dashboard/scan-card";
+import { RedTeamFeed, type RedTeamLog } from "@/components/dashboard/red-team-feed";
+import { Sparkline } from "@/components/dashboard/sparkline";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import { StatTile } from "@/components/ui/stat-tile";
+import { buttonStyles } from "@/components/ui/button";
+import { scansTableToCards } from "@/lib/scans/adapt";
 import {
-  FolderKanban,
-  MessageSquare,
-  TrendingUp,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  ArrowRight,
-  Plus,
-  FileText,
-  Users,
-  BarChart3,
-  Activity,
-} from 'lucide-react';
-import { useProjects } from '@/hooks/useProjects';
-import { useMessages } from '@/hooks/useMessages';
-import { useAuth } from '@/hooks/useAuth';
-import { useSubmissions } from '@/hooks/useSubmissions';
-import { getProjectStatusDisplay, getStatusColor } from '@/lib/utils';
+  createServerSupabase,
+  getCurrentProfile,
+  getSessionUser,
+} from "@/lib/supabase/server";
+import type { Database } from "@/types/supabase";
 
-type DashboardStatCard = {
-  label: string;
-  icon: typeof FileText;
-  color: 'cyan' | 'purple' | 'orange' | 'green';
-  getValue: (...args: any[]) => number;
-};
+/**
+ * /dashboard — User Overview.
+ * ---------------------------
+ * Server component. All data is RLS-scoped to the current user via the
+ * request-scoped Supabase client. There are no demo seeds: if the
+ * tables are empty for this user, the UI honestly shows zeros and an
+ * "no scans yet" prompt.
+ */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const adminStatsCards: DashboardStatCard[] = [
-  {
-    label: 'Total Submissions',
-    icon: FileText,
-    color: 'cyan',
-    getValue: (submissions: any[]) => submissions.length,
-  },
-  {
-    label: 'Pending Reviews',
-    icon: Clock,
-    color: 'orange',
-    getValue: (submissions: any[]) =>
-      submissions.filter((s: any) => s.status === 'pending').length,
-  },
-  {
-    label: 'Active Projects',
-    icon: FolderKanban,
-    color: 'purple',
-    getValue: (_: any[], projects: any[]) =>
-      projects.filter((p: any) => p.status === 'in_progress').length,
-  },
-  {
-    label: 'Completed Projects',
-    icon: CheckCircle,
-    color: 'green',
-    getValue: (_: any[], projects: any[]) =>
-      projects.filter((p: any) => p.status === 'completed').length,
-  },
-];
+export default async function UserDashboardPage() {
+  const user = await getSessionUser();
+  if (!user) redirect("/auth/login?next=/dashboard");
 
-const clientStatsCards = [
-  {
-    label: 'My Projects',
-    icon: FolderKanban,
-    color: 'cyan',
-    getValue: (projects: any[]) => projects.length,
-  },
-  {
-    label: 'Active Projects',
-    icon: Activity,
-    color: 'purple',
-    getValue: (projects: any[]) =>
-      projects.filter((p: any) => p.status === 'in_progress').length,
-  },
-  {
-    label: 'Unread Messages',
-    icon: MessageSquare,
-    color: 'orange',
-    getValue: (_: any[], unreadCount: number) => unreadCount,
-  },
-  {
-    label: 'Completed',
-    icon: CheckCircle,
-    color: 'green',
-    getValue: (projects: any[]) =>
-      projects.filter((p: any) => p.status === 'completed').length,
-  },
-];
+  const profile = await getCurrentProfile();
+  const supabase = await createServerSupabase();
 
-const colorClasses: Record<string, { bg: string; text: string }> = {
-  cyan: { bg: 'bg-cyan/10', text: 'text-cyan' },
-  purple: { bg: 'bg-purple-500/10', text: 'text-purple-500' },
-  orange: { bg: 'bg-orange-500/10', text: 'text-orange-500' },
-  green: { bg: 'bg-green-500/10', text: 'text-green-500' },
-};
+  // -- Scans --------------------------------------------------------------
+  const { data: scanRows, error: scanErr } = await supabase
+    .from("scans")
+    .select(
+      "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(8) as { data: Database["public"]["Tables"]["scans"]["Row"][] | null, error: any };
+  if (scanErr) console.error("[dashboard] scans:", scanErr.message);
 
-export default function DashboardPage() {
-  const { user } = useAuth();
-  const { projects, isLoading: projectsLoading } = useProjects();
-  const { unreadCount, isLoading: messagesLoading } = useMessages();
-  const { submissions, isLoading: submissionsLoading } = useSubmissions();
-  const [mounted, setMounted] = useState(false);
+  const scans = scansTableToCards(scanRows ?? []);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // -- Live log slice -----------------------------------------------------
+  // Pull the most recent 24h of log lines across all of this user's
+  // scans. RLS on `scan_logs` (USING scan_id IN (SELECT id FROM scans
+  // WHERE user_id = auth.uid())) keeps it scoped automatically.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data: rawLogs, error: logErr } = await supabase
+    .from("scan_logs")
+    .select("id, scan_id, type, severity, attack_name, payload, created_at")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(50) as { data: Database["public"]["Tables"]["scan_logs"]["Row"][] | null, error: any };
+  if (logErr) console.error("[dashboard] scan_logs:", logErr.message);
 
-  if (!mounted || !user) {
+  const logs: RedTeamLog[] = (rawLogs ?? [])
+    .map(toRedTeamLog)
+    .filter((l): l is RedTeamLog => l !== null);
+
+  // -- KPIs derived from real rows ---------------------------------------
+  const activeCount = (scanRows ?? []).filter(
+    (s) => s.status === "queued" || s.status === "probing",
+  ).length;
+  const blockedCount = (rawLogs ?? []).filter(
+    (l) => l.type === "attempt" || (l.type === "audit" && l.severity === "info"),
+  ).length;
+  const breachCount = (rawLogs ?? []).filter(
+    (l) => l.type === "finding" && (l.severity === "high" || l.severity === "critical"),
+  ).length;
+  const totalFindings = (scanRows ?? []).reduce(
+    (acc, s) => acc + (s.finding_count ?? 0),
+    0,
+  );
+  const sealed = (scanRows ?? []).filter((s) => s.status === "sealed").length;
+  const coveragePct =
+    (scanRows?.length ?? 0) === 0
+      ? "—"
+      : `${Math.round((sealed / (scanRows?.length ?? 1)) * 100)}%`;
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="Operator"
+        title={greeting(profile?.full_name ?? user.email ?? "Operator")}
+        description="Live posture across your AI surfaces. Probes run server-side and only RLS-scoped rows reach this view."
+        actions={
+          <>
+            <Link
+              href="/dashboard/scans"
+              className={buttonStyles({ variant: "secondary", size: "sm" })}
+            >
+              <Terminal size={14} strokeWidth={1.5} />
+              Scan history
+            </Link>
+            <Link
+              href="/dashboard/scans/new"
+              className={buttonStyles({ variant: "primary", size: "sm" })}
+            >
+              <Plus size={14} strokeWidth={1.5} />
+              New scan
+            </Link>
+          </>
+        }
+      />
+
+      {/* KPI strip */}
+      <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StaggerItem>
+          <StatTile
+            label="Active scans"
+            value={activeCount}
+            tone="neutral"
+            icon={Radar}
+            footer={
+              <Sparkline
+                data={lastSevenDayCounts(scanRows ?? [], (r) =>
+                  Boolean(r.created_at),
+                )}
+                stroke="muted"
+              />
+            }
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile
+            label="Probes / 24h"
+            value={blockedCount}
+            tone="secure"
+            icon={ShieldCheck}
+            footer={
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
+                {(rawLogs ?? []).length} log lines
+              </span>
+            }
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile
+            label="High-sev findings"
+            value={breachCount}
+            tone="threat"
+            icon={Activity}
+            footer={
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
+                {totalFindings} total
+              </span>
+            }
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile
+            label="Sealed coverage"
+            value={coveragePct}
+            tone={sealed > 0 ? "secure" : "neutral"}
+            footer={
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
+                {sealed} of {(scanRows ?? []).length} scans
+              </span>
+            }
+          />
+        </StaggerItem>
+      </Stagger>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-5">
+        <SectionCard
+          className="lg:col-span-3"
+          eyebrow="Live"
+          title="Active scans"
+          description="Probes currently in flight against your registered surfaces."
+          action={<SectionLink href="/dashboard/scans">All scans</SectionLink>}
+        >
+          {scans.length === 0 ? (
+            <EmptyState
+              icon={Radar}
+              title="No scans found"
+              description="Start your first audit. Paste a target endpoint + API key and ForgeGuard begins probing immediately."
+              action={
+                <Link
+                  href="/dashboard/scans/new"
+                  className={buttonStyles({ variant: "primary", size: "sm" })}
+                >
+                  <Plus size={14} strokeWidth={1.5} />
+                  Start your first audit
+                </Link>
+              }
+            />
+          ) : (
+            <Stagger className="grid gap-3 md:grid-cols-2">
+              {scans.map((s) => (
+                <StaggerItem key={s.id}>
+                  <ScanCard scan={s} />
+                </StaggerItem>
+              ))}
+            </Stagger>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          className="lg:col-span-2"
+          eyebrow="Stream"
+          title="Red teaming logs"
+          description="Probe-by-probe outcomes from your live sandbox runs."
+          action={<SectionLink href="/dashboard/scans">Open log</SectionLink>}
+          density="flush"
+        >
+          {logs.length === 0 ? (
+            <EmptyState
+              icon={Activity}
+              title="Log feed is silent"
+              description="Probe outcomes will appear here once your first scan starts emitting findings."
+            />
+          ) : (
+            <RedTeamFeed seed={logs.slice(0, 8)} />
+          )}
+        </SectionCard>
+      </div>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function greeting(name: string): string {
+  const first = name.split(/[\s@]/)[0] ?? "Operator";
+  const cap = first.charAt(0).toUpperCase() + first.slice(1);
+  const h = new Date().getHours();
+  const tod =
+    h < 5 ? "Late shift" : h < 12 ? "Morning" : h < 17 ? "Afternoon" : "Evening";
+  return `${tod}, ${cap}.`;
+}
+
+/** Bucket a list of rows into the last 7 days for sparkline rendering. */
+function lastSevenDayCounts<T extends { created_at: string }>(
+  rows: T[],
+  predicate: (r: T) => boolean,
+): number[] {
+  const buckets = new Array(7).fill(0) as number[];
+  const now = new Date();
+  for (const r of rows) {
+    if (!predicate(r)) continue;
+    const days = Math.floor(
+      (now.getTime() - new Date(r.created_at).getTime()) / (24 * 60 * 60 * 1000),
+    );
+    if (days >= 0 && days < 7) buckets[6 - days] += 1;
+  }
+  return buckets;
+}
+
+/** Map a `scan_logs` row → the RedTeamFeed shape. */
+function toRedTeamLog(row: {
+  id: number;
+  scan_id: string;
+  type: "progress" | "finding" | "attempt" | "audit" | "error" | "info";
+  severity: "info" | "low" | "medium" | "high" | "critical";
+  attack_name: string | null;
+  payload: unknown;
+  created_at: string;
+}): RedTeamLog | null {
+  if (row.type !== "finding" && row.type !== "attempt" && row.type !== "audit") {
     return null;
   }
 
-  const isAdmin = user.role === 'admin';
-  const statsCards = isAdmin ? adminStatsCards : clientStatsCards;
-  const recentProjects = projects.slice(0, 5);
-  const recentSubmissions = submissions.slice(0, 5);
+  const outcome: RedTeamLog["outcome"] =
+    row.type === "finding" && (row.severity === "high" || row.severity === "critical")
+      ? "leaked"
+      : row.type === "audit"
+      ? "audit"
+      : "blocked";
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">
-            {isAdmin ? 'Admin Dashboard' : 'Client Dashboard'}
-          </h1>
-          <p className="text-gray-400">
-            {isAdmin
-              ? 'Manage submissions, projects, and client communications'
-              : 'Welcome back! Here\'s your project overview.'
-            }
-          </p>
-        </div>
-        {!isAdmin && (
-          <Link
-            href="/dashboard/submit"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan text-background font-semibold text-sm hover:bg-cyan/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Submit Project
-          </Link>
-        )}
-      </div>
+  return {
+    id: String(row.id),
+    at: row.created_at,
+    technique: row.attack_name ?? row.type,
+    payload: summarisePayload(row.payload),
+    outcome,
+    severity: row.severity,
+    scanId: row.scan_id,
+  };
+}
 
-      {/* Stats Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsCards.map((stat, index) => {
-          const colors = colorClasses[stat.color];
-          const value = isAdmin
-            ? (stat as typeof adminStatsCards[number]).getValue(submissions, projects)
-            : (stat as typeof clientStatsCards[number]).getValue(projects, unreadCount);
-
-          return (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
-              className="glass rounded-xl p-6"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-gray-400 text-sm mb-1">{stat.label}</p>
-                  <p className="text-3xl font-bold">
-                    {isAdmin && stat.label.includes('Submission')
-                      ? (submissionsLoading ? '-' : value)
-                      : projectsLoading && stat.label.includes('Project')
-                      ? '-'
-                      : messagesLoading && stat.label.includes('Message')
-                      ? '-'
-                      : value}
-                  </p>
-                </div>
-                <div className={`w-10 h-10 rounded-xl ${colors.bg} flex items-center justify-center`}>
-                  <stat.icon className={`w-5 h-5 ${colors.text}`} />
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Admin: Recent Submissions */}
-        {isAdmin ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.4 }}
-            className="glass rounded-2xl p-6"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">Recent Submissions</h2>
-              <Link
-                href="/dashboard/submissions"
-                className="text-sm text-cyan hover:underline flex items-center gap-1"
-              >
-                View All
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            {submissionsLoading ? (
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-16 bg-white/5 rounded-xl animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : recentSubmissions.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No submissions yet</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentSubmissions.map((submission) => (
-                  <div
-                    key={submission.id}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-white/5"
-                  >
-                    <div
-                      className="w-2 h-12 rounded-full"
-                      style={{
-                        backgroundColor:
-                          submission.status === 'pending' ? '#f59e0b' :
-                          submission.status === 'in_progress' ? '#06b6d4' :
-                          submission.status === 'completed' ? '#10b981' : '#ef4444',
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate capitalize">
-                        {submission.service_type.replace('_', ' ')}
-                      </h3>
-                      <div className="flex items-center gap-3 text-sm text-gray-400">
-                        <span>{submission.client?.full_name || 'Unknown Client'}</span>
-                        <span>•</span>
-                        <span className="capitalize">{submission.status.replace('_', ' ')}</span>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-500" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        ) : (
-          /* Client: Recent Projects */
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.4 }}
-            className="glass rounded-2xl p-6"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">My Projects</h2>
-              <Link
-                href="/dashboard/projects"
-                className="text-sm text-cyan hover:underline flex items-center gap-1"
-              >
-                View All
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            {projectsLoading ? (
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-16 bg-white/5 rounded-xl animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : recentProjects.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <FolderKanban className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No projects yet</p>
-                <Link
-                  href="/dashboard/submit"
-                  className="text-cyan hover:underline text-sm"
-                >
-                  Submit your first project
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentProjects.map((project) => (
-                  <Link
-                    key={project.id}
-                    href={`/dashboard/projects/${project.id}`}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-                  >
-                    <div
-                      className="w-2 h-12 rounded-full"
-                      style={{
-                        backgroundColor: getStatusColor(project.status),
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate">{project.title}</h3>
-                      <div className="flex items-center gap-3 text-sm text-gray-400">
-                        <span>{getProjectStatusDisplay(project.status)}</span>
-                        <span>•</span>
-                        <span>{project.progress}% complete</span>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-500" />
-                  </Link>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Admin: Admin Actions */}
-        {isAdmin ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.5 }}
-            className="space-y-6"
-          >
-            {/* Admin Actions Card */}
-            <div className="glass rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-6">Admin Actions</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Link
-                  href="/dashboard/submissions"
-                  className="flex items-center gap-3 p-4 rounded-xl bg-cyan/10 hover:bg-cyan/20 transition-colors"
-                >
-                  <FileText className="w-5 h-5 text-cyan" />
-                  <div>
-                    <p className="font-medium">Review Submissions</p>
-                    <p className="text-sm text-gray-400">Approve or reject requests</p>
-                  </div>
-                </Link>
-                <Link
-                  href="/dashboard/messages"
-                  className="flex items-center gap-3 p-4 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 transition-colors"
-                >
-                  <MessageSquare className="w-5 h-5 text-purple-500" />
-                  <div>
-                    <p className="font-medium">Client Messages</p>
-                    <p className="text-sm text-gray-400">Respond to inquiries</p>
-                  </div>
-                </Link>
-              </div>
-            </div>
-
-            {/* Submission Status Overview */}
-            <div className="glass rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-6">Submission Status</h2>
-              <div className="space-y-4">
-                {[
-                  { label: 'Pending Review', count: submissions.filter((s) => s.status === 'pending').length, color: 'bg-yellow-500' },
-                  { label: 'In Progress', count: submissions.filter((s) => s.status === 'in_progress').length, color: 'bg-cyan' },
-                  { label: 'Completed', count: submissions.filter((s) => s.status === 'completed').length, color: 'bg-green-500' },
-                  { label: 'Rejected', count: submissions.filter((s) => s.status === 'rejected').length, color: 'bg-red-500' },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center gap-4">
-                    <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                    <span className="flex-1">{item.label}</span>
-                    <span className="font-semibold">{item.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        ) : (
-          /* Client: Quick Actions */
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.5 }}
-            className="space-y-6"
-          >
-            {/* Quick Actions Card */}
-            <div className="glass rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-6">Quick Actions</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Link
-                  href="/dashboard/submit"
-                  className="flex items-center gap-3 p-4 rounded-xl bg-cyan/10 hover:bg-cyan/20 transition-colors"
-                >
-                  <Plus className="w-5 h-5 text-cyan" />
-                  <div>
-                    <p className="font-medium">Submit Project</p>
-                    <p className="text-sm text-gray-400">Request AI security services</p>
-                  </div>
-                </Link>
-                <Link
-                  href="/dashboard/messages"
-                  className="flex items-center gap-3 p-4 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 transition-colors"
-                >
-                  <MessageSquare className="w-5 h-5 text-purple-500" />
-                  <div>
-                    <p className="font-medium">Send Message</p>
-                    <p className="text-sm text-gray-400">Chat with Konain</p>
-                  </div>
-                </Link>
-              </div>
-            </div>
-
-            {/* Project Status Overview */}
-            <div className="glass rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-6">Project Status</h2>
-              <div className="space-y-4">
-                {[
-                  { label: 'In Progress', count: projects.filter((p) => p.status === 'in_progress').length, color: 'bg-cyan' },
-                  { label: 'Under Review', count: projects.filter((p) => p.status === 'review').length, color: 'bg-purple-500' },
-                  { label: 'Completed', count: projects.filter((p) => p.status === 'completed').length, color: 'bg-green-500' },
-                  { label: 'Pending', count: projects.filter((p) => p.status === 'pending').length, color: 'bg-yellow-500' },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center gap-4">
-                    <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                    <span className="flex-1">{item.label}</span>
-                    <span className="font-semibold">{item.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </div>
-    </div>
-  );
+function summarisePayload(p: unknown): string {
+  if (p == null) return "—";
+  if (typeof p === "string") return p;
+  if (typeof p !== "object") return String(p);
+  const r = p as Record<string, unknown>;
+  if (typeof r.message === "string") return r.message;
+  if (typeof r.summary === "string") return r.summary;
+  if (typeof r.attack === "string") return r.attack;
+  if (typeof r.probe === "string") return r.probe;
+  try {
+    return JSON.stringify(r).slice(0, 160);
+  } catch {
+    return "[unserializable]";
+  }
 }

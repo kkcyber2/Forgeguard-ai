@@ -255,7 +255,7 @@ create table if not exists public.scan_reports (
   id uuid primary key default uuid_generate_v4(),
   scan_id uuid not null unique references public.scans (id) on delete cascade,
   generated_at timestamptz not null default now(),
-  generator_model text not null default 'claude-opus-4-6',
+  generator_model text not null default 'llama-3.3-70b-versatile',
 
   -- Executive
   executive_summary_md text not null,

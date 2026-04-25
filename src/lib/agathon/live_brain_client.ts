@@ -1,6 +1,6 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
+import Groq from "groq-sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 
@@ -29,6 +29,10 @@ import type { Database } from "@/types/supabase";
  *      can run to 5–20k tokens per scan) would burn budget for no gain.
  *      `buildContextDigest()` distils that down to ~30 lines.
  *
+ * Brain runtime: Groq (OpenAI-compatible). Default model is
+ * `llama-3.3-70b-versatile`, which natively supports tool calling and
+ * has 128k context — comfortably more than we ever feed it via the digest.
+ *
  * Public surface:
  *   - buildContextDigest({scanId, supabase}) -> ContextDigest
  *       Pure read; safe to call from any server boundary that has a
@@ -36,12 +40,12 @@ import type { Database } from "@/types/supabase";
  *       their own scans anyway).
  *
  *   - streamChatTurn({digest, userMessage, history}) -> AsyncIterable<ChatChunk>
- *       Wraps the Anthropic streaming SDK. The route handler at
+ *       Wraps the Groq streaming SDK. The route handler at
  *       /api/agathon/chat just iterates and pumps SSE frames.
  *
  *   - LiveBrainConfig
- *       Centralised model/tier knobs so we can hot-swap Sonnet ↔ Haiku
- *       without grepping for model strings.
+ *       Centralised model/tier knobs so we can hot-swap models without
+ *       grepping for model strings.
  */
 
 // --------------------------------------------------------------------------- //
@@ -52,7 +56,7 @@ type ScanRow = Database["public"]["Tables"]["scans"]["Row"];
 type ScanLogRow = Database["public"]["Tables"]["scan_logs"]["Row"];
 
 export interface ContextDigest {
-  /** The compressed text fed to Claude as the system-context block. */
+  /** The compressed text fed to the model as the system-context block. */
   text: string;
   /** Number of scan_logs rows the digest is built from. */
   rowsConsidered: number;
@@ -77,7 +81,7 @@ export type ChatChunk =
   | { kind: "done"; stop_reason: string | null };
 
 export interface LiveBrainConfig {
-  /** Anthropic model id. Defaults to Sonnet for the chat surface. */
+  /** Groq (OpenAI-compatible) model id. */
   model: string;
   /** Sampling temp for the chat persona. Lower = more factual. */
   temperature: number;
@@ -88,28 +92,31 @@ export interface LiveBrainConfig {
 }
 
 export const DEFAULT_LIVE_BRAIN_CONFIG: LiveBrainConfig = {
-  model: "claude-sonnet-4-6",
+  // Free-tier Groq model with native tool-call support and 128k context.
+  // The orchestrator uses the same model — keep them in sync unless you
+  // deliberately want different posture for chat vs autonomous loop.
+  model: "llama-3.3-70b-versatile",
   temperature: 0.3,
   maxTokens: 1024,
   digestRows: 50,
 };
 
 // --------------------------------------------------------------------------- //
-// Anthropic client (lazy, server-only)                                        //
+// Groq client (lazy, server-only)                                             //
 // --------------------------------------------------------------------------- //
 
-let _anthropic: Anthropic | null = null;
-function getAnthropic(): Anthropic {
-  if (_anthropic) return _anthropic;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+let _groq: Groq | null = null;
+function getGroq(): Groq {
+  if (_groq) return _groq;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "[agathon:live-brain] ANTHROPIC_API_KEY is not set. The chat surface " +
+      "[agathon:live-brain] GROQ_API_KEY is not set. The chat surface " +
         "won't work until you add it to your Vercel environment.",
     );
   }
-  _anthropic = new Anthropic({ apiKey });
-  return _anthropic;
+  _groq = new Groq({ apiKey });
+  return _groq;
 }
 
 // --------------------------------------------------------------------------- //
@@ -309,40 +316,41 @@ export async function* streamChatTurn(
   input: StreamChatTurnInput,
 ): AsyncGenerator<ChatChunk, void, void> {
   const cfg = { ...DEFAULT_LIVE_BRAIN_CONFIG, ...(input.config ?? {}) };
-  const anthropic = getAnthropic();
+  const groq = getGroq();
 
-  const messages = [
+  // Groq is OpenAI-compatible: the system context block is just a second
+  // system message. We keep it as a separate message (rather than
+  // concatenating into one) so the persona prompt and per-scan digest stay
+  // visually distinct in transcripts.
+  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: CHAT_SYSTEM_PROMPT },
+    {
+      role: "system",
+      content: `<scan_context>\n${input.digest.text}\n</scan_context>`,
+    },
     ...(input.history ?? []).map((t) => ({
       role: t.role,
       content: t.content,
     })),
-    {
-      role: "user" as const,
-      content: input.userMessage,
-    },
+    { role: "user", content: input.userMessage },
   ];
 
-  // Composite system prompt — base persona + per-turn scan context.
-  const system = [
-    { type: "text" as const, text: CHAT_SYSTEM_PROMPT },
-    {
-      type: "text" as const,
-      text: `<scan_context>\n${input.digest.text}\n</scan_context>`,
-      // Cache the context block — it's the same across all turns in a
-      // chat session, so we save tokens after turn #1.
-      cache_control: { type: "ephemeral" as const },
-    },
-  ];
-
-  let stream: Awaited<ReturnType<typeof anthropic.messages.stream>>;
+  let stream: Awaited<ReturnType<typeof groq.chat.completions.create>>;
   try {
-    stream = anthropic.messages.stream({
-      model: cfg.model,
-      max_tokens: cfg.maxTokens,
-      temperature: cfg.temperature,
-      system,
-      messages,
-    });
+    stream = await groq.chat.completions.create(
+      {
+        model: cfg.model,
+        max_tokens: cfg.maxTokens,
+        temperature: cfg.temperature,
+        messages,
+        stream: true,
+      },
+      {
+        // Forward the abort signal so we don't keep the upstream socket
+        // open if the SSE client disconnects mid-turn.
+        signal: input.signal,
+      },
+    );
   } catch (err) {
     yield {
       kind: "error",
@@ -351,51 +359,42 @@ export async function* streamChatTurn(
     return;
   }
 
-  // Hook abort -> close stream.
-  if (input.signal) {
-    input.signal.addEventListener(
-      "abort",
-      () => {
-        try {
-          stream.controller.abort();
-        } catch {
-          /* swallow */
-        }
-      },
-      { once: true },
-    );
-  }
-
   let inputTokens = 0;
   let outputTokens = 0;
   let stopReason: string | null = null;
 
   try {
-    for await (const event of stream) {
-      switch (event.type) {
-        case "content_block_delta": {
-          if (event.delta.type === "text_delta") {
-            yield { kind: "text", delta: event.delta.text };
-          }
-          break;
+    // Groq's streaming returns AsyncIterable<ChatCompletionChunk> — each
+    // chunk has `choices[0].delta.content` (a string fragment) and on the
+    // final chunk a `finish_reason` + `x_groq.usage` block.
+    for await (const chunk of stream as AsyncIterable<{
+      choices: Array<{
+        delta: { content?: string | null };
+        finish_reason: string | null;
+      }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+      x_groq?: {
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      };
+    }>) {
+      const choice = chunk.choices?.[0];
+      const delta = choice?.delta?.content;
+      if (typeof delta === "string" && delta.length > 0) {
+        yield { kind: "text", delta };
+      }
+      if (choice?.finish_reason) {
+        stopReason = choice.finish_reason;
+      }
+      // Groq exposes usage on the terminal chunk under either `usage` or
+      // `x_groq.usage` depending on SDK version — read both, keep the latest.
+      const usage = chunk.usage ?? chunk.x_groq?.usage;
+      if (usage) {
+        if (typeof usage.prompt_tokens === "number") {
+          inputTokens = usage.prompt_tokens;
         }
-        case "message_delta": {
-          if (event.usage?.output_tokens) {
-            outputTokens = event.usage.output_tokens;
-          }
-          if (event.delta.stop_reason) {
-            stopReason = event.delta.stop_reason;
-          }
-          break;
+        if (typeof usage.completion_tokens === "number") {
+          outputTokens = usage.completion_tokens;
         }
-        case "message_start": {
-          if (event.message.usage?.input_tokens) {
-            inputTokens = event.message.usage.input_tokens;
-          }
-          break;
-        }
-        default:
-          break;
       }
     }
   } catch (err) {

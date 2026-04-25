@@ -20,9 +20,9 @@ import {
  * the client just needs to JSON.parse each `data:` line.
  *
  * Why nodejs runtime (not edge):
- *   - The Anthropic SDK + Supabase SSR client both rely on Node APIs we
+ *   - The Groq SDK + Supabase SSR client both rely on Node APIs we
  *     don't want to polyfill. Edge would be marginally faster on the
- *     first byte but we're CPU-bound on the Brain anyway.
+ *     first byte but we're network-bound on the Brain anyway.
  *
  * Auth:
  *   - We call createServerSupabase() to get the cookie-bound client. RLS

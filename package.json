@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@ai-sdk/groq": "^1.0.0",
-    "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/ssr": "^0.5.2",
+    "groq-sdk": "^1.1.0",
     "@supabase/supabase-js": "^2.45.4",
     "ai": "^4.0.0",
     "clsx": "^2.1.1",

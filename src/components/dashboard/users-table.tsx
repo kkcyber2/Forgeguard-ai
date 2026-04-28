@@ -71,7 +71,10 @@ export function UsersTable({ rows }: { rows: UserRow[] }) {
               </Badge>
             </Td>
             <Td>
-              <Badge tone={u.isVerified ? "secure" : "warn"} dot={u.isVerified}>
+              <Badge
+                tone={u.isVerified ? "secure" : "warn"}
+                dot={u.isVerified ?? false}
+              >
                 {u.isVerified ? "Verified" : "Pending"}
               </Badge>
             </Td>

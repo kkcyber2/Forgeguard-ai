@@ -32,8 +32,12 @@ const RATE_LIMITS = {
 } as const;
 
 function getClientKey(request: NextRequest, bucket: string): string {
+  // Next.js 15 dropped `NextRequest.ip` — always read from proxy headers.
+  // Vercel + most CDNs populate `x-forwarded-for` with the client IP first.
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || request.ip || "unknown";
+  const realIp = request.headers.get("x-real-ip");
+  const ip =
+    forwarded?.split(",")[0]?.trim() || realIp?.trim() || "unknown";
   // Key by bucket, not raw path — page visits and form submissions to the
   // same URL must not share a budget.
   return `${ip}:${bucket}`;

@@ -69,7 +69,11 @@ export async function updateProfile(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
-  const { error } = await supabase
+  // Cast through `any` because Supabase v2's typed `.update(...)` argument
+  // collapses to `never` under the SSR client's generic shape. Same pattern
+  // used in scans/actions.ts. Runtime is unchanged.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from("profiles")
     .update({
       full_name: parsed.data.full_name,

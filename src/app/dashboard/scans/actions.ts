@@ -83,7 +83,12 @@ export async function createScan(
     };
   }
 
-  const { data: scan, error: insErr } = await supabase
+  // Cast through `any` because the Supabase v2 typings collapse the
+  // `.insert()` argument to `never` when the cookie-bound SSR client and
+  // the bare supabase-js client expose different generic arities. Runtime
+  // is unchanged — we just lose the per-column typecheck on this one call.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: scan, error: insErr } = (await (supabase as any)
     .from("scans")
     .insert({
       user_id: user.id,
@@ -95,7 +100,10 @@ export async function createScan(
       notes: parsed.data.notes ?? null,
     })
     .select("id")
-    .single();
+    .single()) as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
 
   if (insErr || !scan) {
     console.error("[scans] insert failed:", insErr?.message);

@@ -11,10 +11,12 @@ export function cn(...inputs: ClassValue[]): string {
 /* -------------------------------------------------------------------------- */
 
 export function formatDate(
-  date: string | Date,
+  date: string | Date | null | undefined,
   options?: Intl.DateTimeFormatOptions,
 ): string {
+  if (date == null) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -23,8 +25,15 @@ export function formatDate(
   });
 }
 
-export function formatDateTime(date: string | Date): string {
+// Accept null/undefined and emit a placeholder. Supabase columns marked
+// `created_at timestamptz` are NOT NULL in the DB but the codegen still
+// types them as `string | null` because Postgres permits transient nulls
+// during INSERT…RETURNING. Centralising the null handling here keeps every
+// caller from having to gate the call.
+export function formatDateTime(date: string | Date | null | undefined): string {
+  if (date == null) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-US", {
     year: "numeric",
     month: "short",
@@ -34,8 +43,12 @@ export function formatDateTime(date: string | Date): string {
   });
 }
 
-export function formatRelativeTime(date: string | Date): string {
+export function formatRelativeTime(
+  date: string | Date | null | undefined,
+): string {
+  if (date == null) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return "—";
   const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
   if (diffSec < 60) return "just now";
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;

@@ -177,7 +177,14 @@ export default async function ScanDetailPage({ params }: PageProps) {
           <Card>
             <CardHead icon={Clock} label="Timing" />
             <dl className="space-y-1 text-xs">
-              <DefRow label="Created" value={formatRelativeTime(scan.created_at)} />
+              <DefRow
+                label="Created"
+                value={
+                  scan.created_at
+                    ? formatRelativeTime(scan.created_at)
+                    : "—"
+                }
+              />
               <DefRow
                 label="Started"
                 value={

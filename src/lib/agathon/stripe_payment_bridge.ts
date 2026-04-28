@@ -204,11 +204,14 @@ export async function ensureStripeCustomer(
 ): Promise<string> {
   const admin = asAgathonDb(createAdminSupabase());
 
-  const { data: profile, error } = await admin
+  const { data: profile, error } = (await admin
     .from("profiles")
     .select("id, stripe_customer_id")
     .eq("id", input.userId)
-    .maybeSingle();
+    .maybeSingle()) as {
+    data: { id: string; stripe_customer_id: string | null } | null;
+    error: { message: string } | null;
+  };
 
   if (error) {
     throw new Error(`[agathon:stripe] cannot read profile: ${error.message}`);
@@ -312,11 +315,14 @@ export async function createPortalSession(input: {
   returnUrl?: string;
 }): Promise<{ url: string }> {
   const admin = asAgathonDb(createAdminSupabase());
-  const { data: profile, error } = await admin
+  const { data: profile, error } = (await admin
     .from("profiles")
     .select("stripe_customer_id")
     .eq("id", input.userId)
-    .maybeSingle();
+    .maybeSingle()) as {
+    data: { stripe_customer_id: string | null } | null;
+    error: { message: string } | null;
+  };
 
   if (error || !profile?.stripe_customer_id) {
     throw new Error("[agathon:stripe] no stripe customer for this user");
@@ -369,11 +375,17 @@ export async function recordUsage(input: RecordUsageInput): Promise<void> {
   if (input.quantity <= 0) return;
 
   const admin = asAgathonDb(createAdminSupabase());
-  const { data: profile, error } = await admin
+  const { data: profile, error } = (await admin
     .from("profiles")
     .select("stripe_customer_id, current_plan")
     .eq("id", input.userId)
-    .maybeSingle();
+    .maybeSingle()) as {
+    data: {
+      stripe_customer_id: string | null;
+      current_plan: AgathonPlan | null;
+    } | null;
+    error: { message: string } | null;
+  };
   if (error || !profile?.stripe_customer_id) {
     // Free tier never has a customer; that's fine, we just no-op the
     // Stripe call. The audit row in usage_events is enough.
@@ -473,14 +485,17 @@ export async function handleStripeWebhook(args: {
       const userId = sub.metadata?.agathon_user_id ?? null;
       if (!userId) {
         // Try to back-fill via customer mapping.
-        const fromCustomer = await admin
+        const fromCustomer = (await admin
           .from("profiles")
           .select("id")
           .eq(
             "stripe_customer_id",
             typeof sub.customer === "string" ? sub.customer : sub.customer.id,
           )
-          .maybeSingle();
+          .maybeSingle()) as {
+          data: { id: string } | null;
+          error: { message: string } | null;
+        };
         if (!fromCustomer.data) {
           return { received: true, eventType: event.type };
         }
@@ -648,11 +663,18 @@ export async function userCanRunIntensity(
   intensity: AgathonIntensity,
 ): Promise<{ allowed: boolean; plan: AgathonPlan; reason?: string }> {
   const admin = asAgathonDb(createAdminSupabase());
-  const { data: profile, error } = await admin
+  const { data: profile, error } = (await admin
     .from("profiles")
     .select("current_plan, scans_used_this_period, entitlements")
     .eq("id", userId)
-    .maybeSingle();
+    .maybeSingle()) as {
+    data: {
+      current_plan: AgathonPlan | null;
+      scans_used_this_period: number | null;
+      entitlements: Record<string, unknown> | null;
+    } | null;
+    error: { message: string } | null;
+  };
   if (error || !profile) {
     return { allowed: false, plan: "free", reason: "no profile row" };
   }

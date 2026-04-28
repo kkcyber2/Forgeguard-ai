@@ -2,8 +2,7 @@ import "server-only";
 
 import Stripe from "stripe";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { asAgathonDb, type AgathonDatabase } from "@/lib/agathon/agathon-db";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { asAgathonDb } from "@/lib/agathon/agathon-db";
 // NOTE: We deliberately don't import Database here — the Agathon tables
 // (subscriptions/invoices/etc.) are added by migration 0002 and aren't in
 // the codegenned shape until you run `supabase gen types typescript`.
@@ -576,7 +575,11 @@ export async function handleStripeWebhook(args: {
 // Subscription mirror                                                         //
 // --------------------------------------------------------------------------- //
 
-type AgathonAdminClient = SupabaseClient<AgathonDatabase>;
+// Match the widened return type of `asAgathonDb` — see agathon-db.ts for
+// why this is `any`. Per-call `as { data, error }` casts give us back any
+// type safety we actually need at the destructure site.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AgathonAdminClient = any;
 
 /**
  * Refetch the subscription from Stripe and write the canonical state into

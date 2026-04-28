@@ -80,12 +80,15 @@ export default async function AdminOverviewPage() {
   const threats = rollupThreats(rawLogs ?? [], scanIndex);
 
   // -- Users panel --------------------------------------------------------
+  // Supabase returns `role` as the broader `string | null` (the column has a
+  // CHECK constraint but the codegen doesn't reflect literal-union narrowing).
+  // Coerce unknown values to null so UserRow stays strict.
   const users: UserRow[] = (profiles ?? []).map((p) => ({
     id: p.id,
     email: p.email,
     fullName: p.full_name,
     company: p.company_name,
-    role: p.role,
+    role: p.role === "admin" || p.role === "client" ? p.role : null,
     isVerified: p.is_verified,
     createdAt: p.created_at,
   }));

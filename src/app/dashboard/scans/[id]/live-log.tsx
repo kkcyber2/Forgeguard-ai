@@ -36,7 +36,13 @@ export type ScanLogEntry = {
 interface Props {
   scanId: string;
   initial: ScanLogEntry[];
-  createdAt: string;
+  /**
+   * Scan creation timestamp. Supabase types this as `string | null` even
+   * though the column is NOT NULL — accept null and fall back to "now"
+   * inside the component (only relevant for the relative-time pill on
+   * empty feeds, so the fallback is harmless).
+   */
+  createdAt: string | null;
 }
 
 const SEVERITY_TONE: Record<ScanLogEntry["severity"], string> = {
@@ -114,7 +120,7 @@ export function ScanLiveLog({ scanId, initial, createdAt }: Props) {
         </p>
         <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle">
           Channel {connected ? "live" : "connecting…"} · queued at{" "}
-          {new Date(createdAt).toLocaleTimeString()}
+          {createdAt ? new Date(createdAt).toLocaleTimeString() : "—"}
         </p>
       </div>
     );

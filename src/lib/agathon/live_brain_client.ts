@@ -130,7 +130,17 @@ function getGroq(): Groq {
 
 interface DigestInput {
   scanId: string;
-  supabase: SupabaseClient<Database>;
+  /**
+   * Accept ANY SupabaseClient typed against our Database. We deliberately
+   * leave the schema generics open because `@supabase/ssr.createServerClient`
+   * and `@supabase/supabase-js.SupabaseClient` resolve to slightly different
+   * generic arities (3 vs 4 type params depending on package version), and
+   * TypeScript can't unify them across the package boundary. This widening
+   * is type-only — runtime behaviour is identical, and every property we
+   * touch (`.from`, `.auth`) is the same on both shapes.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<Database, any, any>;
   /** Override default config (e.g. raise digestRows for an admin view). */
   config?: Partial<LiveBrainConfig>;
 }

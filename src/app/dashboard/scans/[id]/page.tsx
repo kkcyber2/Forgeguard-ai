@@ -59,13 +59,34 @@ export default async function ScanDetailPage({ params }: PageProps) {
 
   const supabase = await createServerSupabase();
 
-  const { data: scan, error: scanErr } = await supabase
+  // Cast through the structural shape we actually consume here. Supabase v2
+  // generic drift between `@supabase/ssr` and `@supabase/supabase-js` makes
+  // this read collapse to `never` at the Next.js TS boundary; the cast keeps
+  // strict-mode happy without changing any runtime behaviour.
+  type ScanStatus = keyof typeof STATUS_TONE;
+  type ScanDetailRow = {
+    id: string;
+    target_model: string;
+    target_url: string;
+    status: ScanStatus;
+    progress_pct: number | null;
+    finding_count: number | null;
+    high_severity_count: number | null;
+    notes: string | null;
+    created_at: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+  };
+  const { data: scan, error: scanErr } = (await supabase
     .from("scans")
     .select(
       "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, notes, created_at, started_at, completed_at",
     )
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle()) as {
+    data: ScanDetailRow | null;
+    error: { message: string } | null;
+  };
 
   if (scanErr) console.error("[scans/detail] fetch:", scanErr.message);
   if (!scan) notFound();

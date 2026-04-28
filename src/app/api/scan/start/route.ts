@@ -57,11 +57,17 @@ export async function POST(req: NextRequest) {
   // Confirm the scan exists and belongs to this user. RLS would block
   // foreign rows from being returned anyway, but this check turns a
   // silent "no rows" into an explicit 403/404.
-  const { data: scan, error: fetchErr } = await supabase
+  //
+  // We cast the Supabase response to a concrete row shape because
+  // `.maybeSingle()` chained off a typed `.from()` sometimes collapses to
+  // `never` at the Next.js TypeScript boundary (cross-package generic drift
+  // between @supabase/ssr and @supabase/supabase-js). Runtime is unchanged.
+  type ScanRow = { id: string; user_id: string; status: string };
+  const { data: scan, error: fetchErr } = (await supabase
     .from("scans")
     .select("id, user_id, status")
     .eq("id", payload.scan_id)
-    .maybeSingle();
+    .maybeSingle()) as { data: ScanRow | null; error: { message: string } | null };
   if (fetchErr) {
     console.error("[api/scan/start] fetch:", fetchErr.message);
     return NextResponse.json(

@@ -1,8 +1,27 @@
 import "server-only";
 
 import Groq from "groq-sdk";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
+
+/**
+ * Structural Supabase client used by buildContextDigest.
+ *
+ * We deliberately do NOT import SupabaseClient from @supabase/supabase-js
+ * here. The reason: @supabase/ssr.createServerClient and the bare
+ * @supabase/supabase-js client expose different generic arities (3 vs 4
+ * type parameters depending on package version), and TypeScript can't
+ * unify the two across the package boundary even with `any` widening.
+ *
+ * This module only ever calls `.from(table).select(...).eq(...).order(...)
+ * .limit(...).maybeSingle()`. Capture exactly that surface area as a
+ * structural type and both client shapes assign to it cleanly.
+ */
+type AnySupabaseClient = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  auth: any;
+};
 
 /**
  * Agathon — Live Brain client (Vercel side).
@@ -131,16 +150,10 @@ function getGroq(): Groq {
 interface DigestInput {
   scanId: string;
   /**
-   * Accept ANY SupabaseClient typed against our Database. We deliberately
-   * leave the schema generics open because `@supabase/ssr.createServerClient`
-   * and `@supabase/supabase-js.SupabaseClient` resolve to slightly different
-   * generic arities (3 vs 4 type params depending on package version), and
-   * TypeScript can't unify them across the package boundary. This widening
-   * is type-only — runtime behaviour is identical, and every property we
-   * touch (`.from`, `.auth`) is the same on both shapes.
+   * Any Supabase client typed against our Database — see `AnySupabaseClient`
+   * above for why we use a structural type instead of the SDK's nominal one.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<Database, any, any>;
+  supabase: AnySupabaseClient;
   /** Override default config (e.g. raise digestRows for an admin view). */
   config?: Partial<LiveBrainConfig>;
 }

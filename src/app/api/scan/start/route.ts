@@ -88,12 +88,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Fire-and-forget. The runner appends to scan_logs via the
-  // service-role client and updates `scans.status` / `progress_pct`
-  // as it goes; the dashboard's Realtime channel picks it up.
-  void runScan({ scanId: scan.id, userId: user.id }).catch((err) => {
+  // We MUST await runScan() — Vercel terminates the serverless function
+  // the instant we return a response, so any unawaited Promise (including
+  // the inner fetch to Railway) gets garbage-collected before its network
+  // request actually goes out.
+  //
+  // runScan() returns quickly (~1-2s) because the heavy lifting happens
+  // server-side on Railway: we just decrypt the credential, validate env,
+  // transition the scan to "probing", and POST to /scan/start which
+  // Railway acknowledges in <500ms before running the scan asynchronously.
+  try {
+    await runScan({ scanId: scan.id, userId: user.id });
+  } catch (err) {
     console.error("[api/scan/start] runScan rejected:", err);
-  });
+    // The runScan helper has already markFailure'd the scan row, so the
+    // user sees a "failed" status with the actual reason. We just bubble
+    // a 500 here so the Server Action knows something went wrong.
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Runner kickoff failed: ${(err as Error).message ?? "unknown"}`,
+      },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json(
     { ok: true, scan_id: scan.id, message: "Runner dispatched" },

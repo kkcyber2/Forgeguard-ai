@@ -1,31 +1,33 @@
 import "server-only";
 
-import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { openCredential } from "@/lib/crypto/credentials";
-import { runSyntheticScan } from "./synthetic";
 import type { Database } from "@/types/supabase";
 
 /**
- * Python red-team toolkit bridge.
- * --------------------------------
+ * Vercel → Railway scan dispatcher.
+ * ---------------------------------
  *
- * runScan() is invoked fire-and-forget from /api/scan/start. It:
+ * runScan() is invoked from /api/scan/start. On Vercel it CANNOT spawn
+ * Python (no interpreter) and CANNOT keep work running after the HTTP
+ * response is sent (serverless function terminates). So this version
+ * forwards the scan to the long-lived FastAPI orchestrator running on
+ * Railway, which actually executes the attacks.
  *
- *   1. Loads the scan row with the service-role client (so it sees the
- *      sealed credential and bypasses RLS for log inserts).
- *   2. Decrypts the target API key via AES-GCM.
- *   3. Decides whether to spawn the Python toolkit (preferred) or fall
- *      back to the deterministic synthetic generator (CI / dev without
- *      Python). The decision is explicit env: REDTEAM_MODE=python|synthetic.
- *   4. Streams JSONL events from the runner into `scan_logs`, while
- *      maintaining `scans.status` + `scans.progress_pct`.
+ * Flow:
+ *   1. Load the scan row with the service-role client (bypasses RLS).
+ *   2. Decrypt the target API key with our AES-GCM secret.
+ *   3. Normalize the target URL (strip `/v1/chat/completions` etc — the
+ *      OpenAI-compatible client appends its own paths).
+ *   4. POST to ${AGATHON_ORCHESTRATOR_URL}/scan/start with bearer auth.
+ *   5. The orchestrator emits to scan_logs over Postgres + WebSocket.
+ *      We just need to mark the scan as "probing" and return.
  *
- * The Python toolkit is expected to print one JSON object per line on
- * stdout. Non-JSON lines are routed to a "log" event so they're still
- * visible in the live feed for debugging.
+ * Required env vars (Vercel side):
+ *   - AGATHON_ORCHESTRATOR_URL : your Railway service public URL
+ *   - AGATHON_INTERNAL_SECRET  : bearer token shared with Railway
+ *   - SCAN_CREDENTIAL_SECRET   : AES key for unsealing the API key
+ *   - SUPABASE_SERVICE_ROLE_KEY : service-role for admin DB writes
  */
 
 type ScanStatus = Database["public"]["Tables"]["scans"]["Row"]["status"];
@@ -37,8 +39,6 @@ interface RunnerEvent {
   severity?: LogSeverity;
   attack_name?: string | null;
   payload?: unknown;
-  // For 'progress' events the runner can also surface a percentage.
-  progress_pct?: number;
 }
 
 interface RunScanOptions {
@@ -46,27 +46,27 @@ interface RunScanOptions {
   userId: string;
 }
 
-const PYTHON_TOOLKIT_DIR =
-  process.env.REDTEAM_TOOLKIT_DIR ??
-  path.resolve(process.cwd(), "..", "Ai red");
-// Bridge script (created alongside the toolkit) speaks the JSONL
-// protocol this runner consumes. It is *not* the user's existing
-// `run_redteam.py` CLI — that script writes HTML reports to disk and
-// expects per-provider keys via Config(). The bridge takes a single
-// TARGET_API_KEY in env and emits scan_logs events on stdout.
-const RUNNER_ENTRY = process.env.REDTEAM_ENTRY ?? "forgeguard_bridge.py";
-const PYTHON_BIN =
-  process.env.REDTEAM_PYTHON ??
-  (process.platform === "win32" ? "python" : "python3");
-
 export async function runScan({ scanId, userId }: RunScanOptions): Promise<void> {
   const admin = createAdminSupabase();
 
-  const { data: scan, error: scanErr } = await admin
+  // 1. Load scan row -------------------------------------------------------
+  const { data: scan, error: scanErr } = (await admin
     .from("scans")
-    .select("id, user_id, target_model, target_url, target_credential_encrypted")
+    .select(
+      "id, user_id, target_model, target_url, target_credential_encrypted, intensity",
+    )
     .eq("id", scanId)
-    .maybeSingle();
+    .maybeSingle()) as {
+    data: {
+      id: string;
+      user_id: string;
+      target_model: string;
+      target_url: string;
+      target_credential_encrypted: string | null;
+      intensity: string | null;
+    } | null;
+    error: { message: string } | null;
+  };
 
   if (scanErr || !scan) {
     console.error("[runner] could not load scan:", scanErr?.message);
@@ -77,8 +77,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     return;
   }
 
-  // Decrypt the API key. If the secret is missing we can still emit a
-  // structured failure log so the operator sees what happened.
+  // 2. Decrypt the target API key -----------------------------------------
   let apiKey: string;
   try {
     if (!scan.target_credential_encrypted) {
@@ -94,223 +93,120 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     return;
   }
 
+  // 3. Normalize the target URL ------------------------------------------
+  // Users often paste the full endpoint (e.g. ".../v1/chat/completions").
+  // The OpenAI-compatible client on Railway appends its own path, so we
+  // need the base URL only. Strip common trailing paths defensively.
+  const normalizedUrl = normalizeTargetUrl(scan.target_url);
+
+  // 4. Validate Railway env vars before dispatch -------------------------
+  const orchestratorUrl = process.env.AGATHON_ORCHESTRATOR_URL?.replace(
+    /\/$/,
+    "",
+  );
+  const internalSecret = process.env.AGATHON_INTERNAL_SECRET;
+  if (!orchestratorUrl) {
+    await markFailure(
+      admin,
+      scanId,
+      "AGATHON_ORCHESTRATOR_URL is not configured on Vercel.",
+    );
+    return;
+  }
+  if (!internalSecret) {
+    await markFailure(
+      admin,
+      scanId,
+      "AGATHON_INTERNAL_SECRET is not configured on Vercel.",
+    );
+    return;
+  }
+
+  // 5. Mark scan as probing + emit a kickoff log -------------------------
   await transitionStatus(admin, scanId, "probing", { progress_pct: 1 });
   await emit(admin, scanId, {
     type: "info",
     severity: "info",
-    payload: { message: "Runner started", target_model: scan.target_model },
-  });
-
-  const mode = decideMode();
-
-  try {
-    if (mode === "python") {
-      await runPython({
-        admin,
-        scanId,
-        targetModel: scan.target_model,
-        targetUrl: scan.target_url,
-        apiKey,
-      });
-    } else {
-      await runSynthetic({
-        admin,
-        scanId,
-        targetModel: scan.target_model,
-        targetUrl: scan.target_url,
-      });
-    }
-
-    await transitionStatus(admin, scanId, "sealed", {
-      progress_pct: 100,
-      completed_at: new Date().toISOString(),
-    });
-    await emit(admin, scanId, {
-      type: "audit",
-      severity: "info",
-      payload: { message: "Scan sealed", mode },
-    });
-  } catch (err) {
-    console.error("[runner] failure:", err);
-    await markFailure(admin, scanId, (err as Error).message);
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Mode selection                                                             */
-/* -------------------------------------------------------------------------- */
-
-function decideMode(): "python" | "synthetic" {
-  const explicit = process.env.REDTEAM_MODE?.toLowerCase();
-  if (explicit === "python" || explicit === "synthetic") return explicit;
-
-  // Auto: prefer Python iff the toolkit + entry script are present.
-  const entry = path.join(PYTHON_TOOLKIT_DIR, RUNNER_ENTRY);
-  if (existsSync(entry)) return "python";
-  return "synthetic";
-}
-
-/* -------------------------------------------------------------------------- */
-/* Python branch                                                              */
-/* -------------------------------------------------------------------------- */
-
-interface PythonRunArgs {
-  admin: ReturnType<typeof createAdminSupabase>;
-  scanId: string;
-  targetModel: string;
-  targetUrl: string;
-  apiKey: string;
-}
-
-function runPython(args: PythonRunArgs): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const entry = path.join(PYTHON_TOOLKIT_DIR, RUNNER_ENTRY);
-    const child = spawn(
-      PYTHON_BIN,
-      [
-        entry,
-        "--scan-id",
-        args.scanId,
-        "--target-model",
-        args.targetModel,
-        "--target-url",
-        args.targetUrl,
-      ],
-      {
-        cwd: PYTHON_TOOLKIT_DIR,
-        env: {
-          ...process.env,
-          // Pass the API key out-of-band via env so it never appears in
-          // command lines / process listings.
-          TARGET_API_KEY: args.apiKey,
-          PYTHONIOENCODING: "utf-8",
-          PYTHONUNBUFFERED: "1",
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-
-    let stdoutBuf = "";
-    let stderrBuf = "";
-
-    child.stdout.setEncoding("utf-8");
-    child.stdout.on("data", (chunk: string) => {
-      stdoutBuf += chunk;
-      let nl: number;
-      while ((nl = stdoutBuf.indexOf("\n")) !== -1) {
-        const line = stdoutBuf.slice(0, nl).trim();
-        stdoutBuf = stdoutBuf.slice(nl + 1);
-        if (!line) continue;
-        void handleStdoutLine(args.admin, args.scanId, line);
-      }
-    });
-
-    child.stderr.setEncoding("utf-8");
-    child.stderr.on("data", (chunk: string) => {
-      stderrBuf += chunk;
-      // Don't drown the log table in stderr — only flush once the
-      // process exits with non-zero.
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-
-    child.on("close", (code) => {
-      // Flush whatever is left in the line buffer.
-      if (stdoutBuf.trim()) {
-        void handleStdoutLine(args.admin, args.scanId, stdoutBuf.trim());
-      }
-      if (code === 0) {
-        resolve();
-      } else {
-        const tail = stderrBuf.trim().split("\n").slice(-10).join("\n");
-        void emit(args.admin, args.scanId, {
-          type: "error",
-          severity: "high",
-          payload: { message: `Runner exited with code ${code}`, stderr: tail },
-        });
-        reject(new Error(`Python runner exited ${code}`));
-      }
-    });
-  });
-}
-
-async function handleStdoutLine(
-  admin: ReturnType<typeof createAdminSupabase>,
-  scanId: string,
-  line: string,
-): Promise<void> {
-  let parsed: RunnerEvent | null = null;
-  try {
-    const obj = JSON.parse(line) as Record<string, unknown>;
-    if (obj && typeof obj.type === "string") {
-      parsed = {
-        type: (obj.type as LogType) ?? "info",
-        severity: (obj.severity as LogSeverity) ?? "info",
-        attack_name: (obj.attack_name as string) ?? null,
-        payload: obj.payload ?? obj,
-        progress_pct:
-          typeof obj.progress_pct === "number" ? obj.progress_pct : undefined,
-      };
-    }
-  } catch {
-    // Not JSON — treat as a plain info line.
-  }
-
-  if (!parsed) {
-    parsed = {
-      type: "info",
-      severity: "info",
-      payload: { message: line },
-    };
-  }
-
-  if (
-    typeof parsed.progress_pct === "number" &&
-    parsed.progress_pct >= 0 &&
-    parsed.progress_pct <= 100
-  ) {
-    await admin
-      .from("scans")
-      .update({ progress_pct: Math.round(parsed.progress_pct) })
-      .eq("id", scanId);
-  }
-
-  await emit(admin, scanId, parsed);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Synthetic branch (no Python required)                                       */
-/* -------------------------------------------------------------------------- */
-
-async function runSynthetic(args: {
-  admin: ReturnType<typeof createAdminSupabase>;
-  scanId: string;
-  targetModel: string;
-  targetUrl: string;
-}): Promise<void> {
-  await emit(args.admin, args.scanId, {
-    type: "info",
-    severity: "info",
     payload: {
-      message:
-        "Python toolkit not detected; running deterministic synthetic suite.",
+      message: "Dispatching to Agathon orchestrator on Railway",
+      target_model: scan.target_model,
+      target_url: normalizedUrl,
+      intensity: scan.intensity ?? "standard",
     },
   });
 
-  for await (const ev of runSyntheticScan({
-    targetModel: args.targetModel,
-    targetUrl: args.targetUrl,
-  })) {
-    if (typeof ev.progress_pct === "number") {
-      await args.admin
-        .from("scans")
-        .update({ progress_pct: Math.round(ev.progress_pct) })
-        .eq("id", args.scanId);
+  // 6. POST to /scan/start -------------------------------------------------
+  try {
+    const resp = await fetch(`${orchestratorUrl}/scan/start`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${internalSecret}`,
+      },
+      body: JSON.stringify({
+        scan_id: scan.id,
+        user_id: scan.user_id,
+        target_model: scan.target_model,
+        target_url: normalizedUrl,
+        intensity: scan.intensity ?? "standard",
+        api_key: apiKey,
+      }),
+      // Don't hold the connection open — Railway acknowledges fast.
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "<no body>");
+      throw new Error(
+        `Railway returned ${resp.status} ${resp.statusText}: ${text.slice(0, 400)}`,
+      );
     }
-    await emit(args.admin, args.scanId, ev);
+
+    const json = (await resp.json().catch(() => ({}))) as {
+      accepted?: boolean;
+      scan_id?: string;
+      intensity?: string;
+    };
+
+    await emit(admin, scanId, {
+      type: "info",
+      severity: "info",
+      payload: {
+        message: "Orchestrator accepted scan",
+        accepted: json.accepted ?? false,
+        intensity: json.intensity ?? scan.intensity ?? "standard",
+      },
+    });
+  } catch (err) {
+    console.error("[runner] dispatch failed:", err);
+    await markFailure(
+      admin,
+      scanId,
+      `Failed to dispatch to orchestrator: ${(err as Error).message}`,
+    );
+    return;
   }
+
+  // From here on, Railway owns the lifecycle. It writes scan_logs +
+  // updates scans.progress_pct/status as the Brain works through the
+  // attack catalogue. Vercel's job is done.
+}
+
+/* -------------------------------------------------------------------------- */
+/* URL normalization                                                          */
+/* -------------------------------------------------------------------------- */
+
+function normalizeTargetUrl(raw: string): string {
+  let url = raw.trim();
+  // Drop trailing slash.
+  while (url.endsWith("/")) url = url.slice(0, -1);
+  // Strip the conventional OpenAI-compatible chat completions path.
+  url = url.replace(/\/v1\/chat\/completions$/i, "");
+  url = url.replace(/\/v1\/completions$/i, "");
+  url = url.replace(/\/v1\/embeddings$/i, "");
+  // Strip a bare /v1 suffix — the client appends /v1 itself.
+  url = url.replace(/\/v1$/i, "");
+  return url;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -322,12 +218,13 @@ async function emit(
   scanId: string,
   ev: RunnerEvent,
 ): Promise<void> {
-  const { error } = await admin.from("scan_logs").insert({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (admin as any).from("scan_logs").insert({
     scan_id: scanId,
     type: ev.type,
     severity: ev.severity ?? "info",
     attack_name: ev.attack_name ?? null,
-    payload: (ev.payload ?? null) as Database["public"]["Tables"]["scan_logs"]["Insert"]["payload"],
+    payload: ev.payload ?? null,
   });
   if (error) {
     console.error("[runner] log insert failed:", error.message);
@@ -347,7 +244,11 @@ async function transitionStatus(
   if (status === "probing" && !patch.started_at) {
     update.started_at = new Date().toISOString();
   }
-  const { error } = await admin.from("scans").update(update).eq("id", scanId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (admin as any)
+    .from("scans")
+    .update(update)
+    .eq("id", scanId);
   if (error) {
     console.error("[runner] status transition failed:", error.message);
   }

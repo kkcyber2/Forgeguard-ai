@@ -110,9 +110,14 @@ export async function createScan(
     return { ok: false, error: "Could not create scan. Try again." };
   }
 
-  // Kick the runner. If it fails the scan sticks in "queued" and can be
-  // retried — we don't want to fail the user's form submission just because
-  // the runner had a cold start.
+  // Kick the runner. We MUST await this — Vercel Server Actions terminate
+  // the serverless invocation as soon as `redirect()` throws, so any
+  // unawaited fetch gets garbage-collected before the network request goes
+  // out. Awaiting forces the function to stay alive until Railway responds.
+  //
+  // The Railway orchestrator's /scan/start handler returns immediately
+  // (~200-500ms) — it dispatches the actual scan to a background task — so
+  // the user only waits a fraction of a second for the redirect.
   try {
     const h = await headers();
     const proto = h.get("x-forwarded-proto") ?? "http";
@@ -121,16 +126,29 @@ export async function createScan(
     // The Server Action runs under the user's session cookies; we
     // forward them so /api/scan/start can authorise via getUser().
     const cookie = h.get("cookie") ?? "";
-    // Fire-and-forget — don't await the full scan.
-    void fetch(`${origin}/api/scan/start`, {
+    const dispatchResp = await fetch(`${origin}/api/scan/start`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         cookie,
       },
       body: JSON.stringify({ scan_id: scan.id }),
-    }).catch((e) => console.error("[scans] runner kickoff failed:", e));
+      // Bail out if Vercel→Vercel routing is somehow slow; the scan row
+      // stays in 'queued' and the user can retry.
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!dispatchResp.ok) {
+      const body = await dispatchResp.text().catch(() => "<no body>");
+      console.error(
+        "[scans] runner kickoff returned",
+        dispatchResp.status,
+        body.slice(0, 400),
+      );
+    }
   } catch (e) {
+    // We log + swallow — the scan row exists in 'queued' and can be
+    // resumed. We don't want to block the redirect on a transient kickoff
+    // failure (e.g. Railway cold start hitting the 20s budget).
     console.error("[scans] runner kickoff error:", e);
   }
 

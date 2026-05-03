@@ -4,10 +4,15 @@ import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   AlertOctagon,
+  Brain,
   CheckCircle2,
   ChevronRight,
+  DollarSign,
+  FileText,
   Info,
   ShieldAlert,
+  Terminal,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -24,9 +29,25 @@ import { cn } from "@/lib/utils";
  * filter on the client.
  */
 
+// Widened to match every type the orchestrator emits. Adding a new type
+// to the orchestrator? Add it here AND to TYPE_ICON below, otherwise the
+// realtime feed will crash trying to render an `undefined` icon.
+export type ScanLogType =
+  | "progress"
+  | "finding"
+  | "attempt"
+  | "audit"
+  | "error"
+  | "info"
+  | "cost_event"
+  | "brain_decision"
+  | "tool_authored"
+  | "tool_run"
+  | "report";
+
 export type ScanLogEntry = {
   id: number;
-  type: "progress" | "finding" | "attempt" | "audit" | "error" | "info";
+  type: ScanLogType | string; // accept unknown types defensively
   severity: "info" | "low" | "medium" | "high" | "critical";
   attack_name: string | null;
   payload: unknown;
@@ -61,17 +82,32 @@ const SEVERITY_DOT: Record<ScanLogEntry["severity"], string> = {
   info: "bg-foreground-subtle",
 };
 
-const TYPE_ICON: Record<
-  ScanLogEntry["type"],
-  React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>
-> = {
+type IconComponent = React.ComponentType<{
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+}>;
+
+const TYPE_ICON: Record<ScanLogType, IconComponent> = {
   progress: Zap,
   finding: ShieldAlert,
   attempt: ChevronRight,
   audit: CheckCircle2,
   error: AlertOctagon,
   info: Info,
+  cost_event: DollarSign,
+  brain_decision: Brain,
+  tool_authored: Wrench,
+  tool_run: Terminal,
+  report: FileText,
 };
+
+// Defensive lookup — if a future log type slips through that we haven't
+// mapped yet, render with the generic Info icon instead of crashing the
+// whole live feed component.
+function iconFor(type: string): IconComponent {
+  return (TYPE_ICON as Record<string, IconComponent>)[type] ?? Info;
+}
 
 export function ScanLiveLog({ scanId, initial, createdAt }: Props) {
   const reduce = useReducedMotion();
@@ -140,7 +176,7 @@ export function ScanLiveLog({ scanId, initial, createdAt }: Props) {
       <ul className="max-h-[460px] divide-y divide-white/[0.04] overflow-y-auto rounded-sm border-hairline border-white/[0.04] bg-obsidian-900/30">
         <AnimatePresence initial={false}>
           {entries.map((ev) => {
-            const Icon = TYPE_ICON[ev.type];
+            const Icon = iconFor(ev.type);
             return (
               <motion.li
                 key={ev.id}

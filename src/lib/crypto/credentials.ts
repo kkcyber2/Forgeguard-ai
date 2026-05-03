@@ -58,9 +58,26 @@ export function sealCredential(plaintext: string): string {
 export function openCredential(blob: string): string {
   if (!blob) throw new Error("openCredential: empty blob");
 
+  // The `target_credential_encrypted` column is `bytea` in Postgres, and
+  // Supabase's PostgREST returns bytea values as hex strings prefixed with
+  // `\x`. Detect and decode that wrapper FIRST so all subsequent logic
+  // operates on the original UTF-8 string we wrote.
+  let cleaned = blob;
+  if (cleaned.startsWith("\\x")) {
+    try {
+      cleaned = Buffer.from(cleaned.slice(2), "hex").toString("utf8");
+    } catch (e) {
+      throw new Error(
+        `openCredential: failed to decode bytea hex wrapper: ${
+          (e as Error).message
+        }`,
+      );
+    }
+  }
+
   // New format: marker + base64.
-  if (blob.startsWith(MARKER)) {
-    const b64 = blob.slice(MARKER.length);
+  if (cleaned.startsWith(MARKER)) {
+    const b64 = cleaned.slice(MARKER.length);
     try {
       return Buffer.from(b64, "base64").toString("utf8");
     } catch (e) {
@@ -74,7 +91,7 @@ export function openCredential(blob: string): string {
   // from before we removed encryption, fail fast with a clear message
   // so the operator knows to delete the old scan and create a new one.
   // (Old blobs were base64 with no marker prefix, ~128 chars long.)
-  if (/^[A-Za-z0-9+/=]+$/.test(blob) && blob.length >= 64) {
+  if (/^[A-Za-z0-9+/=]+$/.test(cleaned) && cleaned.length >= 64) {
     throw new Error(
       "openCredential: this scan was created under the old AES-GCM scheme. " +
         "Delete it and create a new scan — the new scheme is forward-only.",

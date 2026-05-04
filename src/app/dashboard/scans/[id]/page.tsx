@@ -295,7 +295,18 @@ function DefRow({ label, value }: { label: string; value: string }) {
 
 type LogRow = {
   severity: "info" | "low" | "medium" | "high" | "critical";
-  type: "progress" | "finding" | "attempt" | "audit" | "error" | "info";
+  type:
+    | "info"
+    | "attack"
+    | "error"
+    | "brain_decision"
+    | "cost_event"
+    | "tool_run"
+    | "tool_authored"
+    | "audit"
+    | "report"
+    | "attempt"
+    | "finding";
 };
 
 function aggregateSeverity(rows: LogRow[]) {

@@ -165,7 +165,7 @@ function stripe(): Stripe {
   _stripe = new Stripe(key, {
     // Pinning the API version means a Stripe-side change can't silently
     // alter the shape of objects we mirror to Postgres. Bump deliberately.
-    apiVersion: "2025-09-30.acacia" as Stripe.LatestApiVersion,
+    apiVersion: "2024-06-20" as Stripe.LatestApiVersion,
     appInfo: { name: "Agathon", version: "0.1.0" },
     typescript: true,
   });

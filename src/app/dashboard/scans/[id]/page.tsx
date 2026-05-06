@@ -18,7 +18,9 @@ import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 import { ScanLiveLog } from "./live-log";
 import { ScanStatusTracker } from "./scan-status-tracker";
+import { FindingsReport } from "./findings-report";
 import { deleteScan } from "../actions";
+import type { ScanReport } from "./findings-report";
 
 /**
  * /dashboard/scans/[id] — single-scan detail.
@@ -96,6 +98,15 @@ export default async function ScanDetailPage({ params }: PageProps) {
   // The Status card is now a client component (ScanStatusTracker) that
   // re-fetches on mount and subscribes to scans UPDATE events — it never
   // gets stuck at whatever progress was captured at server-render time.
+
+  // Fetch detailed findings report (only populated when scan is sealed).
+  const { data: scanReport } = (await supabase
+    .from("scan_reports")
+    .select(
+      "executive_summary_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, attacks_run, wall_seconds, generation_cost_usd",
+    )
+    .eq("scan_id", id)
+    .maybeSingle()) as { data: ScanReport | null };
 
   // Severity breakdown derived from initial logs (the live child keeps
   // its own running totals after that).
@@ -214,6 +225,9 @@ export default async function ScanDetailPage({ params }: PageProps) {
         </Card>
       </div>
 
+      {/* Detailed findings report — only rendered when scan is sealed */}
+      <FindingsReport report={scanReport} scanStatus={scan.status} />
+
       <p className="mt-6 text-[11px] text-foreground-subtle">
         Last server snapshot: {formatDateTime(new Date())}
       </p>
@@ -271,30 +285,4 @@ function DefRow({ label, value }: { label: string; value: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
-/* -------------------------------------------------------------------------- */
-
-type LogRow = {
-  severity: "info" | "low" | "medium" | "high" | "critical";
-  type:
-    | "info"
-    | "attack"
-    | "error"
-    | "brain_decision"
-    | "cost_event"
-    | "tool_run"
-    | "tool_authored"
-    | "audit"
-    | "report"
-    | "attempt"
-    | "finding";
-};
-
-function aggregateSeverity(rows: LogRow[]) {
-  const out = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  for (const r of rows) {
-    if (r.type !== "finding") continue;
-    out[r.severity] = (out[r.severity] ?? 0) + 1;
-  }
-  return out;
-}
+/* Helpers                      

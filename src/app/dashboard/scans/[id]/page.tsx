@@ -11,13 +11,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
-import { Badge } from "@/components/ui/badge";
 import { SeverityMeter } from "@/components/dashboard/severity-meter";
 import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { buttonStyles } from "@/components/ui/button";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 import { ScanLiveLog } from "./live-log";
+import { ScanStatusTracker } from "./scan-status-tracker";
 import { deleteScan } from "../actions";
 
 /**
@@ -39,13 +39,6 @@ const STATUS_TONE = {
   failed: "threat",
 } as const;
 
-const STATUS_LABEL = {
-  queued: "Queued",
-  probing: "Probing",
-  triage: "Triage",
-  sealed: "Sealed",
-  failed: "Failed",
-} as const;
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -100,8 +93,9 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  const tone = STATUS_TONE[scan.status];
-  const isActive = scan.status === "probing" || scan.status === "queued";
+  // The Status card is now a client component (ScanStatusTracker) that
+  // re-fetches on mount and subscribes to scans UPDATE events — it never
+  // gets stuck at whatever progress was captured at server-render time.
 
   // Severity breakdown derived from initial logs (the live child keeps
   // its own running totals after that).
@@ -149,28 +143,15 @@ export default async function ScanDetailPage({ params }: PageProps) {
         <StaggerItem>
           <Card>
             <CardHead icon={Cpu} label="Status" />
-            <div className="flex items-center justify-between">
-              <Badge tone={tone} dot={isActive}>
-                {STATUS_LABEL[scan.status]}
-              </Badge>
-              <span className="font-mono text-xs text-foreground-muted">
-                {scan.progress_pct}%
-              </span>
-            </div>
-            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/[0.04]">
-              <div
-                className={
-                  isActive
-                    ? "h-full rounded-full bg-gradient-to-r from-acid/40 via-acid to-acid/40 bg-[length:200%_100%] animate-shimmer"
-                    : tone === "secure"
-                    ? "h-full rounded-full bg-acid"
-                    : tone === "threat"
-                    ? "h-full rounded-full bg-threat"
-                    : "h-full rounded-full bg-foreground-muted"
-                }
-                style={{ width: `${scan.progress_pct}%` }}
-              />
-            </div>
+            {/* ScanStatusTracker is a client component — it polls on mount
+                and subscribes to scans UPDATE events so the badge + bar
+                always reflect the true current state, even for scans that
+                completed while the WebSocket was disconnected. */}
+            <ScanStatusTracker
+              scanId={scan.id}
+              initialStatus={scan.status}
+              initialProgress={scan.progress_pct ?? 0}
+            />
           </Card>
         </StaggerItem>
         <StaggerItem>
@@ -317,3 +298,4 @@ function aggregateSeverity(rows: LogRow[]) {
   }
   return out;
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              

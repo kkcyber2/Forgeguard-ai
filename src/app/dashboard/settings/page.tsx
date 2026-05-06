@@ -1,6 +1,6 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
-import { ShieldAlert, User2 } from "lucide-react";
+import { KeyRound, ShieldAlert, User2 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
 import { PasswordForm } from "./password-form";
+import { ApiKeysSection, type ApiKeyRow } from "./api-keys-section";
 
 /**
  * /dashboard/settings — operator profile management.
@@ -31,6 +32,14 @@ export default async function SettingsPage() {
   const supabase = await createServerSupabase();
   const { data: sessionData } = await supabase.auth.getSession();
   const lastSignIn = sessionData.session?.user.last_sign_in_at ?? null;
+
+  // Fetch user's API keys for the CI/CD section
+  const { data: rawKeys } = await supabase
+    .from("user_api_keys")
+    .select("id, name, key_prefix, created_at, last_used_at, revoked_at")
+    .order("created_at", { ascending: false });
+
+  const apiKeys: ApiKeyRow[] = (rawKeys ?? []) as ApiKeyRow[];
 
   return (
     <>
@@ -58,6 +67,14 @@ export default async function SettingsPage() {
             title="Password"
           >
             <PasswordForm />
+          </Section>
+
+          <Section
+            icon={KeyRound}
+            eyebrow="CI/CD integration"
+            title="API Keys"
+          >
+            <ApiKeysSection initialKeys={apiKeys} />
           </Section>
         </div>
 
@@ -118,28 +135,4 @@ function Section({
   return (
     <section className="rounded-sm border-hairline border-white/[0.06] bg-surface">
       <div className="flex items-center gap-2 border-b-[0.5px] border-white/[0.06] px-5 py-4">
-        <Icon size={12} strokeWidth={1.75} className="text-foreground-subtle" />
-        <p className="text-eyebrow text-foreground-subtle">{eyebrow}</p>
-        <span className="ml-auto text-sm font-medium text-foreground">
-          {title}
-        </span>
-      </div>
-      <div className="p-5">{children}</div>
-    </section>
-  );
-}
-
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-foreground-subtle">{label}</dt>
-      <dd className="text-right">{children}</dd>
-    </div>
-  );
-}
+        <Icon size={12} strokeWidth={1.75

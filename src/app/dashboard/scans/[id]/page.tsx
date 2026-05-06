@@ -226,7 +226,13 @@ export default async function ScanDetailPage({ params }: PageProps) {
       </div>
 
       {/* Detailed findings report — only rendered when scan is sealed */}
-      <FindingsReport report={scanReport} scanStatus={scan.status} />
+      <FindingsReport
+        report={scanReport}
+        scanStatus={scan.status}
+        scanId={scan.id}
+        targetModel={scan.target_model}
+        targetUrl={scan.target_url}
+      />
 
       <p className="mt-6 text-[11px] text-foreground-subtle">
         Last server snapshot: {formatDateTime(new Date())}
@@ -306,9 +312,4 @@ type LogRow = {
 
 function aggregateSeverity(rows: LogRow[]) {
   const out = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  for (const r of rows) {
-    if (r.type !== "finding") continue;
-    out[r.severity] = (out[r.severity] ?? 0) + 1;
-  }
-  return out;
-}
+  for (const 

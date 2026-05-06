@@ -17,9 +17,10 @@ import {
  */
 
 const userNav: NavItem[] = [
-  { href: "/dashboard", label: "Overview", icon: "layout-dashboard" },
-  { href: "/dashboard/scans", label: "Scans", icon: "radar" },
-  { href: "/dashboard/settings", label: "Settings", icon: "settings" },
+  { href: "/dashboard",           label: "Overview",   icon: "layout-dashboard" },
+  { href: "/dashboard/scans",     label: "Scans",      icon: "radar" },
+  { href: "/dashboard/scheduled", label: "Scheduled",  icon: "calendar-clock" },
+  { href: "/dashboard/settings",  label: "Settings",   icon: "settings" },
 ];
 
 export default async function DashboardLayout({
@@ -40,9 +41,4 @@ export default async function DashboardLayout({
     role: (profile?.role as string | undefined) ?? "user",
   };
 
-  return (
-    <ActivePath nav={userNav} user={shellUser} scope="user">
-      {children}
-    </ActivePath>
-  );
-}
+  return 

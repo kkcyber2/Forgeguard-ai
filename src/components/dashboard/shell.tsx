@@ -5,6 +5,7 @@ import { cn, getInitials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Activity,
+  CalendarClock,
   LayoutDashboard,
   Radar,
   Settings,
@@ -31,7 +32,8 @@ export type NavIconName =
   | "settings"
   | "shield-alert"
   | "users"
-  | "activity";
+  | "activity"
+  | "calendar-clock";
 
 const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
@@ -40,6 +42,7 @@ const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   "shield-alert": ShieldAlert,
   users: Users,
   activity: Activity,
+  "calendar-clock": CalendarClock,
 };
 
 export interface NavItem {
@@ -210,7 +213,4 @@ export function PageHeader({
           <p className="mt-2 max-w-2xl text-sm text-foreground-muted">{description}</p>
         ) : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
-    </header>
-  );
-}
+      {actions ? <div className="flex s

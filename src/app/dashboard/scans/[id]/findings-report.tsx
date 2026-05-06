@@ -8,6 +8,7 @@ import {
   ChevronUp,
   ClipboardCopy,
   Code2,
+  Download,
   FileText,
   Layers,
   ShieldAlert,
@@ -491,120 +492,88 @@ function OWASPPanel({ coverage }: { coverage: Record<string, OWASPBucket> }) {
 interface FindingsReportProps {
   report: ScanReport | null;
   scanStatus: string;
+  scanId?: string;
+  targetModel?: string;
+  targetUrl?: string;
 }
 
-export function FindingsReport({ report, scanStatus }: FindingsReportProps) {
-  if (scanStatus !== "sealed") {
-    return null; // only render when scan is done
-  }
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  PDF Export                                                                  */
+/* ─────────────────────────────────────────────────────────────────────────── */
 
-  if (!report) {
-    return (
-      <div className="mt-4 rounded-sm border border-white/[0.06] bg-surface p-6 text-center">
-        <AlertOctagon size={20} className="mx-auto mb-2 text-foreground-subtle" />
-        <p className="text-xs text-foreground-muted">
-          Report generation failed or is still processing. Refresh in a moment.
-        </p>
-      </div>
-    );
-  }
+function escapeHTML(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
+function buildReportHTML(
+  report: ScanReport,
+  scanId: string,
+  targetModel: string,
+  targetUrl: string,
+): string {
   const findings = report.findings ?? [];
-  const riskCfg = RISK_LABEL_CONFIG[report.risk_label ?? "NONE"] ?? RISK_LABEL_CONFIG.NONE;
+  const SEV_COLOR: Record<string, string> = {
+    critical: "#dc2626",
+    high: "#f97316",
+    medium: "#d97706",
+    low: "#84cc16",
+    info: "#6b7280",
+  };
+  const RISK_COLOR: Record<string, string> = {
+    CRITICAL: "#dc2626",
+    HIGH: "#f97316",
+    MEDIUM: "#d97706",
+    LOW: "#84cc16",
+    NONE: "#6b7280",
+  };
+  const riskLabel = report.risk_label ?? "NONE";
+  const riskCol = RISK_COLOR[riskLabel] ?? RISK_COLOR.NONE;
 
-  const critCount = findings.filter((f) => f.severity === "critical").length;
-  const highCount = findings.filter((f) => f.severity === "high").length;
-
-  return (
-    <div className="mt-4 space-y-4">
-      {/* ── Report header ── */}
-      <div className="flex items-center gap-3 rounded-sm border border-white/[0.06] bg-surface p-5">
-        <ShieldAlert size={16} strokeWidth={1.5} className="shrink-0 text-foreground-subtle" />
-        <div className="flex-1">
-          <p className="text-xs font-medium text-foreground">
-            Intelligence Report
-          </p>
-          <p className="text-[11px] text-foreground-muted">
-            {findings.length} findings · {report.attacks_run ?? 0} attack vectors tested
-            {report.wall_seconds ? ` · ${Math.round(report.wall_seconds / 60)}m scan` : ""}
-          </p>
+  const findingsHTML = findings
+    .map(
+      (f) => `
+    <div style="border:1px solid #e5e7eb;border-left:4px solid ${SEV_COLOR[f.severity] ?? SEV_COLOR.info};margin-bottom:20px;padding:16px;border-radius:4px;page-break-inside:avoid">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="min-width:0;flex:1">
+          <span style="font-family:monospace;font-size:10px;color:#9ca3af">${f.id}</span>
+          <h3 style="margin:4px 0;font-size:13px;color:#111">${escapeHTML(FAMILY_LABEL[f.family] ?? f.family ?? f.attack)}</h3>
+          ${f.summary ? `<p style="margin:4px 0 0;font-size:11px;color:#6b7280">${escapeHTML(f.summary)}</p>` : ""}
+          ${(f.cwe_references?.length ?? 0) > 0 ? `<div style="margin-top:6px">${f.cwe_references!.map((c) => `<span style="display:inline-block;margin-right:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:3px;padding:1px 5px;font-family:monospace;font-size:10px;color:#374151">${escapeHTML(c)}</span>`).join("")}</div>` : ""}
         </div>
-        {/* Overall CVSS */}
-        <div className={cn("text-right", riskCfg.glow)}>
-          <div className={cn("font-mono text-3xl font-bold leading-none", riskCfg.color)}>
-            {(report.cvss_overall ?? 0).toFixed(1)}
-          </div>
-          <div className={cn("text-[9px] font-bold uppercase tracking-widest", riskCfg.color)}>
-            {report.risk_label ?? "NONE"}
-          </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:16px">
+          <div style="font-family:monospace;font-size:22px;font-weight:700;color:${SEV_COLOR[f.severity] ?? SEV_COLOR.info}">${f.cvss.toFixed(1)}</div>
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:${SEV_COLOR[f.severity] ?? SEV_COLOR.info}">${f.severity}</div>
         </div>
       </div>
+      ${f.evidence ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Evidence</div><pre style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:10px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">${escapeHTML(f.evidence)}</pre></div>` : ""}
+      ${f.remediation ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Remediation</div><div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:10px;border-radius:4px;font-size:11px">${escapeHTML(f.remediation)}</div></div>` : ""}
+      <div style="font-size:10px;font-weight:600;display:inline-block;padding:2px 8px;border-radius:3px;background:${f.verdict ? "#fef2f2" : "#f0fdf4"};color:${f.verdict ? "#dc2626" : "#15803d"}">${f.verdict ? "EXPLOITED" : "MITIGATED"}</div>
+    </div>`,
+    )
+    .join("");
 
-      {/* ── Executive summary ── */}
-      {report.executive_summary_md && (
-        <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-          <SectionHead icon={FileText} label="Executive Summary" />
-          <div className="space-y-2">
-            {report.executive_summary_md.split("\n").filter(Boolean).map((line, i) => {
-              if (line.startsWith("##")) {
-                return (
-                  <p key={i} className="text-[11px] font-semibold uppercase tracking-wider text-foreground-subtle">
-                    {line.replace(/^#+\s*/, "")}
-                  </p>
-                );
-              }
-              return (
-                <p key={i} className="text-xs leading-relaxed text-foreground-muted">
-                  {line.startsWith("-") ? `→ ${line.slice(1).trim()}` : line}
-                </p>
-              );
-            })}
-          </div>
-        </div>
-      )}
+  const statsRow = [
+    { label: "Total Findings", val: String(findings.length) },
+    {
+      label: "Critical",
+      val: String(findings.filter((f) => f.severity === "critical").length),
+      color: "#dc2626",
+    },
+    {
+      label: "High",
+      val: String(findings.filter((f) => f.severity === "high").length),
+      color: "#f97316",
+    },
+    { label: "Attack Vectors", val: String(report.attacks_run ?? 0) },
+  ]
+    .map(
+      (s) =>
+        `<div style="border:1px solid #e5e7eb;border-radius:6px;padding:14px;text-align:center"><div style="font-size:26px;font-weight:700;color:${s.color ?? "#111"}">${s.val}</div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">${s.label}</div></div>`,
+    )
+    .join("");
 
-      {/* ── Findings list ── */}
-      {findings.length > 0 && (
-        <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <SectionHead icon={Target} label="Findings" />
-            <div className="flex items-center gap-3 text-[10px]">
-              {critCount > 0 && (
-                <span className="text-threat">{critCount} CRITICAL</span>
-              )}
-              {highCount > 0 && (
-                <span className="text-orange-400">{highCount} HIGH</span>
-              )}
-              <span className="text-foreground-subtle">{findings.length} total</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {findings.map((finding, i) => (
-              <FindingCard key={finding.id} finding={finding} index={i} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Remediation roadmap + OWASP side by side ── */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Roadmap */}
-        {report.optimization_suggestions_md && (
-          <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-            <SectionHead icon={ShieldCheck} label="Remediation Roadmap" />
-            <RemediationRoadmap md={report.optimization_suggestions_md} />
-          </div>
-        )}
-
-        {/* OWASP coverage */}
-        {report.owasp_coverage &&
-          Object.keys(report.owasp_coverage).length > 0 && (
-            <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-              <SectionHead icon={Layers} label="OWASP LLM Coverage" />
-              <OWASPPanel coverage={report.owasp_coverage} />
-            </div>
-          )}
-      </div>
-    </div>
-  );
-}
+  const owaspHTML = report.owa

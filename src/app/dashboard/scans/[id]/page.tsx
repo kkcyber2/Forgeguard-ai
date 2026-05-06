@@ -285,4 +285,30 @@ function DefRow({ label, value }: { label: string; value: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Helpers                      
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+type LogRow = {
+  severity: "info" | "low" | "medium" | "high" | "critical";
+  type:
+    | "info"
+    | "attack"
+    | "error"
+    | "brain_decision"
+    | "cost_event"
+    | "tool_run"
+    | "tool_authored"
+    | "audit"
+    | "report"
+    | "attempt"
+    | "finding";
+};
+
+function aggregateSeverity(rows: LogRow[]) {
+  const out = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  for (const r of rows) {
+    if (r.type !== "finding") continue;
+    out[r.severity] = (out[r.severity] ?? 0) + 1;
+  }
+  return out;
+}

@@ -19,6 +19,11 @@ export interface AuthActionState {
   fieldErrors?: Partial<Record<"email" | "password" | "fullName", string>>;
 }
 
+export interface MagicLinkState {
+  ok: boolean;
+  error?: string;
+}
+
 const LoginSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(1, "Password required"),
@@ -85,6 +90,37 @@ export async function signup(
     ok: true,
     error: "Check your email to confirm your account.",
   };
+}
+
+const MagicLinkSchema = z.object({
+  email: z.string().email("Invalid email"),
+});
+
+export async function sendMagicLink(
+  _prev: MagicLinkState,
+  formData: FormData,
+): Promise<MagicLinkState> {
+  const parsed = MagicLinkSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { ok: false, error: "Enter a valid email address." };
+  }
+
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.auth.signInWithOtp({
+    email: parsed.data.email,
+    options: {
+      // After clicking the link the user lands on /auth/callback which
+      // exchanges the token and redirects to /dashboard.
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/auth/callback?next=/dashboard`,
+      shouldCreateUser: true,
+    },
+  });
+
+  if (error) {
+    return { ok: false, error: "Could not send link. Try again shortly." };
+  }
+
+  return { ok: true, error: "Magic link sent — check your inbox." };
 }
 
 function flattenZod(e: z.ZodError): Record<string, string> {

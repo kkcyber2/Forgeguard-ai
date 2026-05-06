@@ -213,4 +213,7 @@ export function PageHeader({
           <p className="mt-2 max-w-2xl text-sm text-foreground-muted">{description}</p>
         ) : null}
       </div>
-      {actions ? <div className="flex s
+      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+    </header>
+  );
+}

@@ -312,4 +312,9 @@ type LogRow = {
 
 function aggregateSeverity(rows: LogRow[]) {
   const out = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  for (const 
+  for (const r of rows) {
+    if (r.type !== "finding") continue;
+    out[r.severity] = (out[r.severity] ?? 0) + 1;
+  }
+  return out;
+}

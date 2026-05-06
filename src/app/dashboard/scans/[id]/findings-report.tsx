@@ -576,4 +576,236 @@ function buildReportHTML(
     )
     .join("");
 
-  const owaspHTML = report.owa
+  const owaspHTML = report.owasp_coverage
+    ? Object.entries(report.owasp_coverage)
+        .filter(([, v]) => v.count > 0)
+        .map(
+          ([owasp, bucket]) =>
+            `<tr><td style="padding:7px;font-family:monospace;font-size:11px;color:#374151;border-bottom:1px solid #e5e7eb">${escapeHTML(owasp)}</td><td style="padding:7px;text-align:center;border-bottom:1px solid #e5e7eb">${bucket.count}</td><td style="padding:7px;text-align:right;font-family:monospace;font-weight:700;color:${bucket.max_cvss >= 9 ? "#dc2626" : bucket.max_cvss >= 7 ? "#f97316" : bucket.max_cvss >= 5 ? "#d97706" : "#84cc16"};border-bottom:1px solid #e5e7eb">${bucket.max_cvss.toFixed(1)}</td></tr>`,
+        )
+        .join("")
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ForgeGuard AI — Security Report — ${scanId.slice(0, 8)}</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;margin:0;padding:40px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media print{
+  body{padding:0}
+  .no-print{display:none!important}
+  @page{margin:20mm;size:A4}
+  h2{page-break-after:avoid}
+}
+</style>
+</head>
+<body>
+<div class="no-print" style="text-align:center;padding:14px;background:#f9fafb;border-bottom:1px solid #e5e7eb;margin:-40px -40px 40px">
+  <button onclick="window.print()" style="background:#111;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600">⬇ Save as PDF</button>
+  <span style="margin-left:12px;font-size:11px;color:#6b7280">Choose "Save as PDF" in the print dialog</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:20px;margin-bottom:28px">
+  <div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#6b7280;margin-bottom:4px">Security Intelligence Report</div>
+    <h1 style="font-size:22px;font-weight:700;color:#111;margin:0 0 8px">ForgeGuard AI</h1>
+    <div style="font-size:11px;color:#6b7280">Scan ID: <span style="font-family:monospace">${scanId}</span></div>
+    <div style="font-size:11px;color:#6b7280;margin-top:2px">Generated: ${new Date().toLocaleString()}</div>
+  </div>
+  <div style="text-align:right;flex-shrink:0;margin-left:24px">
+    <div style="font-family:monospace;font-size:46px;font-weight:700;line-height:1;color:${riskCol}">${(report.cvss_overall ?? 0).toFixed(1)}</div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:${riskCol}">${riskLabel} RISK</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin-bottom:28px">
+  <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:3px">Model</div><div style="font-family:monospace;font-size:12px">${escapeHTML(targetModel)}</div></div>
+  <div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:3px">Endpoint</div><div style="font-family:monospace;font-size:11px;word-break:break-all">${escapeHTML(targetUrl)}</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px">${statsRow}</div>
+
+${report.executive_summary_md ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Executive Summary</h2><div style="font-size:12px;line-height:1.65;color:#374151;white-space:pre-wrap">${escapeHTML(report.executive_summary_md.replace(/^#+\s*/gm, ""))}</div></div>` : ""}
+
+${findings.length > 0 ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Findings (${findings.length})</h2>${findingsHTML}</div>` : ""}
+
+${owaspHTML ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">OWASP LLM Coverage</h2><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:7px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:2px solid #e5e7eb">Category</th><th style="padding:7px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:2px solid #e5e7eb">Findings</th><th style="padding:7px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:2px solid #e5e7eb">Max CVSS</th></tr></thead><tbody>${owaspHTML}</tbody></table></div>` : ""}
+
+<div style="margin-top:40px;padding-top:14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:10px;color:#9ca3af">
+  <span>ForgeGuard AI · AI Red Team Security Platform</span>
+  <span>CONFIDENTIAL — For authorized recipients only</span>
+</div>
+</body>
+</html>`;
+}
+
+function DownloadReportButton({
+  report,
+  scanId,
+  targetModel,
+  targetUrl,
+}: {
+  report: ScanReport;
+  scanId: string;
+  targetModel: string;
+  targetUrl: string;
+}) {
+  const handleDownload = () => {
+    const html = buildReportHTML(report, scanId, targetModel, targetUrl);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", "noopener");
+    // Revoke after a moment so the new window has time to load
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    // If pop-ups are blocked, fall back to direct download
+    if (!win) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `forgeguard-report-${scanId.slice(0, 8)}.html`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5_000);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleDownload}
+      className="flex items-center gap-1.5 rounded-sm border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-foreground-muted transition-colors hover:border-white/[0.15] hover:text-foreground"
+    >
+      <Download size={11} strokeWidth={1.75} />
+      Download PDF
+    </button>
+  );
+}
+
+export function FindingsReport({
+  report,
+  scanStatus,
+  scanId = "unknown",
+  targetModel = "",
+  targetUrl = "",
+}: FindingsReportProps) {
+  if (scanStatus !== "sealed") {
+    return null; // only render when scan is done
+  }
+
+  if (!report) {
+    return (
+      <div className="mt-4 rounded-sm border border-white/[0.06] bg-surface p-6 text-center">
+        <AlertOctagon size={20} className="mx-auto mb-2 text-foreground-subtle" />
+        <p className="text-xs text-foreground-muted">
+          Report generation failed or is still processing. Refresh in a moment.
+        </p>
+      </div>
+    );
+  }
+
+  const findings = report.findings ?? [];
+  const riskCfg = RISK_LABEL_CONFIG[report.risk_label ?? "NONE"] ?? RISK_LABEL_CONFIG.NONE;
+
+  const critCount = findings.filter((f) => f.severity === "critical").length;
+  const highCount = findings.filter((f) => f.severity === "high").length;
+
+  return (
+    <div className="mt-4 space-y-4">
+      {/* ── Report header ── */}
+      <div className="flex items-center gap-3 rounded-sm border border-white/[0.06] bg-surface p-5">
+        <ShieldAlert size={16} strokeWidth={1.5} className="shrink-0 text-foreground-subtle" />
+        <div className="flex-1">
+          <p className="text-xs font-medium text-foreground">
+            Intelligence Report
+          </p>
+          <p className="text-[11px] text-foreground-muted">
+            {findings.length} findings · {report.attacks_run ?? 0} attack vectors tested
+            {report.wall_seconds ? ` · ${Math.round(report.wall_seconds / 60)}m scan` : ""}
+          </p>
+        </div>
+        <DownloadReportButton
+          report={report}
+          scanId={scanId}
+          targetModel={targetModel}
+          targetUrl={targetUrl}
+        />
+        {/* Overall CVSS */}
+        <div className={cn("text-right", riskCfg.glow)}>
+          <div className={cn("font-mono text-3xl font-bold leading-none", riskCfg.color)}>
+            {(report.cvss_overall ?? 0).toFixed(1)}
+          </div>
+          <div className={cn("text-[9px] font-bold uppercase tracking-widest", riskCfg.color)}>
+            {report.risk_label ?? "NONE"}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Executive summary ── */}
+      {report.executive_summary_md && (
+        <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
+          <SectionHead icon={FileText} label="Executive Summary" />
+          <div className="space-y-2">
+            {report.executive_summary_md.split("\n").filter(Boolean).map((line, i) => {
+              if (line.startsWith("##")) {
+                return (
+                  <p key={i} className="text-[11px] font-semibold uppercase tracking-wider text-foreground-subtle">
+                    {line.replace(/^#+\s*/, "")}
+                  </p>
+                );
+              }
+              return (
+                <p key={i} className="text-xs leading-relaxed text-foreground-muted">
+                  {line.startsWith("-") ? `→ ${line.slice(1).trim()}` : line}
+                </p>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Findings list ── */}
+      {findings.length > 0 && (
+        <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <SectionHead icon={Target} label="Findings" />
+            <div className="flex items-center gap-3 text-[10px]">
+              {critCount > 0 && (
+                <span className="text-threat">{critCount} CRITICAL</span>
+              )}
+              {highCount > 0 && (
+                <span className="text-orange-400">{highCount} HIGH</span>
+              )}
+              <span className="text-foreground-subtle">{findings.length} total</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {findings.map((finding, i) => (
+              <FindingCard key={finding.id} finding={finding} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Remediation roadmap + OWASP side by side ── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Roadmap */}
+        {report.optimization_suggestions_md && (
+          <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
+            <SectionHead icon={ShieldCheck} label="Remediation Roadmap" />
+            <RemediationRoadmap md={report.optimization_suggestions_md} />
+          </div>
+        )}
+
+        {/* OWASP coverage */}
+        {report.owasp_coverage &&
+          Object.keys(report.owasp_coverage).length > 0 && (
+            <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
+              <SectionHead icon={Layers} label="OWASP LLM Coverage" />
+              <OWASPPanel coverage={report.owasp_coverage} />
+            </div>
+          )}
+      </div>
+    </div>
+  );
+}

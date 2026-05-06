@@ -135,4 +135,28 @@ function Section({
   return (
     <section className="rounded-sm border-hairline border-white/[0.06] bg-surface">
       <div className="flex items-center gap-2 border-b-[0.5px] border-white/[0.06] px-5 py-4">
-        <Icon size={12} strokeWidth={1.75
+        <Icon size={12} strokeWidth={1.75} className="text-foreground-subtle" />
+        <p className="text-eyebrow text-foreground-subtle">{eyebrow}</p>
+        <span className="ml-auto text-sm font-medium text-foreground">
+          {title}
+        </span>
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
+
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-foreground-subtle">{label}</dt>
+      <dd className="text-right">{children}</dd>
+    </div>
+  );
+}

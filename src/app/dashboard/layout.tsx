@@ -41,4 +41,9 @@ export default async function DashboardLayout({
     role: (profile?.role as string | undefined) ?? "user",
   };
 
-  return 
+  return (
+    <ActivePath nav={userNav} user={shellUser} scope="user">
+      {children}
+    </ActivePath>
+  );
+}

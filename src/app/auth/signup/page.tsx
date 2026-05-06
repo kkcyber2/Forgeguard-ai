@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/input";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { signup, type AuthActionState } from "../actions";
 import { passwordStrength } from "@/lib/utils";
 
@@ -27,7 +28,12 @@ export default function SignupPage() {
         </p>
       </div>
 
-      <form action={formAction} className="px-6 py-6 space-y-5" noValidate>
+      {/* ── OAuth providers ─────────────────────────────────────────────────── */}
+      <div className="px-6 pt-5">
+        <OAuthButtons mode="signup" divider />
+      </div>
+
+      <form action={formAction} className="px-6 py-4 space-y-5" noValidate>
         <div>
           <Label htmlFor="fullName">Name</Label>
           <Input

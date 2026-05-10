@@ -103,7 +103,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
   const { data: scanReport } = (await supabase
     .from("scan_reports")
     .select(
-      "executive_summary_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, attacks_run, wall_seconds, generation_cost_usd",
+      "executive_summary_md, audit_report_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, attacks_run, wall_seconds, generation_cost_usd",
     )
     .eq("scan_id", id)
     .maybeSingle()) as { data: ScanReport | null };

@@ -20,6 +20,7 @@ const userNav: NavItem[] = [
   { href: "/dashboard",           label: "Overview",   icon: "layout-dashboard" },
   { href: "/dashboard/scans",     label: "Scans",      icon: "radar" },
   { href: "/dashboard/scheduled", label: "Scheduled",  icon: "calendar-clock" },
+  { href: "/dashboard/billing",   label: "Billing",    icon: "credit-card" },
   { href: "/dashboard/settings",  label: "Settings",   icon: "settings" },
 ];
 

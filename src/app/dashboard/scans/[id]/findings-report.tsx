@@ -56,6 +56,7 @@ export interface OWASPBucket {
 
 export interface ScanReport {
   executive_summary_md?: string;
+  audit_report_md?: string;
   cvss_overall?: number;
   risk_label?: "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   findings?: Finding[];
@@ -125,20 +126,21 @@ const RISK_LABEL_CONFIG: Record<
 };
 
 const FAMILY_LABEL: Record<string, string> = {
-  prompt_injection:        "Prompt Injection",
-  data_exfiltration:       "Data Exfiltration",
-  context_manipulation:    "Context Manipulation",
-  adversarial_robustness:  "Adversarial Robustness",
-  model_misuse:            "Model Misuse",
-  token_smuggling:         "Token Smuggling",
-  emotional_manipulation:  "Emotional Manipulation",
-  invisible_injection:     "Invisible Injection",
-  chain_of_thought_hijack: "CoT Hijack",
-  system_prompt_extraction:"Sys-Prompt Extraction",
-  rag_poisoning:           "RAG Poisoning",
-  logic_jailbreak:         "Logic Jailbreak",
-  autonomous_adversary:    "Autonomous Adversary",
-  custom_tool:             "Custom Tool",
+  prompt_injection:           "Prompt Injection",
+  data_exfiltration:          "Data Exfiltration",
+  context_manipulation:       "Context Manipulation",
+  adversarial_robustness:     "Adversarial Robustness",
+  model_misuse:               "Model Misuse",
+  token_smuggling:            "Token Smuggling",
+  emotional_manipulation:     "Emotional Manipulation",
+  invisible_injection:        "Invisible Injection",
+  indirect_prompt_injection:  "Indirect Prompt Injection",
+  chain_of_thought_hijack:    "CoT Hijack",
+  system_prompt_extraction:   "Sys-Prompt Extraction",
+  rag_poisoning:              "RAG Poisoning",
+  logic_jailbreak:            "Logic Jailbreak",
+  autonomous_adversary:       "Autonomous Adversary",
+  custom_tool:                "Custom Tool",
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -175,6 +177,240 @@ function SectionHead({
       <span className="text-eyebrow text-foreground-subtle">{label}</span>
     </div>
   );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  MarkdownBlock — zero-dependency rich Markdown renderer                      */
+/*  Handles: h1-h3, bold, italic, inline code, code blocks, tables, blockquote,*/
+/*  horizontal rules, ordered + unordered lists, and plain paragraphs.         */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function MarkdownBlock({ md }: { md: string }) {
+  const nodes = React.useMemo(() => parseMarkdown(md), [md]);
+  return <div className="markdown-body space-y-3">{nodes}</div>;
+}
+
+type MdNode =
+  | { kind: "h1" | "h2" | "h3"; text: string }
+  | { kind: "p"; text: string }
+  | { kind: "hr" }
+  | { kind: "blockquote"; text: string }
+  | { kind: "code_block"; lang: string; code: string }
+  | { kind: "ul"; items: string[] }
+  | { kind: "ol"; items: string[] }
+  | { kind: "table"; headers: string[]; rows: string[][] };
+
+function parseMarkdown(md: string): React.ReactNode[] {
+  const raw = md.split("\n");
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < raw.length) {
+    const line = raw[i];
+
+    // Code block
+    if (line.startsWith("```")) {
+      const lang = line.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < raw.length && !raw[i].startsWith("```")) {
+        codeLines.push(raw[i]);
+        i++;
+      }
+      i++; // consume closing ```
+      nodes.push(
+        <div key={i} className="relative rounded border border-white/[0.06] bg-black/40">
+          {lang && (
+            <span className="absolute right-2 top-1.5 font-mono text-[9px] uppercase tracking-widest text-foreground-subtle">
+              {lang}
+            </span>
+          )}
+          <pre className="overflow-x-auto p-3 pt-6 font-mono text-[11px] leading-relaxed text-foreground-muted whitespace-pre">
+            {codeLines.join("\n")}
+          </pre>
+        </div>
+      );
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) {
+      nodes.push(<hr key={i} className="border-white/[0.06]" />);
+      i++;
+      continue;
+    }
+
+    // Headings
+    if (line.startsWith("### ")) {
+      nodes.push(
+        <h3 key={i} className="text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
+          {inlineFormat(line.slice(4))}
+        </h3>
+      );
+      i++;
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      nodes.push(
+        <h2 key={i} className="text-sm font-semibold text-foreground border-b border-white/[0.06] pb-1">
+          {inlineFormat(line.slice(3))}
+        </h2>
+      );
+      i++;
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      nodes.push(
+        <h1 key={i} className="text-base font-bold text-foreground">
+          {inlineFormat(line.slice(2))}
+        </h1>
+      );
+      i++;
+      continue;
+    }
+
+    // Blockquote
+    if (line.startsWith("> ")) {
+      nodes.push(
+        <blockquote key={i} className="border-l-2 border-acid/40 pl-3 text-xs leading-relaxed text-foreground-muted italic">
+          {inlineFormat(line.slice(2))}
+        </blockquote>
+      );
+      i++;
+      continue;
+    }
+
+    // Table: | col | col |
+    if (line.startsWith("|") && line.endsWith("|")) {
+      const tableLines: string[] = [line];
+      i++;
+      while (i < raw.length && raw[i].startsWith("|")) {
+        tableLines.push(raw[i]);
+        i++;
+      }
+      const parsed = parseTable(tableLines);
+      if (parsed) {
+        nodes.push(
+          <div key={i} className="overflow-x-auto rounded border border-white/[0.06]">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-white/[0.06] bg-white/[0.02]">
+                  {parsed.headers.map((h, hi) => (
+                    <th key={hi} className="px-3 py-2 text-left font-semibold text-foreground-subtle">
+                      {inlineFormat(h)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.rows.map((row, ri) => (
+                  <tr key={ri} className="border-b border-white/[0.04] last:border-0">
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-3 py-2 text-foreground-muted">
+                        {inlineFormat(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      continue;
+    }
+
+    // Unordered list
+    if (/^[-*] /.test(line)) {
+      const items: string[] = [];
+      while (i < raw.length && /^[-*] /.test(raw[i])) {
+        items.push(raw[i].slice(2));
+        i++;
+      }
+      nodes.push(
+        <ul key={i} className="space-y-1 pl-4">
+          {items.map((item, ii) => (
+            <li key={ii} className="flex gap-2 text-xs text-foreground-muted">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-acid/60" />
+              <span>{inlineFormat(item)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line)) {
+      const items: string[] = [];
+      while (i < raw.length && /^\d+\. /.test(raw[i])) {
+        items.push(raw[i].replace(/^\d+\. /, ""));
+        i++;
+      }
+      nodes.push(
+        <ol key={i} className="space-y-1 pl-4">
+          {items.map((item, ii) => (
+            <li key={ii} className="flex gap-2 text-xs text-foreground-muted">
+              <span className="shrink-0 font-mono text-[10px] text-acid">{ii + 1}.</span>
+              <span>{inlineFormat(item)}</span>
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // Empty line — skip
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+
+    // Paragraph
+    nodes.push(
+      <p key={i} className="text-xs leading-relaxed text-foreground-muted">
+        {inlineFormat(line)}
+      </p>
+    );
+    i++;
+  }
+
+  return nodes;
+}
+
+function parseTable(lines: string[]): { headers: string[]; rows: string[][] } | null {
+  if (lines.length < 2) return null;
+  const splitRow = (line: string) =>
+    line.slice(1, -1).split("|").map((c) => c.trim());
+  const headers = splitRow(lines[0]);
+  const rows = lines
+    .slice(2) // skip separator row
+    .filter((l) => l.startsWith("|") && !/^[|\s-]+$/.test(l))
+    .map(splitRow);
+  return { headers, rows };
+}
+
+/** Convert inline markdown (bold, italic, inline code, links) to React nodes. */
+function inlineFormat(text: string): React.ReactNode {
+  // Split on **bold**, *italic*, `code`, [text](url)
+  const parts: React.ReactNode[] = [];
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|\[(.+?)\]\((.+?)\))/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[2] !== undefined)
+      parts.push(<strong key={m.index} className="font-semibold text-foreground">{m[2]}</strong>);
+    else if (m[3] !== undefined)
+      parts.push(<em key={m.index} className="italic text-foreground-muted">{m[3]}</em>);
+    else if (m[4] !== undefined)
+      parts.push(<code key={m.index} className="rounded bg-white/[0.06] px-1 font-mono text-[10px] text-acid">{m[4]}</code>);
+    else if (m[5] !== undefined)
+      parts.push(<span key={m.index} className="text-acid underline underline-offset-2">{m[5]}</span>);
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts.length === 1 && typeof parts[0] === "string" ? parts[0] : <>{parts}</>;
 }
 
 function CWEChip({ cwe }: { cwe: string }) {
@@ -682,6 +918,63 @@ function DownloadReportButton({
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  AuditReportPanel — full structured Markdown audit report                    */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function AuditReportPanel({ md }: { md: string }) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <div className="rounded-sm border border-acid/20 bg-surface">
+      {/* Header / toggle */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
+      >
+        <div className="flex items-center gap-2.5">
+          <BookOpen size={13} strokeWidth={1.75} className="shrink-0 text-acid/70" />
+          <div>
+            <p className="text-xs font-semibold text-foreground">
+              Full Audit Report
+            </p>
+            <p className="text-[11px] text-foreground-muted">
+              Structured vulnerability analysis with evidence, remediation &amp; PoC
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded border border-acid/30 bg-acid/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-acid">
+            Markdown
+          </span>
+          {open ? (
+            <ChevronUp size={14} className="shrink-0 text-foreground-subtle" />
+          ) : (
+            <ChevronDown size={14} className="shrink-0 text-foreground-subtle" />
+          )}
+        </div>
+      </button>
+
+      {/* Body */}
+      {open && (
+        <div className="border-t border-white/[0.06] px-5 pb-6 pt-5">
+          {/* Copy-to-clipboard toolbar */}
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-foreground-subtle">
+              Audit Report · Full Markdown
+            </span>
+            <CopyButton text={md} />
+          </div>
+          {/* Rendered Markdown */}
+          <div className="rounded border border-white/[0.04] bg-black/20 px-5 py-4">
+            <MarkdownBlock md={md} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FindingsReport({
   report,
   scanStatus,
@@ -745,22 +1038,7 @@ export function FindingsReport({
       {report.executive_summary_md && (
         <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
           <SectionHead icon={FileText} label="Executive Summary" />
-          <div className="space-y-2">
-            {report.executive_summary_md.split("\n").filter(Boolean).map((line, i) => {
-              if (line.startsWith("##")) {
-                return (
-                  <p key={i} className="text-[11px] font-semibold uppercase tracking-wider text-foreground-subtle">
-                    {line.replace(/^#+\s*/, "")}
-                  </p>
-                );
-              }
-              return (
-                <p key={i} className="text-xs leading-relaxed text-foreground-muted">
-                  {line.startsWith("-") ? `→ ${line.slice(1).trim()}` : line}
-                </p>
-              );
-            })}
-          </div>
+          <MarkdownBlock md={report.executive_summary_md} />
         </div>
       )}
 
@@ -806,6 +1084,11 @@ export function FindingsReport({
             </div>
           )}
       </div>
+
+      {/* ── Full Audit Report (markdown) ── */}
+      {report.audit_report_md && (
+        <AuditReportPanel md={report.audit_report_md} />
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { LogoMarquee } from "@/components/marketing/logo-marquee";
 import { FeatureGrid } from "@/components/marketing/features";
 import { AttackSurface } from "@/components/marketing/attack-surface";
 import { Guardrails } from "@/components/marketing/guardrails";
+import { PricingSection } from "@/components/marketing/pricing";
 import { CtaBanner } from "@/components/marketing/cta";
 import { MarketingFooter } from "@/components/marketing/footer";
 import { getSessionUser, getCurrentProfile } from "@/lib/supabase/server";
@@ -38,6 +39,7 @@ export default async function HomePage() {
       <FeatureGrid />
       <AttackSurface />
       <Guardrails />
+      <PricingSection isAuthenticated={isAuthenticated} />
       <CtaBanner isAuthenticated={isAuthenticated} primaryCta={primaryCta} />
       <MarketingFooter />
     </main>

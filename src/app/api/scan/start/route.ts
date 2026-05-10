@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { runScan } from "@/lib/runner/runner";
 
 /**
@@ -86,6 +87,52 @@ export async function POST(req: NextRequest) {
       { ok: true, message: "Scan already running" },
       { status: 200 },
     );
+  }
+
+  /* ── Scan-quota gating ──────────────────────────────────────────────────
+   * Read the my_scan_quota view (scoped to auth.uid() via RLS).
+   * On error we default to allow — never block a scan due to a DB blip.
+   * Free plan: 2 scans/month · Startup: 20 · Enterprise: unlimited.
+   * ─────────────────────────────────────────────────────────────────────── */
+  type QuotaRow = {
+    plan: string;
+    status: string;
+    scans_used_this_period: number;
+    scans_allowed: number;
+    period_expired: boolean;
+  };
+
+  const { data: quota } = (await supabase
+    .from("my_scan_quota")
+    .select("plan, status, scans_used_this_period, scans_allowed, period_expired")
+    .maybeSingle()) as { data: QuotaRow | null };
+
+  if (quota) {
+    const isActive = quota.status === "active" || quota.status === "on_trial";
+    const periodOk  = !quota.period_expired;
+    const underLimit =
+      quota.scans_allowed >= 999_999 ||
+      quota.scans_used_this_period < quota.scans_allowed;
+
+    if (!isActive || !periodOk || !underLimit) {
+      const reason = !isActive
+        ? `Subscription is ${quota.status}. Renew your plan to run more scans.`
+        : !periodOk
+          ? "Your billing period has expired. Please renew to continue scanning."
+          : `Scan limit reached (${quota.scans_used_this_period}/${quota.scans_allowed} this period). Upgrade for more.`;
+
+      return NextResponse.json(
+        { ok: false, error: reason, code: "QUOTA_EXCEEDED", plan: quota.plan },
+        { status: 402 },
+      );
+    }
+
+    // Increment the counter using service-role (bypasses RLS write block on subscriptions).
+    const admin = createAdminSupabase();
+    await admin
+      .from("subscriptions")
+      .update({ scans_used_this_period: quota.scans_used_this_period + 1 })
+      .eq("user_id", user.id);
   }
 
   // We MUST await runScan() — Vercel terminates the serverless function

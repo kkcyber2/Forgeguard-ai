@@ -13,11 +13,12 @@ import {
   PLANS,
   buildCheckoutUrl,
   getCustomerPortalUrl,
-  getLSEnv,
+  getLSVariantIds,
   type PlanId,
   type PlanMeta,
 } from "@/lib/lemonsqueezy";
 import { cn } from "@/lib/utils";
+import { RedeemCodeBox } from "./redeem-code-box";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -73,18 +74,14 @@ export default async function BillingPage({
     }
   }
 
-  // Checkout URLs for upgrade buttons
-  let env: ReturnType<typeof getLSEnv> | null = null;
-  try {
-    env = getLSEnv();
-  } catch {
-    // LS not configured yet — render upgrade buttons as disabled
-  }
+  // Checkout URLs for upgrade buttons — getLSVariantIds() never throws
+  // (it doesn't require the API key, only the variant IDs from env).
+  const { variantStartup, variantEnterprise } = getLSVariantIds();
 
   const variantMap: Record<PlanId, string> = {
     free: "",
-    startup:    env?.variantStartup    ?? "",
-    enterprise: env?.variantEnterprise ?? "",
+    startup:    variantStartup,
+    enterprise: variantEnterprise,
   };
 
   const scansAllowed = PLANS.find((p) => p.id === currentPlan)?.scansPerMonth ?? 2;
@@ -187,6 +184,9 @@ export default async function BillingPage({
           </div>
         )}
       </div>
+
+      {/* ── Promo code box ── */}
+      <RedeemCodeBox />
 
       {/* ── Plan cards ── */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -317,10 +317,9 @@ function PlanCard({
         </a>
       ) : plan.price > 0 ? (
         <div className="rounded-sm border border-white/[0.06] px-3 py-2 text-center font-mono text-[10px] text-foreground-subtle">
-          Configure LEMONSQUEEZY_VARIANT_* env vars
+          Checkout coming soon — contact support
         </div>
       ) : null}
     </div>
   );
 }
-                                                                                                                                 

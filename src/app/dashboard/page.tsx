@@ -1,13 +1,14 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Activity, Plus, Radar, ShieldCheck, Terminal } from "lucide-react";
+import { Activity, Lock, Plus, Radar, ShieldCheck, Terminal } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { SectionCard, SectionLink } from "@/components/dashboard/section-card";
 import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { ScanCard } from "@/components/dashboard/scan-card";
 import { RedTeamFeed, type RedTeamLog } from "@/components/dashboard/red-team-feed";
 import { Sparkline } from "@/components/dashboard/sparkline";
+import { VerificationStatus } from "@/components/dashboard/VerificationStatus";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { StatTile } from "@/components/ui/stat-tile";
 import { buttonStyles } from "@/components/ui/button";
@@ -30,12 +31,43 @@ import type { Database } from "@/types/supabase";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function UserDashboardPage() {
+// ─── Gate banner config ────────────────────────────────────────────────────
+const GATE_COPY: Record<string, { title: string; body: string }> = {
+  forge: {
+    title: "Forge access requires Hacker tier",
+    body:  "The Forge workbench is available to Hacker and Developer identity tiers. Upgrade your identity in the Verification Status panel below to unlock adversarial script execution.",
+  },
+  intel: {
+    title: "Intel Hub requires Hacker tier",
+    body:  "The Intelligence Hub community chat and live threat feed are available to Hacker and Developer tiers. Complete your identity verification to gain access.",
+  },
+};
+
+export default async function UserDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ gate?: string }>;
+}) {
+  // Next.js 15: searchParams is a Promise and must be awaited.
+  const sp = await searchParams;
+  const gateKey = sp.gate && GATE_COPY[sp.gate] ? sp.gate : null;
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard");
 
   const profile = await getCurrentProfile();
   const supabase = await createServerSupabase();
+
+  // -- Identity fields (Sprint 8) ----------------------------------------
+  const { data: identityRow } = await supabase
+    .from("profiles")
+    .select("user_type, access_level, domain_verified, domain_token")
+    .eq("id", user.id)
+    .single();
+  const userType      = (identityRow?.user_type as "client" | "hacker" | "developer" | null) ?? null;
+  const accessLevel   = (identityRow?.access_level as number) ?? 1;
+  const domainVerified= Boolean(identityRow?.domain_verified);
+  const domainToken   = (identityRow?.domain_token as string | null) ?? null;
+  const handle        = (user.email ?? "").split("@")[0];
 
   // -- Scans --------------------------------------------------------------
   const { data: scanRows, error: scanErr } = await supabase
@@ -111,6 +143,21 @@ export default async function UserDashboardPage() {
           </>
         }
       />
+
+      {/* Identity gate banner — shown when redirected from a gated route */}
+      {gateKey && GATE_COPY[gateKey] && (
+        <div className="mb-5 flex items-start gap-3 rounded-[4px] border border-threat/40 bg-threat/5 px-4 py-3 text-sm">
+          <Lock size={15} strokeWidth={1.5} className="mt-0.5 shrink-0 text-threat" />
+          <div>
+            <p className="font-mono font-semibold text-threat">
+              {GATE_COPY[gateKey]!.title}
+            </p>
+            <p className="mt-0.5 text-foreground-muted">
+              {GATE_COPY[gateKey]!.body}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* KPI strip */}
       <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -221,6 +268,23 @@ export default async function UserDashboardPage() {
           ) : (
             <RedTeamFeed seed={logs.slice(0, 8)} />
           )}
+        </SectionCard>
+      </div>
+
+      {/* ── Verification Status ─────────────────────────────────────────── */}
+      <div className="mt-6">
+        <SectionCard
+          eyebrow="Identity"
+          title="Verification Status"
+          description="Your operator identity, access tier, and domain ownership proof."
+        >
+          <VerificationStatus
+            userType={userType}
+            accessLevel={accessLevel}
+            domainVerified={domainVerified}
+            domainToken={domainToken}
+            handle={handle}
+          />
         </SectionCard>
       </div>
     </>

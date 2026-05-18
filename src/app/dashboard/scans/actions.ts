@@ -144,6 +144,19 @@ export async function createScan(
         dispatchResp.status,
         body.slice(0, 400),
       );
+
+      // Surface a professional error for engine overload (429) or crash (500/503).
+      // Clean up the orphaned queued row so the user can retry without accumulating
+      // ghost scans in their history.
+      if ([429, 500, 503].includes(dispatchResp.status)) {
+        await supabase.from("scans").delete().eq("id", scan.id);
+        return {
+          ok: false,
+          error:
+            "System Overload: Retrying... The breach engine is under heavy load. " +
+            "Please wait a moment and try again — your quota was not consumed.",
+        };
+      }
     }
   } catch (e) {
     // We log + swallow — the scan row exists in 'queued' and can be

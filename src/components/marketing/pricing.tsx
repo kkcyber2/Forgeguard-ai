@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Zap } from "lucide-react";
-import { PLANS, type PlanMeta } from "@/lib/lemonsqueezy";
+import { CheckCircle2, Zap, Shield } from "lucide-react";
+import { PLANS, type PlanMeta } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /*  PricingSection — rendered on the marketing landing page                     */
-/*  Client component so we can handle the hover state without SSR mismatch.    */
+/*  Client component so we can handle hover state without SSR mismatch.         */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 export function PricingSection({
@@ -39,8 +39,13 @@ export function PricingSection({
             <span className="text-acid">No LLC required.</span>
           </h2>
           <p className="mt-3 text-sm text-foreground-muted">
-            Pay via LemonSqueezy · Withdraw via Payoneer or Wise · Works
-            worldwide including Pakistan.
+            Pay via{" "}
+            <span className="text-foreground/70">LemonSqueezy</span>
+            {" · "}Withdraw via{" "}
+            <span className="text-foreground/70">Payoneer</span> or{" "}
+            <span className="text-foreground/70">Wise</span>
+            {" · "}Works worldwide including{" "}
+            <span className="text-foreground/70">Pakistan</span>.
           </p>
         </div>
 
@@ -94,20 +99,38 @@ function PricingCard({
   return (
     <div
       className={cn(
-        "relative flex flex-col rounded-sm border p-6 transition-all duration-200",
+        "relative flex flex-col rounded-sm border p-6 transition-all duration-300",
         highlighted
-          ? "border-acid/40 bg-acid/5 shadow-[0_0_32px_rgba(209,255,0,0.08)]"
-          : "border-white/[0.06] bg-surface hover:border-white/[0.12]",
+          ? [
+              "border-acid/60",
+              "bg-acid/[0.04]",
+              // multi-layer glow: tight inner + wide outer
+              "shadow-[0_0_0_1px_rgba(209,255,0,0.15),0_0_24px_rgba(209,255,0,0.18),0_0_64px_rgba(209,255,0,0.08)]",
+              "hover:shadow-[0_0_0_1px_rgba(209,255,0,0.25),0_0_32px_rgba(209,255,0,0.26),0_0_80px_rgba(209,255,0,0.12)]",
+            ].join(" ")
+          : "border-white/[0.06] bg-surface hover:border-white/[0.12] hover:shadow-[0_0_16px_rgba(255,255,255,0.03)]",
       )}
     >
+      {/* Acid Green top-edge accent bar for highlighted card */}
+      {highlighted && (
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-[2px] rounded-t-sm"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, rgba(209,255,0,0.8) 40%, rgba(209,255,0,1) 50%, rgba(209,255,0,0.8) 60%, transparent)",
+          }}
+        />
+      )}
+
       {/* Popular badge */}
       {plan.badge && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded border border-acid/50 bg-obsidian px-3 py-0.5 font-mono text-[9px] uppercase tracking-widest text-acid">
+        <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-sm border border-acid/60 bg-obsidian px-3 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-acid shadow-[0_0_12px_rgba(209,255,0,0.3)]">
           {plan.badge}
         </span>
       )}
 
-      {/* Name */}
+      {/* Plan name */}
       <p className="mb-1 font-mono text-[11px] uppercase tracking-widest text-foreground-subtle">
         {plan.name}
       </p>
@@ -118,7 +141,12 @@ function PricingCard({
           <span className="text-3xl font-bold text-foreground">Free</span>
         ) : (
           <>
-            <span className="text-3xl font-bold text-foreground">
+            <span
+              className={cn(
+                "text-3xl font-bold",
+                highlighted ? "text-acid" : "text-foreground",
+              )}
+            >
               ${plan.price}
             </span>
             <span className="text-xs text-foreground-muted">/month</span>
@@ -130,8 +158,15 @@ function PricingCard({
         {plan.description}
       </p>
 
-      {/* Engine */}
-      <div className="mb-4 flex items-center gap-1.5 rounded border border-white/[0.06] bg-black/30 px-2.5 py-1.5">
+      {/* Engine chip */}
+      <div
+        className={cn(
+          "mb-4 flex items-center gap-1.5 rounded border px-2.5 py-1.5",
+          highlighted
+            ? "border-acid/20 bg-acid/[0.06]"
+            : "border-white/[0.06] bg-black/30",
+        )}
+      >
         <Zap
           size={10}
           strokeWidth={1.75}
@@ -153,7 +188,7 @@ function PricingCard({
               size={11}
               className={cn(
                 "mt-0.5 shrink-0",
-                highlighted ? "text-acid/70" : "text-foreground-subtle",
+                highlighted ? "text-acid/80" : "text-foreground-subtle",
               )}
             />
             {f}
@@ -161,13 +196,23 @@ function PricingCard({
         ))}
       </ul>
 
+      {/* API badge for Enterprise */}
+      {plan.apiAccess && (
+        <div className="mb-3 flex items-center gap-1.5 rounded border border-white/[0.06] bg-black/20 px-2.5 py-1.5">
+          <Shield size={10} strokeWidth={1.75} className="text-foreground-subtle" />
+          <span className="font-mono text-[10px] text-foreground-muted">
+            REST API access included
+          </span>
+        </div>
+      )}
+
       {/* CTA */}
       <a
         href={ctaHref}
         className={cn(
-          "block rounded-sm border px-4 py-2.5 text-center text-[12px] font-semibold transition-all",
+          "block rounded-sm border px-4 py-2.5 text-center text-[12px] font-semibold transition-all duration-200",
           highlighted
-            ? "border-acid bg-acid text-obsidian hover:bg-acid/90"
+            ? "border-acid bg-acid text-obsidian hover:bg-acid/90 hover:shadow-[0_0_16px_rgba(209,255,0,0.4)]"
             : plan.price === 0 && isAuthenticated
               ? "cursor-default border-white/[0.06] text-foreground-subtle"
               : "border-white/[0.1] text-foreground-muted hover:border-white/[0.2] hover:text-foreground",

@@ -1,0 +1,727 @@
+"use client";
+
+/**
+ * /dashboard/bazaar
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Hacker Bazaar — Script Marketplace
+ *
+ * Two modes:
+ *   BROWSE  — grid of published+cleared scripts, filter by lang/tag/price
+ *   UPLOAD  — slide-in panel to submit a new script for AI Customs audit
+ *
+ * Aesthetic: Deep Sea Marineford — obsidian background, acid-green accents,
+ *            sharp edges, monospaced type, no bubbly radius.
+ */
+
+import * as React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ShoppingCart, Upload, Search, Filter, Zap,
+  Shield, CheckCircle, AlertTriangle, XCircle,
+  Star, Code2, Tag, DollarSign, X, ChevronDown,
+  Package, Terminal, Loader2, ShieldCheck,
+} from "lucide-react";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Script {
+  id:               string;
+  name:             string;
+  description:      string;
+  language:         string;
+  tags:             string[];
+  price_usd:        number;
+  is_free:          boolean;
+  purchase_count:   number;
+  audit_verdict:    "cleared" | "flagged" | "rejected" | "pending";
+  audit_risk_score: number;
+  is_purchased:     boolean;
+  created_at:       string;
+  author: {
+    full_name: string;
+    username:  string;
+    rank:      string;
+  } | null;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const LANG_LABELS: Record<string, string> = {
+  python:     "Python",
+  bash:       "Bash",
+  javascript: "JavaScript",
+  rust:       "Rust",
+};
+
+const VERDICT_CONFIG = {
+  cleared:  { label: "CLEARED",  color: "#D1FF00", icon: CheckCircle,    bg: "rgba(209,255,0,0.08)"   },
+  flagged:  { label: "FLAGGED",  color: "#F59E0B", icon: AlertTriangle,  bg: "rgba(245,158,11,0.08)"  },
+  rejected: { label: "REJECTED", color: "#EF4444", icon: XCircle,        bg: "rgba(239,68,68,0.08)"   },
+  pending:  { label: "PENDING",  color: "#6B7280", icon: Shield,          bg: "rgba(107,114,128,0.08)" },
+};
+
+const DEMO_SCRIPTS: Script[] = [
+  {
+    id: "demo-1",
+    name: "sql-blindfire",
+    description: "Automated time-based blind SQLi probe with adaptive delay tuning. Supports MySQL, PostgreSQL, MSSQL.",
+    language: "python",
+    tags: ["sqli", "blind", "automation"],
+    price_usd: 0,
+    is_free: true,
+    purchase_count: 342,
+    audit_verdict: "cleared",
+    audit_risk_score: 12,
+    is_purchased: false,
+    created_at: new Date().toISOString(),
+    author: { full_name: "0xPhantom", username: "phantom", rank: "Legend" },
+  },
+  {
+    id: "demo-2",
+    name: "dns-exfil-tunnel",
+    description: "Bidirectional DNS exfiltration channel. Chunks data into TXT record queries. Evades basic DPI.",
+    language: "python",
+    tags: ["dns", "exfil", "covert-channel"],
+    price_usd: 4.99,
+    is_free: false,
+    purchase_count: 87,
+    audit_verdict: "cleared",
+    audit_risk_score: 68,
+    is_purchased: false,
+    created_at: new Date().toISOString(),
+    author: { full_name: "DeepSea_9", username: "deepsea9", rank: "Hacker" },
+  },
+  {
+    id: "demo-3",
+    name: "ssrf-chainbreaker",
+    description: "SSRF payload generator targeting cloud metadata endpoints (AWS/GCP/Azure). Auto-detects WAF bypass routes.",
+    language: "bash",
+    tags: ["ssrf", "cloud", "bypass"],
+    price_usd: 9.99,
+    is_free: false,
+    purchase_count: 214,
+    audit_verdict: "cleared",
+    audit_risk_score: 55,
+    is_purchased: true,
+    created_at: new Date().toISOString(),
+    author: { full_name: "r00tkitchen", username: "rootkitchen", rank: "Legend" },
+  },
+];
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function VerifiedBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-widest uppercase"
+      style={{
+        color: "#D1FF00",
+        background: "rgba(209,255,0,0.07)",
+        border: "1px solid rgba(209,255,0,0.35)",
+      }}
+      title="Verified by ForgeGuard AI — Risk Score ≤ 10"
+    >
+      <ShieldCheck size={10} strokeWidth={2} />
+      Verified
+    </span>
+  );
+}
+
+function VerdictBadge({ verdict }: { verdict: Script["audit_verdict"] }) {
+  const cfg  = VERDICT_CONFIG[verdict] ?? VERDICT_CONFIG.pending;
+  const Icon = cfg.icon;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-semibold tracking-widest uppercase"
+      style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.color}40` }}
+    >
+      <Icon size={10} />
+      {cfg.label}
+    </span>
+  );
+}
+
+function RiskMeter({ score }: { score: number }) {
+  const color =
+    score >= 80 ? "#EF4444" :
+    score >= 50 ? "#F59E0B" :
+    "#D1FF00";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative h-1 flex-1 rounded-none" style={{ background: "rgba(255,255,255,0.06)" }}>
+        <div
+          className="absolute left-0 top-0 h-full transition-all duration-500"
+          style={{ width: `${score}%`, background: color }}
+        />
+      </div>
+      <span className="font-mono text-[10px]" style={{ color }}>{score}</span>
+    </div>
+  );
+}
+
+function LangDot({ lang }: { lang: string }) {
+  const colors: Record<string, string> = {
+    python: "#3B82F6", bash: "#10B981", javascript: "#F59E0B", rust: "#EF4444",
+  };
+  return (
+    <span className="flex items-center gap-1.5 font-mono text-[11px] text-[#9CA3AF]">
+      <span className="size-2 rounded-full" style={{ background: colors[lang] ?? "#6B7280" }} />
+      {LANG_LABELS[lang] ?? lang}
+    </span>
+  );
+}
+
+function ScriptCard({
+  script,
+  onPurchase,
+  purchasing,
+}: {
+  script:    Script;
+  onPurchase: (id: string) => void;
+  purchasing: string | null;
+}) {
+  const isBuying = purchasing === script.id;
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="group relative flex flex-col"
+      style={{
+        background: "#0A0A0A",
+        border: "1px solid rgba(255,255,255,0.06)",
+        transition: "border-color 0.2s",
+      }}
+      whileHover={{ borderColor: "rgba(209,255,0,0.25)" }}
+    >
+      {/* Accent line */}
+      <div
+        className="h-[2px] w-full"
+        style={{
+          background:
+            script.audit_risk_score >= 80 ? "#EF4444" :
+            script.audit_risk_score >= 50 ? "#F59E0B" :
+            "#D1FF00",
+        }}
+      />
+
+      <div className="flex flex-col gap-3 p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Terminal size={14} className="shrink-0 text-[#D1FF00]" />
+            <span className="font-mono text-[13px] font-semibold text-white truncate">
+              {script.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {script.audit_risk_score <= 10 && <VerifiedBadge />}
+            <VerdictBadge verdict={script.audit_verdict} />
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-[12px] leading-relaxed text-[#6B7280] line-clamp-2">
+          {script.description}
+        </p>
+
+        {/* Risk meter */}
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-mono text-[10px] text-[#4B5563] uppercase tracking-widest">Risk Score</span>
+          </div>
+          <RiskMeter score={script.audit_risk_score} />
+        </div>
+
+        {/* Meta row */}
+        <div className="flex items-center justify-between text-[11px]">
+          <LangDot lang={script.language} />
+          <div className="flex items-center gap-3 text-[#4B5563]">
+            <span className="flex items-center gap-1">
+              <ShoppingCart size={10} />
+              {script.purchase_count.toLocaleString()}
+            </span>
+            <span className="text-[#6B7280]">
+              {script.author?.username ?? "anon"}
+            </span>
+          </div>
+        </div>
+
+        {/* Tags */}
+        {script.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {script.tags.slice(0, 4).map((t) => (
+              <span
+                key={t}
+                className="px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#6B7280" }}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* CTA */}
+        <button
+          disabled={script.is_purchased || isBuying}
+          onClick={() => !script.is_purchased && onPurchase(script.id)}
+          className="mt-1 flex w-full items-center justify-center gap-2 py-2 font-mono text-[11px] font-semibold uppercase tracking-widest transition-all disabled:cursor-default"
+          style={
+            script.is_purchased
+              ? { background: "rgba(209,255,0,0.06)", color: "#D1FF00", border: "1px solid rgba(209,255,0,0.2)" }
+              : { background: "rgba(209,255,0,0.08)", color: "#D1FF00", border: "1px solid rgba(209,255,0,0.3)" }
+          }
+        >
+          {isBuying ? (
+            <><Loader2 size={12} className="animate-spin" />Processing…</>
+          ) : script.is_purchased ? (
+            <><CheckCircle size={12} />Owned — View Code</>
+          ) : script.is_free ? (
+            <><Zap size={12} />Free — Acquire</>
+          ) : (
+            <><DollarSign size={12} />${script.price_usd.toFixed(2)} — Purchase</>
+          )}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Upload Panel ─────────────────────────────────────────────────────────────
+
+function UploadPanel({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = React.useState({
+    name: "", description: "", language: "python", tags: "", code: "", price_usd: "0",
+  });
+  const [uploading, setUploading]   = React.useState(false);
+  const [result, setResult]         = React.useState<null | { verdict: string; risk_score: number; reason: string }>(null);
+  const [error, setError]           = React.useState<string | null>(null);
+
+  const submit = async () => {
+    setUploading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/bazaar/upload", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          ...form,
+          tags:      form.tags.split(",").map((t) => t.trim()).filter(Boolean),
+          price_usd: Number(form.price_usd),
+        }),
+      });
+      const data = await res.json() as { ok: boolean; audit?: { verdict: string; risk_score: number; reason: string }; error?: string };
+      if (!data.ok) throw new Error(data.error ?? "Upload failed");
+      setResult(data.audit ?? { verdict: "cleared", risk_score: 0, reason: "Cleared by AI Customs." });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const verdictColor =
+    result?.verdict === "cleared"  ? "#D1FF00" :
+    result?.verdict === "flagged"  ? "#F59E0B" :
+    result?.verdict === "rejected" ? "#EF4444" : "#6B7280";
+
+  return (
+    <motion.div
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col"
+      style={{ background: "#070707", border: "1px solid rgba(255,255,255,0.08)" }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-6 py-4"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-2">
+          <Upload size={16} className="text-[#D1FF00]" />
+          <span className="font-mono text-[13px] font-semibold uppercase tracking-widest text-white">
+            Upload to Bazaar
+          </span>
+        </div>
+        <button onClick={onClose} className="text-[#4B5563] hover:text-white transition-colors">
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        {result ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col gap-4 p-5"
+            style={{ background: "#0A0A0A", border: `1px solid ${verdictColor}40` }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="size-10 flex items-center justify-center text-lg"
+                style={{ background: `${verdictColor}15`, color: verdictColor }}
+              >
+                {result.verdict === "cleared" ? "✓" : result.verdict === "flagged" ? "!" : "✗"}
+              </div>
+              <div>
+                <p className="font-mono text-[11px] uppercase tracking-widest" style={{ color: verdictColor }}>
+                  AI Customs — {result.verdict.toUpperCase()}
+                </p>
+                <p className="font-mono text-[13px] font-semibold text-white">
+                  Risk Score: {result.risk_score}/100
+                </p>
+              </div>
+            </div>
+            <p className="text-[12px] leading-relaxed text-[#9CA3AF]">{result.reason}</p>
+            {result.verdict !== "rejected" && (
+              <p className="font-mono text-[11px] text-[#D1FF00]">
+                {result.verdict === "cleared"
+                  ? "Script published to Bazaar. Operatives can now acquire it."
+                  : "Script queued for admin review before publishing."}
+              </p>
+            )}
+          </motion.div>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] uppercase tracking-widest text-[#6B7280]">Script Name</label>
+              <input
+                className="w-full bg-transparent px-3 py-2 font-mono text-[13px] text-white placeholder:text-[#374151] focus:outline-none"
+                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+                placeholder="sql-blindfire"
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] uppercase tracking-widest text-[#6B7280]">Description</label>
+              <textarea
+                rows={2}
+                className="w-full resize-none bg-transparent px-3 py-2 font-mono text-[13px] text-white placeholder:text-[#374151] focus:outline-none"
+                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+                placeholder="What does this script do?"
+                value={form.description}
+                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="font-mono text-[10px] uppercase tracking-widest text-[#6B7280]">Language</label>
+                <div className="relative">
+                  <select
+                    className="w-full appearance-none bg-transparent px-3 py-2 font-mono text-[13px] text-white focus:outline-none"
+                    style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+                    value={form.language}
+                    onChange={(e) => setForm((p) => ({ ...p, language: e.target.value }))}
+                  >
+                    <option value="python" className="bg-[#0A0A0A]">Python</option>
+                    <option value="bash"   className="bg-[#0A0A0A]">Bash</option>
+                    <option value="javascript" className="bg-[#0A0A0A]">JavaScript</option>
+                    <option value="rust"   className="bg-[#0A0A0A]">Rust</option>
+                  </select>
+                  <ChevronDown size={12} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4B5563]" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-mono text-[10px] uppercase tracking-widest text-[#6B7280]">Price (USD)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="w-full bg-transparent px-3 py-2 font-mono text-[13px] text-white placeholder:text-[#374151] focus:outline-none"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+                  placeholder="0.00"
+                  value={form.price_usd}
+                  onChange={(e) => setForm((p) => ({ ...p, price_usd: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] uppercase tracking-widest text-[#6B7280]">Tags (comma-separated)</label>
+              <input
+                className="w-full bg-transparent px-3 py-2 font-mono text-[13px] text-white placeholder:text-[#374151] focus:outline-none"
+                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+                placeholder="sqli, bypass, automation"
+                value={form.tags}
+                onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-mono text-[10px] uppercase tracking-widest text-[#6B7280]">Script Code</label>
+              <textarea
+                rows={12}
+                className="w-full resize-none bg-transparent px-3 py-2 font-mono text-[12px] leading-relaxed text-white placeholder:text-[#374151] focus:outline-none"
+                style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#050505" }}
+                placeholder="# Paste your script here…"
+                value={form.code}
+                onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                spellCheck={false}
+              />
+            </div>
+
+            <div
+              className="flex items-start gap-2 px-3 py-3 text-[11px]"
+              style={{ background: "rgba(209,255,0,0.04)", border: "1px solid rgba(209,255,0,0.12)" }}
+            >
+              <Shield size={12} className="mt-0.5 shrink-0 text-[#D1FF00]" />
+              <p className="leading-relaxed text-[#9CA3AF]">
+                All scripts are scanned by{" "}
+                <span className="text-[#D1FF00]">AI Customs (Scout tier)</span> for Traitor logic —
+                code that targets ForgeGuard infrastructure. Violations are permanently rejected.
+              </p>
+            </div>
+
+            {error && (
+              <div
+                className="px-3 py-2 font-mono text-[12px] text-[#EF4444]"
+                style={{ border: "1px solid rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.05)" }}
+              >
+                {error}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      {!result && (
+        <div
+          className="px-6 py-4"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <button
+            disabled={uploading || !form.name || !form.code}
+            onClick={submit}
+            className="flex w-full items-center justify-center gap-2 py-3 font-mono text-[11px] font-semibold uppercase tracking-widest transition-all disabled:opacity-40"
+            style={{ background: "rgba(209,255,0,0.1)", color: "#D1FF00", border: "1px solid rgba(209,255,0,0.3)" }}
+          >
+            {uploading ? (
+              <><Loader2 size={12} className="animate-spin" />Running AI Customs…</>
+            ) : (
+              <><Upload size={12} />Submit to AI Customs</>
+            )}
+          </button>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function BazaarPage() {
+  const [scripts, setScripts]       = React.useState<Script[]>(DEMO_SCRIPTS);
+  const [loading, setLoading]       = React.useState(true);
+  const [search, setSearch]         = React.useState("");
+  const [filterLang, setFilterLang] = React.useState("all");
+  const [filterFree, setFilterFree] = React.useState(false);
+  const [uploading, setUploading]   = React.useState(false);
+  const [purchasing, setPurchasing] = React.useState<string | null>(null);
+  const [showUpload, setShowUpload] = React.useState(false);
+
+  // Load scripts from API
+  React.useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ limit: "50" });
+        if (filterLang !== "all") params.set("lang",  filterLang);
+        if (filterFree)           params.set("free",  "true");
+        const res  = await fetch(`/api/bazaar/list?${params.toString()}`);
+        const data = await res.json() as { ok: boolean; scripts?: Script[] };
+        if (data.ok && data.scripts?.length) {
+          setScripts(data.scripts);
+        }
+      } catch {
+        // keep demo data on network failure
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [filterLang, filterFree]);
+
+  const handlePurchase = async (scriptId: string) => {
+    setPurchasing(scriptId);
+    try {
+      const res  = await fetch("/api/bazaar/purchase", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ script_id: scriptId }),
+      });
+      const data = await res.json() as { ok: boolean; code?: string; error?: string };
+      if (data.ok) {
+        setScripts((prev) =>
+          prev.map((s) => s.id === scriptId ? { ...s, is_purchased: true } : s)
+        );
+        if (data.code) {
+          // In production: open a code viewer modal
+          console.info("[Bazaar] Acquired script code for", scriptId);
+        }
+      }
+    } catch {
+      // silent — button resets
+    } finally {
+      setPurchasing(null);
+    }
+  };
+
+  const filtered = scripts.filter((s) => {
+    const q = search.toLowerCase();
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.description.toLowerCase().includes(q) ||
+      s.tags.some((t) => t.includes(q))
+    );
+  });
+
+  const stats = {
+    total:   scripts.length,
+    free:    scripts.filter((s) => s.is_free).length,
+    cleared: scripts.filter((s) => s.audit_verdict === "cleared").length,
+  };
+
+  return (
+    <div className="min-h-screen" style={{ background: "#050505" }}>
+      {/* Upload panel overlay */}
+      <AnimatePresence>
+        {showUpload && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40"
+              style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+              onClick={() => setShowUpload(false)}
+            />
+            <UploadPanel onClose={() => setShowUpload(false)} />
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Page header */}
+      <div
+        className="px-6 py-5"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+      >
+        <div className="mx-auto max-w-6xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Package size={18} className="text-[#D1FF00]" />
+                <h1 className="font-mono text-xl font-bold tracking-tight text-white">
+                  HACKER BAZAAR
+                </h1>
+                <span
+                  className="px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest"
+                  style={{ background: "rgba(209,255,0,0.08)", color: "#D1FF00", border: "1px solid rgba(209,255,0,0.2)" }}
+                >
+                  v1.0 Live
+                </span>
+              </div>
+              <p className="font-mono text-[12px] text-[#4B5563]">
+                AI-audited script marketplace. All uploads screened by Customs Agent.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 px-4 py-2.5 font-mono text-[11px] font-semibold uppercase tracking-widest transition-all"
+              style={{ background: "rgba(209,255,0,0.1)", color: "#D1FF00", border: "1px solid rgba(209,255,0,0.3)" }}
+            >
+              <Upload size={13} />
+              Upload Script
+            </button>
+          </div>
+
+          {/* Stats bar */}
+          <div className="mt-4 flex items-center gap-6">
+            {[
+              { label: "Scripts",  value: stats.total,   icon: Code2 },
+              { label: "Free",     value: stats.free,    icon: Zap },
+              { label: "Cleared",  value: stats.cleared, icon: CheckCircle },
+            ].map(({ label, value, icon: Icon }) => (
+              <div key={label} className="flex items-center gap-2">
+                <Icon size={12} className="text-[#D1FF00]" />
+                <span className="font-mono text-[13px] font-semibold text-white">{value}</span>
+                <span className="font-mono text-[11px] text-[#4B5563]">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div
+        className="sticky top-0 z-10 px-6 py-3"
+        style={{ background: "rgba(5,5,5,0.9)", backdropFilter: "blur(8px)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+      >
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          {/* Search */}
+          <div
+            className="relative flex flex-1 items-center"
+            style={{ border: "1px solid rgba(255,255,255,0.08)", maxWidth: 320 }}
+          >
+            <Search size={13} className="absolute left-3 text-[#4B5563]" />
+            <input
+              className="w-full bg-transparent py-2 pl-9 pr-3 font-mono text-[12px] text-white placeholder:text-[#374151] focus:outline-none"
+              placeholder="Search scripts…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Language filter */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-transparent py-2 pl-3 pr-8 font-mono text-[11px] text-[#9CA3AF] focus:outline-none cursor-pointer"
+              style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+              value={filterLang}
+              onChange={(e) => setFilterLang(e.target.value)}
+            >
+              <option value="all"        className="bg-[#0A0A0A]">All Languages</option>
+              <option value="python"     className="bg-[#0A0A0A]">Python</option>
+              <option value="bash"       className="bg-[#0A0A0A]">Bash</option>
+              <option value="javascript" className="bg-[#0A0A0A]">JavaScript</option>
+              <option value="rust"       className="bg-[#0A0A0A]">Rust</option>
+            </select>
+            <ChevronDown size={10} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4B5563]" />
+          </div>
+
+          {/* Free toggle */}
+          <button
+            onClick={() => setFilterFree((p) => !p)}
+            className="flex items-center gap-2 px-3 py-2 font-mono text-[11px] uppercase tracking-wide transition-all"
+            style={{
+              border: "1px solid",
+              borderColor: filterFree ? "rgba(209,255,0,0.4)" : "rgba(255,255,255,0.08)",
+              color:       filterFree ? "#D1FF00" : "#6B7280",
+              background:  filterFree ? "rgba(209,255,0,0.06)" : "transparent",
+            }}
+          >
+            <Zap size={11} />
+            Free Only
+          </button>
+        </div>
+      </div>
+
+      {/* Grid */}
+      <div className="mx-auto max-w-6xl px-6 py-6">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={20} className="animate-spin text-[#D1FF00]" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <Package size={32} className="mb-3 text-[#1F2937]" />
+            <p className="font-mono text-[13px] text-[#374151]">No scripts match you

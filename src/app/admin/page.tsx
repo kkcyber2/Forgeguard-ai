@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   Activity,
   Cpu,
+  Gift,
   Globe2,
   Radar,
   ShieldAlert,
@@ -21,6 +22,7 @@ import {
   type SystemHealthMetrics,
 } from "@/components/dashboard/system-health";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { LiveWorldMap } from "@/components/dashboard/live-world-map";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
@@ -224,6 +226,18 @@ export default async function AdminOverviewPage() {
         </StaggerItem>
       </Stagger>
 
+      {/* Live scan surface map */}
+      <div className="mt-6">
+        <SectionCard
+          eyebrow="Surface"
+          title="Global scan activity"
+          description="Live PoP nodes light up as findings are emitted. Pulses are seeded from active scan locations."
+          density="flush"
+        >
+          <LiveWorldMap activeScans={activeScans} />
+        </SectionCard>
+      </div>
+
       {/* Body grid */}
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <SectionCard
@@ -268,9 +282,10 @@ export default async function AdminOverviewPage() {
         </SectionCard>
       </div>
 
-      {/* User management */}
-      <div className="mt-6">
+      {/* User management + Promotions */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <SectionCard
+          className="lg:col-span-2"
           eyebrow="Identity"
           title="User management"
           description="Active operators on this tenant. Click an action to mutate role / status."
@@ -286,6 +301,27 @@ export default async function AdminOverviewPage() {
           ) : (
             <UsersTable rows={users.slice(0, 8)} />
           )}
+        </SectionCard>
+
+        <SectionCard
+          eyebrow="Growth"
+          title="Promotions"
+          description="Promo codes and plan access grants."
+          action={<SectionLink href="/admin/promotions">Manage codes</SectionLink>}
+        >
+          <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
+            <Gift size={24} className="text-acid/40" />
+            <p className="text-xs text-foreground-muted">
+              Create single-use or multi-use codes that grant instant plan access.
+            </p>
+            <Link
+              href="/admin/promotions"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-acid/40 bg-acid/10 px-3 py-1.5 font-mono text-[10px] text-acid transition-colors hover:bg-acid/20"
+            >
+              <Gift size={10} />
+              Open promotions
+            </Link>
+          </div>
         </SectionCard>
       </div>
     </>

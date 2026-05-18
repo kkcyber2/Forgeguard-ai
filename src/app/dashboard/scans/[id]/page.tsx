@@ -108,6 +108,14 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .eq("scan_id", id)
     .maybeSingle()) as { data: ScanReport | null };
 
+  // Fetch user's subscription plan for feature gating (PDF download = Startup+).
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("plan")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const userPlan = (sub?.plan as "free" | "startup" | "enterprise" | null) ?? "free";
+
   // Severity breakdown derived from initial logs (the live child keeps
   // its own running totals after that).
   const sevCounts = aggregateSeverity(logs ?? []);
@@ -232,6 +240,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
         scanId={scan.id}
         targetModel={scan.target_model}
         targetUrl={scan.target_url}
+        userPlan={userPlan}
       />
 
       <p className="mt-6 text-[11px] text-foreground-subtle">

@@ -9,6 +9,7 @@ import {
   ClipboardCopy,
   Code2,
   Download,
+  Lock,
   FileText,
   Layers,
   ShieldAlert,
@@ -17,6 +18,8 @@ import {
   Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type PlanId = "free" | "startup" | "enterprise";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /*  Types                                                                       */
@@ -200,6 +203,32 @@ type MdNode =
   | { kind: "ol"; items: string[] }
   | { kind: "table"; headers: string[]; rows: string[][] };
 
+/**
+ * Returns true when a heading text belongs to a "scare-factor" section
+ * produced by the DeepSeek-R1 audit reporter, warranting Acid Green glow.
+ */
+const SCARY_PATTERNS = [
+  /acid\s*shield/i,
+  /exploitable/i,
+  /blast\s*radius/i,
+  /breach\s*(precedent|report|vector|summary)?/i,
+  /critical\s*(finding|vuln|risk|exposure)/i,
+  /attack\s*(surface|path|vector)/i,
+  /zero[\s-]day/i,
+  /jailbreak/i,
+  /policy\s*violation/i,
+  /exfiltrat/i,
+  /injection\s*(success|achieved|confirmed)/i,
+  /\u26A1|\u26D4|\uD83D\uDD34|\uD83D\uDEA8/u,
+  /ACTIVELY\s*EXPLOIT/i,
+  /HIGH\s*SEVERITY/i,
+  /SEVERE/i,
+];
+
+function isScaryHeading(text: string): boolean {
+  return SCARY_PATTERNS.some((re) => re.test(text));
+}
+
 function parseMarkdown(md: string): React.ReactNode[] {
   const raw = md.split("\n");
   const nodes: React.ReactNode[] = [];
@@ -242,28 +271,59 @@ function parseMarkdown(md: string): React.ReactNode[] {
 
     // Headings
     if (line.startsWith("### ")) {
+      const text3 = line.slice(4);
+      const scary3 = isScaryHeading(text3);
       nodes.push(
-        <h3 key={i} className="text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
-          {inlineFormat(line.slice(4))}
+        <h3
+          key={i}
+          className={
+            scary3
+              ? "text-xs font-bold uppercase tracking-wider text-acid drop-shadow-[0_0_8px_rgba(209,255,0,0.55)]"
+              : "text-xs font-semibold uppercase tracking-wider text-foreground-subtle"
+          }
+        >
+          {inlineFormat(text3)}
         </h3>
       );
       i++;
       continue;
     }
     if (line.startsWith("## ")) {
+      const text2 = line.slice(3);
+      const scary2 = isScaryHeading(text2);
       nodes.push(
-        <h2 key={i} className="text-sm font-semibold text-foreground border-b border-white/[0.06] pb-1">
-          {inlineFormat(line.slice(3))}
-        </h2>
+        scary2 ? (
+          <h2
+            key={i}
+            className="text-sm font-bold text-acid border-b border-acid/30 pb-1 drop-shadow-[0_0_12px_rgba(209,255,0,0.45)]"
+          >
+            {inlineFormat(text2)}
+          </h2>
+        ) : (
+          <h2 key={i} className="text-sm font-semibold text-foreground border-b border-white/[0.06] pb-1">
+            {inlineFormat(text2)}
+          </h2>
+        )
       );
       i++;
       continue;
     }
     if (line.startsWith("# ")) {
+      const text1 = line.slice(2);
+      const scary1 = isScaryHeading(text1);
       nodes.push(
-        <h1 key={i} className="text-base font-bold text-foreground">
-          {inlineFormat(line.slice(2))}
-        </h1>
+        scary1 ? (
+          <h1
+            key={i}
+            className="text-base font-black text-acid drop-shadow-[0_0_18px_rgba(209,255,0,0.55)] border border-acid/20 rounded px-2 py-1 bg-acid/[0.04]"
+          >
+            {inlineFormat(text1)}
+          </h1>
+        ) : (
+          <h1 key={i} className="text-base font-bold text-foreground">
+            {inlineFormat(text1)}
+          </h1>
+        )
       );
       i++;
       continue;
@@ -731,6 +791,7 @@ interface FindingsReportProps {
   scanId?: string;
   targetModel?: string;
   targetUrl?: string;
+  userPlan?: PlanId;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -884,12 +945,28 @@ function DownloadReportButton({
   scanId,
   targetModel,
   targetUrl,
+  userPlan = "free",
 }: {
   report: ScanReport;
   scanId: string;
   targetModel: string;
   targetUrl: string;
+  userPlan?: PlanId;
 }) {
+  const hasPdfAccess = userPlan === "startup" || userPlan === "enterprise";
+  if (!hasPdfAccess) {
+    return (
+      <a
+        href="/dashboard/billing"
+        title="Upgrade to Startup to unlock PDF reports"
+        className="group flex items-center gap-1.5 rounded-sm border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[11px] font-medium text-foreground-subtle transition-colors hover:border-acid/30 hover:text-acid"
+      >
+        <Lock size={10} strokeWidth={1.75} />
+        PDF — Startup+
+      </a>
+    );
+  }
+
   const handleDownload = () => {
     const html = buildReportHTML(report, scanId, targetModel, targetUrl);
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -981,6 +1058,7 @@ export function FindingsReport({
   scanId = "unknown",
   targetModel = "",
   targetUrl = "",
+  userPlan = "free",
 }: FindingsReportProps) {
   if (scanStatus !== "sealed") {
     return null; // only render when scan is done
@@ -1022,6 +1100,7 @@ export function FindingsReport({
           scanId={scanId}
           targetModel={targetModel}
           targetUrl={targetUrl}
+          userPlan={userPlan}
         />
         {/* Overall CVSS */}
         <div className={cn("text-right", riskCfg.glow)}>

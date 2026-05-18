@@ -70,7 +70,10 @@ function getRateLimitConfig(
     pathname.startsWith("/api/chat") ||
     pathname.startsWith("/api/submissions") ||
     pathname.startsWith("/api/contact") ||
-    pathname.startsWith("/api/scan")
+    pathname.startsWith("/api/scan") ||
+    pathname.startsWith("/api/forge") ||
+    pathname.startsWith("/api/bounty") ||
+    pathname.startsWith("/api/aegis")
   ) {
     return { bucket: "scan", ...RATE_LIMITS.scan };
   }
@@ -106,7 +109,7 @@ function buildCsp(nonce: string, isDev: boolean): string {
     `style-src ${styleSrc}`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.groq.com`,
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.groq.com https://openrouter.ai`,
     `frame-ancestors 'none'`,
     `form-action 'self'`,
     `base-uri 'self'`,

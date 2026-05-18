@@ -1,15 +1,25 @@
 import * as React from "react";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
+import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { cn, getInitials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { CommandBar } from "@/components/dashboard/command-bar";
+import { EngineStatus } from "@/components/dashboard/engine-status";
+import { WalletCredits } from "@/components/dashboard/wallet-credits";
 import {
   Activity,
   CalendarClock,
+  CreditCard,
+  FlaskConical,
+  GitBranch,
+  Globe,
   LayoutDashboard,
   Radar,
   Settings,
   ShieldAlert,
+  ShieldCheck,
+  Store,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -31,18 +41,30 @@ export type NavIconName =
   | "radar"
   | "settings"
   | "shield-alert"
+  | "shield-check"
   | "users"
   | "activity"
-  | "calendar-clock";
+  | "calendar-clock"
+  | "credit-card"
+  | "flask-conical"
+  | "globe"
+  | "store"
+  | "git-branch";
 
-const NAV_ICONS: Record<NavIconName, LucideIcon> = {
+export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
   radar: Radar,
   settings: Settings,
   "shield-alert": ShieldAlert,
+  "shield-check": ShieldCheck,
   users: Users,
   activity: Activity,
   "calendar-clock": CalendarClock,
+  "credit-card": CreditCard,
+  "flask-conical": FlaskConical,
+  globe: Globe,
+  store: Store,
+  "git-branch": GitBranch,
 };
 
 export interface NavItem {
@@ -73,10 +95,13 @@ export function DashboardShell({
 }) {
   return (
     <div className="relative min-h-screen bg-background">
+      {/* Global CMD+K command palette — mounted once at root */}
+      <CommandBar />
       <Sidebar nav={nav} user={user} scope={scope} activePath={activePath} />
-      <Topbar scope={scope} user={user} />
+      <Topbar nav={nav} scope={scope} user={user} activePath={activePath} />
       <main className="lg:pl-60 pt-14 lg:pt-0">
         <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
+          <EngineStatus />
           {children}
         </div>
       </main>
@@ -98,12 +123,19 @@ function Sidebar({
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r-[0.5px] border-white/[0.06] bg-obsidian-950/80 backdrop-blur-md lg:flex">
       <div className="flex h-14 items-center gap-2 border-b-[0.5px] border-white/[0.06] px-5">
-        <Logo />
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Logo />
+        </Link>
         {scope === "admin" ? (
           <Badge tone="admin" className="ml-auto">
             Admin
           </Badge>
         ) : null}
+      </div>
+
+      {/* CMD+K search trigger — sidebar placement */}
+      <div className="px-3 py-3 border-b-[0.5px] border-white/[0.04]">
+        <CommandBar />
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-5">
@@ -159,6 +191,7 @@ function Sidebar({
               {user.email}
             </p>
           </div>
+          <WalletCredits />
         </div>
         <form action="/auth/signout" method="post">
           <button
@@ -173,10 +206,25 @@ function Sidebar({
   );
 }
 
-function Topbar({ scope, user }: { scope: "user" | "admin"; user: ShellUser }) {
+function Topbar({
+  nav,
+  scope,
+  user,
+  activePath,
+}: {
+  nav: NavItem[];
+  scope: "user" | "admin";
+  user: ShellUser;
+  activePath: string;
+}) {
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b-[0.5px] border-white/[0.06] bg-obsidian-950/80 px-4 backdrop-blur-md lg:hidden">
-      <Logo />
+      <div className="flex items-center gap-3">
+        <MobileNav nav={nav} user={user} scope={scope} activePath={activePath} />
+        <Link href="/" className="hover:opacity-80 transition-opacity">
+          <Logo />
+        </Link>
+      </div>
       <div className="flex items-center gap-2">
         {scope === "admin" ? <Badge tone="admin">Admin</Badge> : null}
         <div className="flex h-8 w-8 items-center justify-center rounded-sm border-hairline border-white/10 bg-obsidian-800 font-mono text-[11px] text-foreground">
@@ -210,10 +258,4 @@ export function PageHeader({
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-2xl text-sm text-foreground-muted">{description}</p>
-        ) : null}
-      </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
-    </header>
-  );
-}
+          <p className="mt-2 max-w-2xl

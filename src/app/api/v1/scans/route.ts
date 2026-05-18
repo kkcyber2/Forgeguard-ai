@@ -99,6 +99,32 @@ export async function POST(req: NextRequest) {
     return json({ error: "Invalid or revoked API key" }, 401);
   }
 
+  // 2b. Enforce Enterprise plan — REST API access is Enterprise-only.
+  const userId = keyRow.user_id as string;
+  const { data: subRow } = await admin
+    .from("subscriptions")
+    .select("plan, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const plan = (subRow?.plan as string | null) ?? "free";
+  const subStatus = (subRow?.status as string | null) ?? "inactive";
+  const isEnterprise =
+    plan === "enterprise" && (subStatus === "active" || subStatus === "trialing");
+
+  if (!isEnterprise) {
+    return json(
+      {
+        error: "PLAN_UPGRADE_REQUIRED",
+        message:
+          "REST API access requires the Enterprise plan. Upgrade at /dashboard/billing.",
+        currentPlan: plan,
+        requiredPlan: "enterprise",
+      },
+      403,
+    );
+  }
+
   // 3. Parse + validate body
   let body: unknown;
   try {
@@ -130,8 +156,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 5. Insert scan row (as the key owner)
-  const userId = keyRow.user_id as string;
+  // 5. Insert scan row (as the key owner — userId declared in step 2b above)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: scan, error: insErr } = await (admin as any)

@@ -28,8 +28,8 @@ export default async function HomePage() {
   }
 
   const primaryCta = isAuthenticated
-    ? { href: "/dashboard/scans/new", label: "Start a new scan" }
-    : { href: "/auth/signup", label: "Deploy ForgeGuard" };
+    ? { href: "/dashboard", label: "Return to Command Center" }
+    : { href: "/auth/signup", label: "Join the Stronghold" };
 
   return (
     <main className="relative w-full">

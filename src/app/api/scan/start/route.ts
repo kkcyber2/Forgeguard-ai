@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
   /* ── Scan-quota gating ──────────────────────────────────────────────────
    * Read the my_scan_quota view (scoped to auth.uid() via RLS).
    * On error we default to allow — never block a scan due to a DB blip.
-   * Free plan: 2 scans/month · Startup: 20 · Enterprise: unlimited.
+   * Free plan: 3 scans/month · Startup: 20 · Enterprise: unlimited.
    * ─────────────────────────────────────────────────────────────────────── */
   type QuotaRow = {
     plan: string;

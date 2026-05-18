@@ -3,11 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useActionState } from "react";
-import { AlertTriangle, Eye, EyeOff, Lock, Radar, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, Lock, Radar, ShieldCheck, Zap, Radiation, Activity } from "lucide-react";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { createScan, type CreateScanState } from "../actions";
+import { LegalVerificationModal } from "@/components/scans/LegalVerificationModal";
+import type { LegalIntensity } from "../legal-actions";
 
 /**
  * NewScanForm — client-side wrapper around the `createScan` Server Action.
@@ -50,12 +52,53 @@ const PRESET_ENDPOINTS = [
   },
 ] as const;
 
+/* ── Intensity selector config ─────────────────────────────────────── */
+type ScanIntensity = "standard" | LegalIntensity;
+
+const INTENSITY_OPTIONS: {
+  value:    ScanIntensity;
+  label:    string;
+  sublabel: string;
+  Icon:     React.ElementType;
+  color:    string;
+  needsLegal: boolean;
+}[] = [
+  {
+    value:      "standard",
+    label:      "Standard",
+    sublabel:   "Full suite, rate-limited",
+    Icon:       Activity,
+    color:      "rgba(209,255,0,1)",
+    needsLegal: false,
+  },
+  {
+    value:      "high",
+    label:      "High",
+    sublabel:   "Aggressive mutations",
+    Icon:       Zap,
+    color:      "rgb(251,191,36)",
+    needsLegal: true,
+  },
+  {
+    value:      "nuclear",
+    label:      "Nuclear",
+    sublabel:   "Marine Swarm unleashed",
+    Icon:       Radiation,
+    color:      "rgb(239,68,68)",
+    needsLegal: true,
+  },
+];
+
 export function NewScanForm() {
   const [state, formAction, pending] = useActionState(createScan, initial);
-  const [showKey, setShowKey] = React.useState(false);
-  const [preset, setPreset] = React.useState<string>("OpenAI");
-  const [targetUrl, setTargetUrl] = React.useState<string>(PRESET_ENDPOINTS[0].url);
-  const [targetModel, setTargetModel] = React.useState<string>(PRESET_ENDPOINTS[0].model);
+  const [showKey,    setShowKey]    = React.useState(false);
+  const [preset,     setPreset]     = React.useState<string>("OpenAI");
+  const [targetUrl,  setTargetUrl]  = React.useState<string>(PRESET_ENDPOINTS[0].url);
+  const [targetModel,setTargetModel]= React.useState<string>(PRESET_ENDPOINTS[0].model);
+  const [intensity,  setIntensity]  = React.useState<ScanIntensity>("standard");
+  const [showLegal,  setShowLegal]  = React.useState(false);
+  const [authId,     setAuthId]     = React.useState<string | null>(null);
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   React.useEffect(() => {
     const hit = PRESET_ENDPOINTS.find((p) => p.label === preset);
@@ -64,12 +107,42 @@ export function NewScanForm() {
     setTargetModel(hit.model);
   }, [preset]);
 
+  function handleLaunch(e: React.FormEvent) {
+    const selected = INTENSITY_OPTIONS.find((o) => o.value === intensity);
+    if (selected?.needsLegal && !authId) {
+      e.preventDefault();
+      setShowLegal(true);
+    }
+    // else: let the form submit naturally via formAction
+  }
+
+  function handleAuthorized(id: string) {
+    setAuthId(id);
+    setShowLegal(false);
+    // Submit the form now that auth is in place
+    setTimeout(() => formRef.current?.requestSubmit(), 50);
+  }
+
   return (
+    <>
+    {showLegal && intensity !== "standard" && (
+      <LegalVerificationModal
+        intensity={intensity as LegalIntensity}
+        onAuthorized={handleAuthorized}
+        onCancel={() => setShowLegal(false)}
+      />
+    )}
     <form
+      ref={formRef}
       action={formAction}
+      onSubmit={handleLaunch}
       className="rounded-sm border-hairline border-white/[0.08] bg-surface/80 backdrop-blur-md shadow-elevated"
       noValidate
     >
+      {/* Hidden fields for intensity + auth */}
+      <input type="hidden" name="intensity" value={intensity} />
+      {authId && <input type="hidden" name="legal_auth_id" value={authId} />}
+
       <div className="border-b-[0.5px] border-white/[0.06] px-6 py-5">
         <p className="text-eyebrow text-acid">Target acquisition</p>
         <h2 className="mt-2 text-lg font-medium text-foreground">
@@ -184,6 +257,56 @@ export function NewScanForm() {
           </p>
         </div>
 
+        {/* ── Intensity selector ──────────────────────────────────── */}
+        <div>
+          <Label>Scan intensity</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {INTENSITY_OPTIONS.map((opt) => {
+              const active = intensity === opt.value;
+              const OptIcon = opt.Icon;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { setIntensity(opt.value); setAuthId(null); }}
+                  className="relative flex flex-col items-start rounded-sm px-3 py-2.5 text-left transition-all"
+                  style={{
+                    background: active ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+                    border: active
+                      ? `0.5px solid ${opt.color}50`
+                      : "0.5px solid rgba(255,255,255,0.08)",
+                    boxShadow: active ? `0 0 16px ${opt.color}18` : "none",
+                  }}
+                >
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <OptIcon size={12} style={{ color: active ? opt.color : "rgba(255,255,255,0.3)" }} strokeWidth={1.75} />
+                    <span
+                      className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em]"
+                      style={{ color: active ? opt.color : "rgba(255,255,255,0.4)" }}
+                    >
+                      {opt.label}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-white/30">{opt.sublabel}</span>
+                  {opt.needsLegal && (
+                    <span
+                      className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.1em]"
+                      style={{ color: opt.color, opacity: 0.7 }}
+                    >
+                      Legal gate
+                    </span>
+                  )}
+                  {opt.needsLegal && authId && intensity === opt.value && (
+                    <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-green-400">
+                      ✓ Authorized
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div>
           <Label htmlFor="notes">
             Notes <span className="opacity-50">(optional)</span>
@@ -226,9 +349,10 @@ export function NewScanForm() {
         </Link>
         <Button type="submit" variant="primary" size="md" disabled={pending}>
           <Radar size={14} strokeWidth={1.75} />
-          {pending ? "Launching probe…" : "Launch scan"}
+          {pending ? "Initializing Breach Simulation..." : "Launch scan"}
         </Button>
       </div>
     </form>
+    </>
   );
 }

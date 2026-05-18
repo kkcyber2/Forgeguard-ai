@@ -132,6 +132,7 @@ const config: Config = {
         "marquee": "marquee 38s linear infinite",
         "fade-in-up": "fadeInUp 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both",
         "shimmer": "shimmer 2.6s linear infinite",
+        "blink": "blink 1s step-end infinite",
       },
       keyframes: {
         pulseAcid: {
@@ -157,6 +158,10 @@ const config: Config = {
         shimmer: {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
+        },
+        blink: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0" },
         },
       },
       transitionTimingFunction: {

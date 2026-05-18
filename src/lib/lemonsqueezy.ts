@@ -12,15 +12,44 @@ function requireEnv(key: string): string {
   return v;
 }
 
+/**
+ * Hardcoded fallback variant IDs.
+ * These are used when env vars are not set (e.g., during local dev or
+ * if Vercel env vars haven't been configured yet).
+ * Replace these with your actual LemonSqueezy variant IDs from:
+ * https://app.lemonsqueezy.com/products
+ *
+ * To find your variant IDs:
+ *   1. Go to LemonSqueezy → Products
+ *   2. Click a product → Variants tab
+ *   3. Copy the numeric ID from the URL or the variant row
+ */
+const FALLBACK_VARIANT_STARTUP    = process.env.LEMONSQUEEZY_VARIANT_STARTUP    ?? "";
+const FALLBACK_VARIANT_ENTERPRISE = process.env.LEMONSQUEEZY_VARIANT_ENTERPRISE ?? "";
+
+/**
+ * Read variant IDs only — does NOT require the API key.
+ * Safe to call even when LS credentials aren't configured.
+ * Used by billing page checkout URL builder.
+ */
+export function getLSVariantIds() {
+  return {
+    variantStartup:    FALLBACK_VARIANT_STARTUP,
+    variantEnterprise: FALLBACK_VARIANT_ENTERPRISE,
+  };
+}
+
 /** Lazy-read so the module can be imported without crashing at build time. */
 export function getLSEnv() {
   return {
     apiKey:        requireEnv("LEMONSQUEEZY_API_KEY"),
     webhookSecret: requireEnv("LEMONSQUEEZY_WEBHOOK_SECRET"),
     storeId:       process.env.LEMONSQUEEZY_STORE_ID ?? "",
-    // Variant IDs map: set these in your .env after creating products in LS
-    variantStartup:    process.env.LEMONSQUEEZY_VARIANT_STARTUP ?? "",
-    variantEnterprise: process.env.LEMONSQUEEZY_VARIANT_ENTERPRISE ?? "",
+    // Variant IDs — set in .env after creating products in LemonSqueezy:
+    //   Startup    → $49/mo  → LEMONSQUEEZY_VARIANT_STARTUP
+    //   Enterprise → $199/mo → LEMONSQUEEZY_VARIANT_ENTERPRISE
+    variantStartup:    FALLBACK_VARIANT_STARTUP,
+    variantEnterprise: FALLBACK_VARIANT_ENTERPRISE,
   };
 }
 
@@ -28,81 +57,11 @@ export function getLSEnv() {
 /*  Plan metadata (source of truth for the UI)                                  */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-export type PlanId = "free" | "startup" | "enterprise";
+// Re-export from client-safe module so server-side code can still
+// import PlanMeta/PLANS from here without duplication.
+export type { PlanId, PlanMeta } from "@/lib/plans";
+export { PLANS, getPlanMeta as _getPlanMeta } from "@/lib/plans";
 
-export interface PlanMeta {
-  id: PlanId;
-  name: string;
-  price: number; // USD/month (0 = free)
-  scansPerMonth: number; // 999_999 = unlimited
-  engine: string;
-  pdfReport: boolean;
-  apiAccess: boolean;
-  badge?: string;
-  description: string;
-  features: string[];
-}
-
-export const PLANS: PlanMeta[] = [
-  {
-    id: "free",
-    name: "Hacker",
-    price: 0,
-    scansPerMonth: 2,
-    engine: "Llama-8B",
-    pdfReport: false,
-    apiAccess: false,
-    description: "Explore AI red-teaming with no commitment.",
-    features: [
-      "2 scans / month",
-      "Llama-8B attack engine",
-      "Full finding breakdown",
-      "OWASP LLM coverage map",
-    ],
-  },
-  {
-    id: "startup",
-    name: "Startup",
-    price: 19,
-    scansPerMonth: 20,
-    engine: "DeepSeek-V3",
-    pdfReport: true,
-    apiAccess: false,
-    badge: "Most Popular",
-    description: "For teams shipping AI products that need real security.",
-    features: [
-      "20 scans / month",
-      "DeepSeek-V3 attack engine",
-      "Full Audit Report PDF",
-      "OWASP LLM coverage map",
-      "Remediation roadmap",
-      "Email support",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: 199,
-    scansPerMonth: 999_999,
-    engine: "DeepSeek-R1 (High Reasoning)",
-    pdfReport: true,
-    apiAccess: true,
-    description: "Unlimited power for security teams and regulated industries.",
-    features: [
-      "Unlimited scans",
-      "DeepSeek-R1 reasoning engine",
-      "Full Audit Report PDF",
-      "REST API access",
-      "Priority Slack support",
-      "Custom attack playbooks",
-      "SLA guarantee",
-    ],
-  },
-];
-
-export function getPlanMeta(id: PlanId): PlanMeta {
-  return PLANS.find((p) => p.id === id) ?? PLANS[0];
-}
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /*  Webhook signature verification                                              */
@@ -214,3 +173,4 @@ export function buildCheckoutUrl(
     "checkout[success_url]":                `${process.env.NEXT_PUBLIC_APP_URL ?? "https://forgeguard.ai"}/dashboard/billing?upgraded=1`,
   });
   return `${base}?${params.toString()}`;
+}

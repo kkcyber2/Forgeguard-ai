@@ -24,6 +24,7 @@ import {
   Lock,
   Play,
   RefreshCw,
+  Send,
   ShieldAlert,
   Square,
   Terminal,
@@ -102,6 +103,7 @@ function termColor(ev: ForgeEvent): string {
     case "start":  return "text-accent";
     case "info":   return "text-steel-300";
     case "comment":return "text-steel-700";
+    case "stdin":  return "text-acid";
     default:       return "text-steel-200";
   }
 }
@@ -249,6 +251,9 @@ export default function ForgePage() {
   const [events, setEvents]               = React.useState<ForgeEvent[]>([]);
   const [gateError, setGateError]         = React.useState<string | null>(null);
   const [sessionId, setSessionId]         = React.useState<string | null>(null);
+  const [stdinInput, setStdinInput]       = React.useState("");
+  const [stdinSending, setStdinSending]   = React.useState(false);
+  const [waitingForInput, setWaitingForInput] = React.useState(false);
 
   const termRef    = React.useRef<HTMLDivElement>(null);
   const abortRef   = React.useRef<AbortController | null>(null);
@@ -381,6 +386,9 @@ export default function ForgePage() {
             if (ev.type === "start" && ev.session_id) {
               setSessionId(ev.session_id);
             }
+            // STDIN flow: server signals when script pauses for input
+            if (ev.type === "waiting_for_input") setWaitingForInput(true);
+            if (ev.type === "done" || ev.type === "killed") setWaitingForInput(false);
             setEvents((prev) => [...prev, ev]);
           } catch {
             setEvents((prev) => [...prev, { type: "stdout", line: dataLine }]);
@@ -397,6 +405,27 @@ export default function ForgePage() {
     } finally {
       setRunning(false);
       abortRef.current = null;
+    }
+  }
+
+  /** Send user's stdin to the terminal_inputs table so the Railway worker can read it. */
+  async function sendStdin() {
+    if (!stdinInput.trim() || !sessionId || stdinSending) return;
+    const text = stdinInput.trim();
+    setStdinSending(true);
+    try {
+      const res = await fetch("/api/forge/input", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ session_id: sessionId, content: text }),
+      });
+      if (res.ok) {
+        setStdinInput("");
+        setWaitingForInput(false);
+        setEvents(prev => [...prev, { type: "stdin", line: `> ${text}` }]);
+      }
+    } finally {
+      setStdinSending(false);
     }
   }
 
@@ -714,6 +743,45 @@ export default function ForgePage() {
               </AnimatePresence>
             )}
           </div>
+
+          {/* STDIN input bar — visible while running or waiting for input */}
+          <AnimatePresence>
+            {(running || waitingForInput) && (
+              <motion.div
+                key="stdin-bar"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center gap-2 rounded-sm border border-white/[0.07] bg-obsidian-900/80 px-3 py-2"
+              >
+                <span className="shrink-0 select-none font-mono text-[11px] text-acid">
+                  {waitingForInput ? "stdin›" : "input›"}
+                </span>
+                {waitingForInput && (
+                  <span className="mr-1 select-none font-mono text-[10px] uppercase tracking-widest text-acid/60 animate-pulse">
+                    Waiting for Input...
+                  </span>
+                )}
+                <input
+                  type="text"
+                  value={stdinInput}
+                  onChange={e => setStdinInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") void sendStdin(); }}
+                  placeholder="Send to running script…"
+                  autoFocus={waitingForInput}
+                  className="flex-1 bg-transparent font-mono text-[12px] text-foreground placeholder:text-steel-700 focus:outline-none"
+                />
+                <button
+                  onClick={() => void sendStdin()}
+                  disabled={!stdinInput.trim() || stdinSending}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm border border-white/[0.08] bg-obsidian-800/60 text-acid transition-colors hover:bg-acid/10 disabled:opacity-30"
+                >
+                  {stdinSending ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />}
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Stats bar */}
           {events.length > 0 && (

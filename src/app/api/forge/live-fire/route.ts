@@ -219,6 +219,26 @@ export async function POST(req: NextRequest) {
       p_reason:  "Traitor Protocol: attempt to access platform credentials detected in submitted code.",
     });
 
+    // ── Intel Hub broadcast ────────────────────────────────────────────────────
+    // Shame message broadcast to all platform members via Realtime.
+    // Uses service-role client to bypass RLS and insert on behalf of the
+    // offending user so their handle appears in the message feed.
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const adminClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false } },
+      );
+      const handle = (user.email?.split("@")[0] ?? user.id.slice(0, 8)).toUpperCase();
+      await adminClient.from("intel_messages").insert({
+        user_id: user.id,
+        content: `🚨 ${handle} ATTEMPTED SYSTEM EXFILTRATION. RANK SET TO TRAITOR. ASSETS FROZEN.`,
+      });
+    } catch {
+      // Non-fatal — wallet freeze already applied; broadcast is cosmetic.
+    }
+
     // Return SSE error stream so terminal renders it correctly
     const stream = new ReadableStream({
       start(controller) {
@@ -255,4 +275,98 @@ export async function POST(req: NextRequest) {
     .split("/")[0]!
     .split(":")[0]!;
 
-  const { data: verificat
+  const { data: verification } = await supabase
+    .from("target_verifications")
+    .select("id, verified, verified_at, expires_at")
+    .eq("user_id",       user.id)
+    .eq("target_domain", rawDomain)
+    .eq("verified",      true)
+    .gt("expires_at",    new Date().toISOString())
+    .maybeSingle();
+
+  if (!verification) {
+    const stream = new ReadableStream({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(enc.encode(sseEvent({
+          type:    "error",
+          line:    `⛔ TARGET NOT VERIFIED — ${rawDomain}`,
+          message: "Verification token not found or expired. Go to Bounties → Domain Verification to authorise this target before running Live Fire tools.",
+          code:    "TARGET_NOT_VERIFIED",
+        })));
+        controller.enqueue(enc.encode(sseEvent({ type: "done", exit_code: 1 })));
+        controller.close();
+      },
+    });
+
+    return new NextResponse(stream, {
+      status: 200,
+      headers: {
+        "Content-Type":  "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection":    "keep-alive",
+      },
+    });
+  }
+
+  // ─── Build and execute tool ───────────────────────────────────────────────
+
+  const { model, system, prompt } = buildToolPrompt(tool, target, options);
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enc = new TextEncoder();
+
+      const send = (evt: Record<string, unknown>) =>
+        controller.enqueue(enc.encode(sseEvent(evt)));
+
+      send({ type: "start", line: `[ForgeGuard Live Fire] ${tool} → ${target}` });
+      send({ type: "info",  line: `▶ Verification: ${rawDomain} ✓ (verified ${new Date(verification.verified_at as string).toLocaleDateString()})` });
+      send({ type: "info",  line: `▶ Model: ${model === "scout" ? "Gemini Flash 1.5 [SCOUT]" : "DeepSeek-V3 [ASSASSIN]"}` });
+      send({ type: "info",  line: `▶ Target: ${target}` });
+      send({ type: "info",  line: "─".repeat(60) });
+
+      try {
+        const raw = await callOpenRouter(model, system, prompt);
+
+        const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
+
+        if (lines.length === 0) {
+          for (const line of raw.split("\n").filter(Boolean)) {
+            send({ type: "stdout", line });
+          }
+        } else {
+          for (const line of lines) {
+            try {
+              const evt = JSON.parse(line) as Record<string, unknown>;
+              send(evt);
+              await new Promise((r) => setTimeout(r, 60));
+            } catch {
+              send({ type: "stdout", line });
+            }
+          }
+        }
+
+        send({ type: "done", exit_code: 0, tool, target });
+      } catch (err) {
+        send({
+          type:      "error",
+          line:      `✗ ${tool} execution error: ${err instanceof Error ? err.message : String(err)}`,
+          exit_code: 1,
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new NextResponse(stream, {
+    status: 200,
+    headers: {
+      "Content-Type":      "text/event-stream",
+      "Cache-Control":     "no-cache",
+      "Connection":        "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}

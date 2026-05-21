@@ -24,7 +24,8 @@ export async function setUserIdentity(userType: UserType): Promise<void> {
   }
 
   const admin = createAdminSupabase();
-  await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin as any)
     .from("profiles")
     .update({
       user_type:    userType,

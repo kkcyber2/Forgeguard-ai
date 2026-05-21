@@ -9,20 +9,19 @@ import { NextResponse } from "next/server";
  * Status semantics:
  *   "unconfigured" — AGATHON_ORCHESTRATOR_URL is absent (dev / preview env).
  *                    Client should stay silent; this is expected in local dev.
+ *                    Returns HTTP 200.
  *   "healthy"      — Orchestrator responded 2xx within the timeout window.
- *   "degraded"     — Orchestrator responded but with a non-2xx status.
- *   "offline"      — Fetch timed out or threw a network error.
- *
- * Always returns HTTP 200 so the client can read the JSON regardless of
- * orchestrator state. Engine errors are communicated in the response body,
- * not via HTTP status, to avoid false-positive error-boundary triggers.
+ *                    Returns HTTP 200.
+ *   "lockdown"     — Orchestrator is degraded or offline.
+ *                    Returns HTTP 503 { status: "lockdown", reason: "Engine Overload" }.
+ *                    Footer badge pulses red when this status is detected client-side.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const baseUrl = process.env.AGATHON_ORCHESTRATOR_URL?.replace(/\/$/, "");
-  const secret  = process.env.AGATHON_INTERNAL_SECRET;
+  const secret  = process.env.INTERNAL_SCAN_TOKEN;
 
   // Not wired up yet (local dev / preview deployment).
   if (!baseUrl) {
@@ -52,22 +51,32 @@ export async function GET() {
       return NextResponse.json({ ok: true, status: "healthy", latencyMs });
     }
 
-    return NextResponse.json({
-      ok: false,
-      status: "degraded",
-      latencyMs,
-      httpStatus: resp.status,
-    });
+    // Non-2xx from Railway → engine overload / lockdown
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "lockdown",
+        reason: "Engine Overload",
+        latencyMs,
+        httpStatus: resp.status,
+      },
+      { status: 503 },
+    );
   } catch (err) {
     const latencyMs = Date.now() - t0;
     const message =
       err instanceof Error ? err.message : "Unknown error";
 
-    return NextResponse.json({
-      ok: false,
-      status: "offline",
-      latencyMs,
-      error: message,
-    });
+    // Network error / timeout → engine offline → lockdown
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "lockdown",
+        reason: "Engine Overload",
+        latencyMs,
+        error: message,
+      },
+      { status: 503 },
+    );
   }
 }

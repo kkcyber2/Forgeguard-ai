@@ -1,28 +1,17 @@
-/**
- * /dashboard/intel layout — server-side identity gate.
- *
- * Intel Hub (community chat + live threat feed) is restricted to
- * access_level ≥ 2 (Hacker / Developer).
- *
- * Redirects to /dashboard?gate=intel so the overview can show an
- * appropriate upgrade prompt without leaking route internals.
- */
+import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
 
-import * as React from "react";
-import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/supabase/server";
-
-export default async function IntelLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const profile = await getCurrentProfile();
-  const accessLevel = (profile?.access_level as number | undefined) ?? 1;
-
-  if (accessLevel < 2) {
-    redirect("/dashboard?gate=intel");
-  }
-
-  return <>{children}</>;
+export default function IntelLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+      <div className="min-w-0">{children}</div>
+      <aside className="hidden lg:block">
+        <div className="sticky top-20 rounded-[4px] border-[0.5px] border-white/[0.08] bg-[#050505]/90 p-4 backdrop-blur-md">
+          <p className="mb-3 font-mono text-[9px] uppercase tracking-[0.22em] text-zinc-500">
+            Operator Leaderboard
+          </p>
+          <OperatorLeaderboard limit={10} />
+        </div>
+      </aside>
+    </div>
+  );
 }

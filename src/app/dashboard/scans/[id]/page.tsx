@@ -19,6 +19,7 @@ import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 import { ScanLiveLog } from "./live-log";
 import { ScanStatusTracker } from "./scan-status-tracker";
 import { FindingsReport } from "./findings-report";
+import { GenesisTabs } from "./genesis-tabs";
 import { deleteScan } from "../actions";
 import type { ScanReport } from "./findings-report";
 
@@ -100,10 +101,11 @@ export default async function ScanDetailPage({ params }: PageProps) {
   // gets stuck at whatever progress was captured at server-render time.
 
   // Fetch detailed findings report (only populated when scan is sealed).
+  // Includes Genesis Intelligence Pipeline columns (Elite 8).
   const { data: scanReport } = (await supabase
     .from("scan_reports")
     .select(
-      "executive_summary_md, audit_report_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, attacks_run, wall_seconds, generation_cost_usd",
+      "executive_summary_md, audit_report_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, attacks_run, wall_seconds, generation_cost_usd, discovery_report, ale_usd, social_templates, aegis_zip_b64",
     )
     .eq("scan_id", id)
     .maybeSingle()) as { data: ScanReport | null };
@@ -241,6 +243,17 @@ export default async function ScanDetailPage({ params }: PageProps) {
         targetModel={scan.target_model}
         targetUrl={scan.target_url}
         userPlan={userPlan}
+      />
+
+      {/* Genesis Intelligence Pipeline — RECON MAP, FINANCIAL RISK, AEGIS BUNDLE, SOCIAL SWARM */}
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <GenesisTabs
+        scanId={scan.id}
+        targetUrl={scan.target_url}
+        discoveryReport={(scanReport?.discovery_report as any) ?? null}
+        aleUsd={scanReport?.ale_usd ?? null}
+        socialTemplates={(scanReport?.social_templates as any) ?? null}
+        aegisZipB64={scanReport?.aegis_zip_b64 ?? null}
       />
 
       <p className="mt-6 text-[11px] text-foreground-subtle">

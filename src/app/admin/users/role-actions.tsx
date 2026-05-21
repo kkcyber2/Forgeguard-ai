@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { setUserRole, setVerified } from "./actions";
+import { setUserRole, setVerified, setHackerRank } from "./actions";
 import { OverrideDialog } from "./override-dialog";
 
 interface RoleActionsProps {
@@ -46,6 +46,18 @@ export function RoleActions({
           className="rounded border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] font-medium text-foreground-muted transition-colors hover:border-acid/40 hover:text-acid"
         >
           {isVerified ? "Unverify" : "Verify"}
+        </button>
+      </form>
+
+      {/* Set as TRAITOR — freezes wallet + stamps hacker_rank */}
+      <form action={setHackerRank}>
+        <input type="hidden" name="user_id" value={userId} />
+        <input type="hidden" name="hacker_rank" value="TRAITOR" />
+        <button
+          type="submit"
+          className="rounded border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.04)] px-2 py-1 text-[10px] font-medium font-mono uppercase tracking-[0.1em] text-[rgb(239,68,68)] transition-colors hover:border-[rgba(239,68,68,0.6)] hover:bg-[rgba(239,68,68,0.08)]"
+        >
+          TRAITOR
         </button>
       </form>
 

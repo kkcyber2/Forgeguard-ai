@@ -19,8 +19,10 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
+  BadgeCheck,
   Calendar,
   CreditCard,
+  Crosshair,
   FlaskConical,
   Globe,
   LayoutDashboard,
@@ -128,6 +130,27 @@ const STATIC_COMMANDS: Command[] = [
     id: "nav-bazaar", label: "Bazaar", sublabel: "Script marketplace",
     icon: Store, href: "/dashboard/bazaar", group: "Navigate",
     keywords: ["bazaar", "marketplace", "scripts", "hacker", "buy", "acquire", "tools"],
+  },
+  {
+    id: "nav-missions", label: "Mission Vault", sublabel: "Security contracts marketplace",
+    icon: Crosshair, href: "/dashboard/missions", group: "Navigate",
+    keywords: ["mission", "missions", "vault", "contract", "marketplace", "job", "hacker", "gig", "security contract"],
+  },
+  // Sovereign identity actions
+  {
+    id: "action-post-mission", label: "Post a Mission", sublabel: "Create a new security contract",
+    icon: Crosshair, href: "/dashboard/missions/new", group: "Actions",
+    keywords: ["mission", "post", "create", "contract", "new mission", "post job", "hire hacker"],
+  },
+  {
+    id: "action-verify-domain", label: "Verify Corporate Domain", sublabel: "Earn your [COMPANY SEC] badge",
+    icon: BadgeCheck, href: "/dashboard/settings#domain", group: "Actions",
+    keywords: ["verify", "domain", "corporate", "badge", "company", "sec", "google", "sovereign", "identity"],
+  },
+  {
+    id: "action-verify-portal", label: "Verification Portal", sublabel: "Clearance progress & identity audit",
+    icon: BadgeCheck, href: "/dashboard/settings#clearance", group: "Actions",
+    keywords: ["verify", "verification", "clearance", "sovereign", "tactical", "professional", "identity", "audit", "sms", "otp"],
   },
 ];
 
@@ -248,11 +271,27 @@ export function CommandBar() {
     }
   }, [open]);
 
+  // ── /verify slash command ─────────────────────────────────────────────────
+  const slashQuery = query.startsWith("/") ? query.slice(1).toLowerCase() : query;
+  const isVerifySlash = query.startsWith("/") && "verify".startsWith(slashQuery);
+
   // ── Filtered results ──────────────────────────────────────────────────────
-  const filtered = React.useMemo(
-    () => STATIC_COMMANDS.filter((c) => fuzzyMatch(query, c)),
-    [query],
-  );
+  const filtered = React.useMemo(() => {
+    const base = STATIC_COMMANDS.filter((c) => fuzzyMatch(query.startsWith("/") ? slashQuery : query, c));
+    if (isVerifySlash || slashQuery === "verify") {
+      const verifyCmd: Command = {
+        id: "slash-verify",
+        label: "/verify",
+        sublabel: "Jump to Sovereign verification portal",
+        icon: BadgeCheck,
+        href: "/dashboard/settings#clearance",
+        group: "Commands",
+        keywords: ["verify", "clearance", "sovereign"],
+      };
+      if (!base.some((c) => c.id === "slash-verify")) return [verifyCmd, ...base];
+    }
+    return base;
+  }, [query, slashQuery, isVerifySlash]);
 
   // ── Group results ─────────────────────────────────────────────────────────
   const grouped = React.useMemo(() => {
@@ -407,4 +446,20 @@ export function CommandBar() {
                   { key: "ESC",hint: "Close"     },
                 ].map(({ key, hint }) => (
                   <div key={key} className="flex items-center gap-1.5">
-                    <kbd className="font-mono text-[9px] rounded-xs border border-white/[0.08] bg-obsidian-700/30 px-1.5 
+                    <kbd className="font-mono text-[9px] rounded-xs border border-white/[0.08] bg-obsidian-700/30 px-1.5 py-0.5 text-foreground-subtle/50">
+                      {key}
+                    </kbd>
+                    <span className="text-[10px] text-foreground-subtle/40">{hint}</span>
+                  </div>
+                ))}
+                <span className="ml-auto font-mono text-[9px] text-foreground-subtle/30">
+                  ForgeGuard Stronghold
+                </span>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}

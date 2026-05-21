@@ -35,6 +35,29 @@ export async function setVerified(formData: FormData): Promise<void> {
   revalidatePath("/admin/users");
 }
 
+export async function setHackerRank(formData: FormData): Promise<void> {
+  const userId = formData.get("user_id") as string;
+  const rank   = formData.get("hacker_rank") as string;
+  if (!userId || rank !== "TRAITOR") return;
+
+  const admin = createAdminSupabase();
+
+  // Stamp hacker_rank in profiles
+  const { error } = await admin
+    .from("profiles")
+    .update({ hacker_rank: "TRAITOR" })
+    .eq("id", userId);
+
+  if (error) console.error("[admin/users] setHackerRank:", error.message);
+
+  // Freeze wallet via SECURITY DEFINER RPC (mirrors Traitor Protocol)
+  await admin.rpc("freeze_wallet", { target_user_id: userId }).catch((e: Error) =>
+    console.error("[admin/users] freeze_wallet:", e.message),
+  );
+
+  revalidatePath("/admin/users");
+}
+
 export async function overrideSubscription(
   formData: FormData,
 ): Promise<{ ok: boolean; message: string }> {

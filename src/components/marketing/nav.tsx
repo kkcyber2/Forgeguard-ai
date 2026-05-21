@@ -13,7 +13,8 @@ const navItems = [
   { label: "Red Team", href: "/#redteam" },
   { label: "Guardrails", href: "/#guardrails" },
   { label: "Demo", href: "/demo" },
-  { label: "Docs", href: "/#docs" },
+  { label: "Guidelines", href: "/resources/guidelines" },
+  { label: "About", href: "/about" },
 ];
 
 /**

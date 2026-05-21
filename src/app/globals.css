@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   ForgeGuard AI — Global Styles
-   Strict monochrome base. No rounded bubbly surfaces, no gradient confetti.
+   ForgeGuard AI — Stronghold 2.0 Global Styles
+   Sovereign Obsidian aesthetic. No bubbly surfaces, no gradient confetti.
+   Layered Obsidian: #050505 base + SVG grain + edge-fading grid.
    ========================================================================== */
 
 @layer base {
@@ -29,56 +30,112 @@
     scroll-behavior: smooth;
   }
 
+  /* ── Layer 1: Deep Obsidian base ── */
   body {
     min-height: 100vh;
     background-color: #050505;
-    /* Hairline grid bed — draws from tailwind.config bg tokens so it stays in sync. */
-    background-image:
-      radial-gradient(ellipse 60% 40% at 50% -10%, rgba(209, 255, 0, 0.035), transparent 70%),
-      linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-    background-size: auto, 48px 48px, 48px 48px;
-    background-attachment: fixed;
     overflow-x: hidden;
+    position: relative;
   }
 
-  /* Typography defaults */
+  /* ── Layer 2: SVG grain/noise at 2% opacity ── */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.02;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/></filter><rect width='256' height='256' filter='url(%23n)'/></svg>");
+    background-size: 256px 256px;
+  }
+
+  /* ── Layer 3: Edge-fading grid ── */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+    background-size: 48px 48px;
+    /* Fade grid out toward all edges */
+    -webkit-mask-image: radial-gradient(
+      ellipse 80% 80% at 50% 50%,
+      rgba(0,0,0,0.9) 30%,
+      rgba(0,0,0,0.3) 65%,
+      transparent 100%
+    );
+    mask-image: radial-gradient(
+      ellipse 80% 80% at 50% 50%,
+      rgba(0,0,0,0.9) 30%,
+      rgba(0,0,0,0.3) 65%,
+      transparent 100%
+    );
+  }
+
+  /* Top acid glow accent */
+  html::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    z-index: 100;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(209, 255, 0, 0.0) 20%,
+      rgba(209, 255, 0, 0.15) 50%,
+      rgba(209, 255, 0, 0.0) 80%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  /* ── Typography ── */
+  /* Headers: weight 600, tight tracking — Geist Sans in Inter Tight style */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-geist-sans), ui-sans-serif, system-ui;
     letter-spacing: -0.02em;
     font-weight: 600;
   }
 
-  code, pre, kbd {
+  /* Data / terminal: monospace */
+  code, pre, kbd,
+  .font-mono,
+  [data-mono] {
     font-family: var(--font-geist-mono), ui-monospace, monospace;
   }
 
-  /* Selection — acid, reserved */
   ::selection {
-    background: rgba(209, 255, 0, 0.25);
+    background: rgba(209, 255, 0, 0.2);
     color: #ECEDF0;
   }
 
-  /* Scrollbars — dark, hairline */
+  /* Minimal scrollbars */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #050505;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #1C1D21;
-    border: 2px solid #050505;
-    border-radius: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #35363C;
+    background: rgba(255,255,255,0.14);
   }
 
   /* Focus rings — acid hairline, never blue */
   :focus-visible {
-    outline: 1px solid rgba(209, 255, 0, 0.6);
+    outline: 1px solid rgba(209, 255, 0, 0.55);
     outline-offset: 2px;
   }
 
@@ -87,14 +144,33 @@
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
   textarea:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0 1000px #0A0A0B inset;
+    -webkit-box-shadow: 0 0 0 1000px #080808 inset;
     -webkit-text-fill-color: #ECEDF0;
     caret-color: #ECEDF0;
   }
 }
 
 @layer components {
-  /* Noise overlay — used by marketing shells */
+  /* ── Glass card ── sharp edges, hairline border, faint inner light */
+  .glass {
+    background:
+      linear-gradient(
+        160deg,
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.01) 50%,
+        rgba(0, 0, 0, 0.05) 100%
+      ) padding-box,
+      linear-gradient(
+        160deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.03) 100%
+      ) border-box;
+    border: 0.5px solid transparent;
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+  }
+
+  /* ── Noise overlay pseudo ── */
   .noise {
     position: relative;
     isolation: isolate;
@@ -104,34 +180,25 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    opacity: 0.035;
+    opacity: 0.025;
     mix-blend-mode: overlay;
     z-index: 0;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   }
 
-  /* Monochrome glass panel — hairline border, faint inner light, no heavy blur */
-  .glass {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)) padding-box,
-      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)) border-box;
-    border: 0.5px solid transparent;
-    backdrop-filter: blur(10px) saturate(140%);
-    -webkit-backdrop-filter: blur(10px) saturate(140%);
-  }
-
-  /* Hairline divider */
+  /* ── Hairline horizontal divider ── */
   .divider-x {
     height: 0.5px;
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.1) 30%,
+      rgba(255, 255, 255, 0.1) 70%,
       transparent 100%
     );
   }
 
-  /* Caret blink for terminal demo */
+  /* ── Terminal caret blink ── */
   .caret-blink::after {
     content: "▋";
     color: #D1FF00;
@@ -142,7 +209,7 @@
     50% { opacity: 0; }
   }
 
-  /* Scan-line overlay */
+  /* ── Scanlines ── */
   .scanlines {
     position: relative;
     overflow: hidden;
@@ -154,19 +221,49 @@
     pointer-events: none;
     background: repeating-linear-gradient(
       0deg,
-      rgba(255, 255, 255, 0.02) 0px,
-      rgba(255, 255, 255, 0.02) 1px,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 1px,
       transparent 1px,
       transparent 3px
     );
     z-index: 1;
   }
 
-  /* Marquee track */
+  /* ── Marquee ── */
   .marquee-track {
     display: flex;
     width: max-content;
     animation: marquee 38s linear infinite;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* ── Data card — obsidian surface, sharp corners ── */
+  .data-card {
+    background: rgba(255,255,255,0.02);
+    border: 0.5px solid rgba(255,255,255,0.07);
+    border-radius: 4px;
+  }
+  .data-card:hover {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.12);
+  }
+
+  /* ── Live indicator dot ── */
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #D1FF00;
+    box-shadow: 0 0 6px rgba(209,255,0,0.8), 0 0 12px rgba(209,255,0,0.3);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(0.85); }
   }
 }
 
@@ -177,13 +274,24 @@
   .text-pretty {
     text-wrap: pretty;
   }
-  /* Hairline border, cross-browser */
   .border-hairline {
     border-width: 0.5px;
   }
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  /* GPU layer promotion */
+  .gpu {
+    will-change: transform;
+    transform: translateZ(0);
+  }
 }
 
-/* Reduced motion — respect user system preferences */
+/* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -193,4 +301,64 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ==========================================================================
+   Light Mode — toggled via .light-mode class on <html>
+   Palette: #F9FAFB base, #0a0a0a text, acid-green accent preserved.
+   ========================================================================== */
+
+html.light-mode {
+  color-scheme: light;
+}
+
+html.light-mode body {
+  background-color: #F9FAFB;
+  color: #0a0a0a;
+}
+
+/* Suppress dark grain + grid in light mode */
+html.light-mode body::before,
+html.light-mode body::after {
+  display: none;
+}
+
+/* Subtle light-mode grid replacement */
+html.light-mode body {
+  background-image:
+    linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Top hairline — same acid green */
+html.light-mode html::before {
+  background: linear-gradient(90deg, transparent 0%, #D1FF00 40%, #a8cc00 60%, transparent 100%);
+}
+
+/* Header — light mode surface */
+html.light-mode header {
+  background-color: rgba(255,255,255,0.92) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* Nav link text */
+html.light-mode .font-mono {
+  color: inherit;
+}
+
+/* Data cards */
+html.light-mode .data-card {
+  background: rgba(0,0,0,0.02);
+  border: 0.5px solid rgba(0,0,0,0.08);
+}
+html.light-mode .data-card:hover {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.14);
+}
+
+/* Live dot stays green */
+html.light-mode .live-dot {
+  background: #7db200;
+  box-shadow: 0 0 6px rgba(125,178,0,0.8), 0 0 12px rgba(125,178,0,0.3);
 }

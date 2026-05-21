@@ -15,11 +15,13 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { purchaseScript } from "@/components/bazaar/actions";
 import {
   ShoppingCart, Upload, Search, Filter, Zap,
   Shield, CheckCircle, AlertTriangle, XCircle,
   Star, Code2, Tag, DollarSign, X, ChevronDown,
-  Package, Terminal, Loader2, ShieldCheck,
+  Package, Terminal, Loader2, ShieldCheck, Copy, Check,
+  Download,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,6 +109,64 @@ const DEMO_SCRIPTS: Script[] = [
     author: { full_name: "r00tkitchen", username: "rootkitchen", rank: "Legend" },
   },
 ];
+
+// ─── Language → file extension ───────────────────────────────────────────────
+const LANG_EXT: Record<string, string> = {
+  python: ".py", bash: ".sh", javascript: ".js", rust: ".rs",
+};
+
+// ─── Minimal client-side PKZIP builder (stored, no compression) ──────────────
+function buildClientZip(filename: string, content: string): Uint8Array {
+  const enc  = new TextEncoder();
+  const data = enc.encode(content);
+  const name = enc.encode(filename);
+
+  // CRC-32 table
+  const T = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    T[n] = c;
+  }
+  let c2 = 0xffffffff;
+  for (const b of data) c2 = T[(c2 ^ b) & 0xff] ^ (c2 >>> 8);
+  const crc = (c2 ^ 0xffffffff) >>> 0;
+
+  const u16 = (v: number, a: Uint8Array, o: number) => {
+    a[o] = v & 0xff; a[o + 1] = (v >> 8) & 0xff;
+  };
+  const u32 = (v: number, a: Uint8Array, o: number) => {
+    a[o] = v & 0xff; a[o + 1] = (v >> 8) & 0xff;
+    a[o + 2] = (v >> 16) & 0xff; a[o + 3] = (v >> 24) & 0xff;
+  };
+
+  // Local file header (30 + name)
+  const lh = new Uint8Array(30 + name.length);
+  u32(0x04034b50, lh, 0); u16(20, lh, 4);
+  u32(crc, lh, 14); u32(data.length, lh, 18); u32(data.length, lh, 22);
+  u16(name.length, lh, 26); lh.set(name, 30);
+
+  // Central directory entry (46 + name)
+  const cde = new Uint8Array(46 + name.length);
+  u32(0x02014b50, cde, 0); u16(20, cde, 4); u16(20, cde, 6);
+  u32(crc, cde, 16); u32(data.length, cde, 20); u32(data.length, cde, 24);
+  u16(name.length, cde, 28); cde.set(name, 46); // offset = 0
+
+  // End of central directory
+  const eocd = new Uint8Array(22);
+  u32(0x06054b50, eocd, 0);
+  u16(1, eocd, 8); u16(1, eocd, 10);
+  u32(cde.length, eocd, 12);
+  u32(lh.length + data.length, eocd, 16);
+
+  const zip = new Uint8Array(lh.length + data.length + cde.length + eocd.length);
+  let pos = 0;
+  zip.set(lh, pos); pos += lh.length;
+  zip.set(data, pos); pos += data.length;
+  zip.set(cde, pos); pos += cde.length;
+  zip.set(eocd, pos);
+  return zip;
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -286,6 +346,139 @@ function ScriptCard({
         </button>
       </div>
     </motion.div>
+  );
+}
+
+// ─── Code Viewer Modal ────────────────────────────────────────────────────────
+
+function CodeViewerModal({
+  scriptName,
+  code,
+  language,
+  onClose,
+}: {
+  scriptName: string;
+  code:       string;
+  language:   string;
+  onClose:    () => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* ignore */ }
+  };
+
+  const handleDownloadZip = () => {
+    const ext      = LANG_EXT[language] ?? ".txt";
+    const filename = `${scriptName}${ext}`;
+    const zip      = buildClientZip(filename, code);
+    const blob     = new Blob([zip], { type: "application/zip" });
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement("a");
+    a.href         = url;
+    a.download     = `${scriptName}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50"
+        style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)" }}
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 8 }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
+        className="fixed inset-x-4 top-[10%] z-[51] mx-auto flex max-h-[80vh] max-w-3xl flex-col"
+        style={{ background: "#070707", border: "1px solid rgba(209,255,0,0.25)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-3"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <div className="flex items-center gap-2">
+            <Terminal size={14} className="text-[#D1FF00]" />
+            <span className="font-mono text-[12px] font-semibold uppercase tracking-widest text-white">
+              {scriptName}
+            </span>
+            <span
+              className="px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+              style={{ color: "#D1FF00", background: "rgba(209,255,0,0.08)", border: "1px solid rgba(209,255,0,0.2)" }}
+            >
+              Acquired
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadZip}
+              className="flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-all"
+              style={{
+                color:      "#D1FF00",
+                border:     "1px solid rgba(209,255,0,0.25)",
+                background: "rgba(209,255,0,0.05)",
+              }}
+            >
+              <Download size={10} />
+              ZIP
+            </button>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-all"
+              style={{
+                color:   copied ? "#D1FF00" : "#9CA3AF",
+                border:  `1px solid ${copied ? "rgba(209,255,0,0.3)" : "rgba(255,255,255,0.08)"}`,
+                background: copied ? "rgba(209,255,0,0.06)" : "transparent",
+              }}
+            >
+              {copied ? <><Check size={10} />Copied</> : <><Copy size={10} />Copy</>}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-[#4B5563] transition-colors hover:text-white"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Code area */}
+        <div className="flex-1 overflow-auto">
+          <pre
+            className="p-5 font-mono text-[12px] leading-relaxed text-[#D1FF00] whitespace-pre-wrap break-all"
+            style={{ background: "#050505", minHeight: "200px" }}
+          >
+            {code}
+          </pre>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="flex items-center gap-2 px-5 py-3"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        >
+          <Shield size={11} className="text-[#4B5563]" />
+          <span className="font-mono text-[10px] text-[#4B5563]">
+            Cleared by AI Customs · For authorised red team use only
+          </span>
+        </div>
+      </motion.div>
+    </>
   );
 }
 
@@ -520,14 +713,15 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function BazaarPage() {
-  const [scripts, setScripts]       = React.useState<Script[]>(DEMO_SCRIPTS);
-  const [loading, setLoading]       = React.useState(true);
-  const [search, setSearch]         = React.useState("");
-  const [filterLang, setFilterLang] = React.useState("all");
-  const [filterFree, setFilterFree] = React.useState(false);
-  const [uploading, setUploading]   = React.useState(false);
-  const [purchasing, setPurchasing] = React.useState<string | null>(null);
-  const [showUpload, setShowUpload] = React.useState(false);
+  const [scripts, setScripts]         = React.useState<Script[]>(DEMO_SCRIPTS);
+  const [loading, setLoading]         = React.useState(true);
+  const [search, setSearch]           = React.useState("");
+  const [filterLang, setFilterLang]   = React.useState("all");
+  const [filterFree, setFilterFree]   = React.useState(false);
+  const [uploading, setUploading]     = React.useState(false);
+  const [purchasing, setPurchasing]   = React.useState<string | null>(null);
+  const [showUpload, setShowUpload]   = React.useState(false);
+  const [acquiredCode, setAcquiredCode] = React.useState<{ scriptName: string; code: string; language: string } | null>(null);
 
   // Load scripts from API
   React.useEffect(() => {
@@ -554,19 +748,16 @@ export default function BazaarPage() {
   const handlePurchase = async (scriptId: string) => {
     setPurchasing(scriptId);
     try {
-      const res  = await fetch("/api/bazaar/purchase", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ script_id: scriptId }),
-      });
-      const data = await res.json() as { ok: boolean; code?: string; error?: string };
+      const data = await purchaseScript(scriptId);
       if (data.ok) {
+        // Mark as purchased in local state
+        const script = scripts.find((s) => s.id === scriptId);
         setScripts((prev) =>
           prev.map((s) => s.id === scriptId ? { ...s, is_purchased: true } : s)
         );
-        if (data.code) {
-          // In production: open a code viewer modal
-          console.info("[Bazaar] Acquired script code for", scriptId);
+        // Open code viewer with acquired code
+        if (data.code && script) {
+          setAcquiredCode({ scriptName: script.name, code: data.code, language: script.language });
         }
       }
     } catch {
@@ -593,6 +784,18 @@ export default function BazaarPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "#050505" }}>
+      {/* Code viewer modal */}
+      <AnimatePresence>
+        {acquiredCode && (
+          <CodeViewerModal
+            scriptName={acquiredCode.scriptName}
+            code={acquiredCode.code}
+            language={acquiredCode.language}
+            onClose={() => setAcquiredCode(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Upload panel overlay */}
       <AnimatePresence>
         {showUpload && (
@@ -724,4 +927,27 @@ export default function BazaarPage() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Package size={32} className="mb-3 text-[#1F2937]" />
-            <p className="font-mono text-[13px] text-[#374151]">No scripts match you
+            <p className="font-mono text-[13px] text-[#374151]">No scripts match your filters.</p>
+          </div>
+        ) : (
+          <motion.div
+            className="grid gap-4"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}
+            layout
+          >
+            <AnimatePresence mode="popLayout">
+              {filtered.map((script) => (
+                <ScriptCard
+                  key={script.id}
+                  script={script}
+                  onPurchase={handlePurchase}
+                  purchasing={purchasing}
+                />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}

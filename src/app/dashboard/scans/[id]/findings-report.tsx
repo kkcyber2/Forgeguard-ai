@@ -68,6 +68,11 @@ export interface ScanReport {
   attacks_run?: number;
   wall_seconds?: number;
   generation_cost_usd?: number;
+  // Genesis Intelligence Pipeline columns (Elite 8)
+  discovery_report?: Record<string, unknown> | null;
+  ale_usd?: number | null;
+  social_templates?: Record<string, unknown>[] | null;
+  aegis_zip_b64?: string | null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */

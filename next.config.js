@@ -1,17 +1,24 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
+
 const nextConfig = {
   reactStrictMode: true,
 
-  // Ship-it mode: don't fail the production build on TS errors or ESLint
-  // warnings. The errors we're tripping are all from cross-package generic
-  // drift between @supabase/ssr and @supabase/supabase-js — runtime is
-  // unaffected, the database invariants are enforced by Postgres + RLS +
-  // Zod at the API boundary, and the Vercel build passes.
-  //
-  // Re-enable strict checks once you've upgraded both Supabase packages
-  // to compatible versions and want full type safety back. Until then,
-  // your IDE still surfaces the type errors so you can clean them up
-  // incrementally without blocking production.
+  // Pin tracing root to this app (avoids wrong workspace when multiple lockfiles exist)
+  outputFileTracingRoot: path.join(__dirname),
+
+  // ── Transpile ESM-only packages ─────────────────────────────────────────
+  // three.js, @react-three/fiber and @react-three/drei ship as pure ESM.
+  // Without this, webpack emits "SyntaxError: Cannot use import statement
+  // outside a module" and "ReactCurrentBatchConfig" crashes because the
+  // ESM module graph gets broken mid-bundle.
+  transpilePackages: ["three", "@react-three/fiber", "@react-three/drei"],
+
+  // ── Build leniency ──────────────────────────────────────────────────────
+  // Don't fail production builds on TS / ESLint warnings from cross-package
+  // generic drift between @supabase/ssr and @supabase/supabase-js.
+  // Runtime correctness is enforced by Postgres + RLS + Zod at API boundary.
+  // Re-enable once Supabase packages are upgraded to aligned versions.
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -29,6 +36,7 @@ const nextConfig = {
   },
 
   webpack: (config) => {
+    // Prevent webpack from trying to bundle native Node addons
     config.externals.push({
       "utf-8-validate": "commonjs utf-8-validate",
       bufferutil: "commonjs bufferutil",

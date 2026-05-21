@@ -66,7 +66,7 @@ export async function getCurrentProfile(): Promise<Database["public"]["Tables"][
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .maybeSingle() as { data: Database["public"]["Tables"]["profiles"]["Row"] | null, error: any };
+    .maybeSingle();
 
   if (error) {
     console.error("[supabase] getCurrentProfile failed:", error.message);

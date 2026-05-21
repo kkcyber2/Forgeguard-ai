@@ -1,40 +1,32 @@
 import * as React from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { type NavItem } from "@/components/dashboard/shell";
 import { ActivePath } from "@/components/dashboard/active-path";
+import {
+  buildDashboardNav,
+  isPathAllowed,
+  redirectForBlockedPath,
+  resolveAccessRank,
+  type UserType,
+} from "@/lib/access/ranks";
 import {
   getSessionUser,
   getCurrentProfile,
+  createServerSupabase,
 } from "@/lib/supabase/server";
 
 /**
- * Authenticated user dashboard shell.
- * Uses Supabase SSR session — anything RLS-protected downstream is
- * automatically scoped to auth.uid().
+ * Authenticated dashboard shell — Stronghold 2.0 top navigation.
  *
- * Access tiers (profiles.access_level):
- *   1 = Client    → Overview, Scans, Bounties, Billing, Settings
- *   2 = Hacker    → + Forge, Intel Hub
- *   3 = Developer → + Scheduled (everything)
+ * Access tiers (profiles.access_level → rank):
+ *   1–2 Recruit     → Overview, Scans (+ client: Aegis, Bounties)
+ *   3–4 Ghost/Sentinel → + Forge, Bazaar, Missions (hackers), Intel, Repos
+ *   5 Legend        → Admin panel + Global threat map
  *
- * Note: NavItem.icon is a string key (resolved client-side in the shell),
- * because functions cannot cross the server→client component boundary.
+ * user_type prioritizes nav order:
+ *   client → Aegis, Bounties first
+ *   hacker → Missions, Forge first
  */
-
-// All possible nav items with the minimum access_level required to see them.
-const ALL_NAV: Array<NavItem & { minLevel: number }> = [
-  { href: "/dashboard",              label: "Overview",    icon: "layout-dashboard", minLevel: 1 },
-  { href: "/dashboard/scans",        label: "Scans",       icon: "radar",            minLevel: 1 },
-  { href: "/dashboard/forge",        label: "Forge",       icon: "flask-conical",    minLevel: 2 },
-  { href: "/dashboard/aegis",         label: "Aegis",       icon: "shield-check",     minLevel: 1 },
-  { href: "/dashboard/bounties",     label: "Bounties",    icon: "shield-alert",     minLevel: 1 },
-  { href: "/dashboard/bazaar",        label: "Bazaar",      icon: "store",            minLevel: 2 },
-  { href: "/dashboard/repos",        label: "Repos",       icon: "git-branch",       minLevel: 2 },
-  { href: "/dashboard/intel",        label: "Intel Hub",   icon: "globe",            minLevel: 2 },
-  { href: "/dashboard/scheduled",    label: "Scheduled",   icon: "calendar-clock",   minLevel: 3 },
-  { href: "/dashboard/billing",      label: "Billing",     icon: "credit-card",      minLevel: 1 },
-  { href: "/dashboard/settings",     label: "Settings",    icon: "settings",         minLevel: 1 },
-];
 
 export default async function DashboardLayout({
   children,
@@ -46,17 +38,49 @@ export default async function DashboardLayout({
 
   const profile = await getCurrentProfile();
 
-  // Default to access_level 1 (client) if the column isn't set yet.
-  const accessLevel = (profile?.access_level as number | undefined) ?? 1;
+  const rawAccessLevel = profile?.access_level ?? 0;
+  if (!rawAccessLevel || rawAccessLevel === 0) {
+    redirect("/auth/signup/identity");
+  }
 
-  // Filter nav to items the current identity tier may see.
-  const userNav: NavItem[] = ALL_NAV
-    .filter(item => accessLevel >= item.minLevel)
-    // Strip the internal minLevel field — NavItem doesn't include it.
-    .map(({ minLevel: _lvl, ...item }) => item);
+  const userType = (profile?.user_type ?? "hacker") as UserType;
+  const accessLevel = rawAccessLevel;
+  const rank = resolveAccessRank(accessLevel, profile?.role ?? null);
+
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "/dashboard";
+
+  if (!isPathAllowed(pathname, rank, userType)) {
+    redirect(redirectForBlockedPath(pathname));
+  }
+
+  const supabase = await createServerSupabase();
+  const { data: wallet } = await supabase
+    .from("user_wallets")
+    .select("balance_usd, is_frozen")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const userNav = buildDashboardNav(accessLevel, userType, profile?.role ?? null);
 
   const shellUser = {
     email: user.email ?? "",
     fullName:
-      (profile?.full_name as string | undefined) ??
-      (user.user_metadata?.full_name as string | unde
+      profile?.full_name ??
+      (user.user_metadata?.full_name as string | undefined) ??
+      null,
+    role: profile?.role ?? "user",
+    hackerRank: profile?.hacker_rank ?? "RECRUIT",
+    walletBalance: Number(wallet?.balance_usd ?? 0),
+    walletFrozen: wallet?.is_frozen ?? false,
+    identityVerified: profile?.identity_verified ?? false,
+    companyTag: profile?.company_tag ?? null,
+    domainVerified: profile?.domain_verified ?? false,
+  };
+
+  return (
+    <ActivePath nav={userNav} user={shellUser} scope="user">
+      {children}
+    </ActivePath>
+  );
+}

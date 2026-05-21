@@ -333,4 +333,101 @@ export async function GET(req: NextRequest) {
     .in("audit_verdict", ["cleared", "flagged"])
     .eq("is_removed", false)
     .gte("audit_risk_score", minRisk)
-    .order("audit_risk_score", {
+    .order("audit_risk_score", { ascending: false })
+    .limit(limit);
+
+  if (since) {
+    query = query.gte("updated_at", since);
+  }
+
+  if (category !== "all") {
+    query = query.contains("tags", [category]);
+  }
+
+  const { data: scripts, error } = await query;
+
+  if (error) {
+    return NextResponse.json({ ok: false, error: "Database error" }, { status: 500 });
+  }
+
+  const safeScripts = (scripts ?? []) as BazaarScript[];
+
+  // ── Suricata ───────────────────────────────────────────────────────────────
+  if (format === "suricata") {
+    const rules = safeScripts.map((s, i) => toSuricataRule(s, i));
+    const body  = renderSuricata(rules);
+    return new NextResponse(body, {
+      status: 200,
+      headers: {
+        "Content-Type":        "text/plain; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="forgeguard-aegis.rules"',
+        "X-ForgeGuard-Rules":  String(rules.length),
+        "X-ForgeGuard-Format": "suricata",
+        "Cache-Control":       "no-store",
+      },
+    });
+  }
+
+  // ── Sigma ──────────────────────────────────────────────────────────────────
+  if (format === "sigma") {
+    const rules = safeScripts.map((s) => toSigmaRule(s));
+    return NextResponse.json({
+      ok:      true,
+      format:  "sigma",
+      version: "2.0",
+      rules,
+      meta: {
+        total:        rules.length,
+        generated_at: new Date().toISOString(),
+        source:       "ForgeGuard Aegis 2.0",
+        org_id:       orgId ?? "internal",
+        plan,
+      },
+    });
+  }
+
+  // ── Default JSON ───────────────────────────────────────────────────────────
+  const rules      = safeScripts.map((s) => toJsonRule(s));
+  const highRisk   = rules.filter((r) => r.risk_score >= 80).length;
+  const mediumRisk = rules.filter((r) => r.risk_score >= 50 && r.risk_score < 80).length;
+  const categories = [...new Set(rules.flatMap((r) => r.ioc_tags))];
+
+  return NextResponse.json(
+    {
+      ok:      true,
+      format:  "json",
+      version: "2.0",
+      meta: {
+        total:         rules.length,
+        high_risk:     highRisk,
+        medium_risk:   mediumRisk,
+        low_risk:      rules.length - highRisk - mediumRisk,
+        categories,
+        generated_at:  new Date().toISOString(),
+        data_source:   "ForgeGuard Bazaar AI Customs",
+        source_system: "ForgeGuard Aegis 2.0",
+        org_id:        orgId ?? "internal",
+        plan,
+        note: plan === "free"
+          ? `Free tier capped at ${limit} rules. Upgrade to Enterprise for the full feed.`
+          : undefined,
+      },
+      threat_rules: rules,
+      schema: {
+        rule_id:      "Unique ForgeGuard threat rule identifier",
+        risk_score:   "0-100, 80+ = HIGH, 50-79 = MEDIUM, <50 = LOW",
+        findings:     "AI-detected patterns",
+        ioc_tags:     "MITRE ATT&CK-aligned tactic tags",
+        last_updated: "ISO 8601 UTC timestamp",
+      },
+    },
+    {
+      headers: {
+        "X-ForgeGuard-Version": "2.0",
+        "X-ForgeGuard-Rules":   String(rules.length),
+        "X-ForgeGuard-Format":  "json",
+        "Cache-Control":        "no-store, max-age=0",
+      },
+    },
+  );
+}

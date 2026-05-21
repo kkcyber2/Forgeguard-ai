@@ -18,6 +18,7 @@ import * as React from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
+  Archive,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -56,6 +57,7 @@ const FORMATS: {
   mime:        string;
   filename:    string;
   description: string;
+  category:    "infrastructure" | "logic";
 }[] = [
   {
     id:          "cloudflare",
@@ -66,6 +68,7 @@ const FORMATS: {
     mime:        "application/json",
     filename:    "forgeguard-aegis-cloudflare.json",
     description: "Import directly into Cloudflare Firewall Rules via the API or Dashboard.",
+    category:    "infrastructure",
   },
   {
     id:          "python",
@@ -76,6 +79,7 @@ const FORMATS: {
     mime:        "text/x-python",
     filename:    "aegis_middleware.py",
     description: "Drop-in ASGI middleware for Starlette, FastAPI, or Django apps.",
+    category:    "infrastructure",
   },
   {
     id:          "nextjs",
@@ -86,8 +90,20 @@ const FORMATS: {
     mime:        "text/typescript",
     filename:    "middleware.ts",
     description: "Place at your project root — Edge runtime blocks injections before route handlers.",
+    category:    "logic",
   },
 ];
+
+const CATEGORY_LABELS: Record<string, { label: string; description: string }> = {
+  infrastructure: {
+    label:       "Infrastructure",
+    description: "Network-layer rules for Cloudflare, AWS WAF, and ASGI servers",
+  },
+  logic: {
+    label:       "Logic",
+    description: "Application-layer rules for JS/TypeScript and malware pattern detection",
+  },
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -168,12 +184,14 @@ function CodePreview({ code, ext }: { code: string; ext: string }) {
 export default function AegisPage() {
   const reduce = useReducedMotion();
 
-  const [scanId,       setScanId]       = React.useState("");
-  const [format,       setFormat]       = React.useState<ExportFormat>("cloudflare");
-  const [loading,      setLoading]      = React.useState(false);
-  const [result,       setResult]       = React.useState<ExportResponse | null>(null);
-  const [error,        setError]        = React.useState<string | null>(null);
-  const [expandInfo,   setExpandInfo]   = React.useState(false);
+  const [scanId,         setScanId]         = React.useState("");
+  const [format,         setFormat]         = React.useState<ExportFormat>("cloudflare");
+  const [loading,        setLoading]        = React.useState(false);
+  const [result,         setResult]         = React.useState<ExportResponse | null>(null);
+  const [error,          setError]          = React.useState<string | null>(null);
+  const [expandInfo,     setExpandInfo]     = React.useState(false);
+  const [bundleLoading,  setBundleLoading]  = React.useState(false);
+  const [bundleError,    setBundleError]    = React.useState<string | null>(null);
 
   const selectedFmt = FORMATS.find((f) => f.id === format)!;
   const code        = result ? codeFromResponse(result) : "";
@@ -210,6 +228,35 @@ export default function AegisPage() {
   function handleDownload() {
     if (!code) return;
     downloadFile(code, selectedFmt.filename, selectedFmt.mime);
+  }
+
+  async function handleDownloadBundle() {
+    if (!canExport || bundleLoading) return;
+    setBundleLoading(true);
+    setBundleError(null);
+    try {
+      const res = await fetch("/api/aegis/export-bundle", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ scan_id: scanId.trim() }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({})) as { error?: string };
+        setBundleError(json.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      const blob     = await res.blob();
+      const url      = URL.createObjectURL(blob);
+      const a        = document.createElement("a");
+      a.href         = url;
+      a.download     = `aegis-bundle-${scanId.slice(0, 8)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setBundleError((err as Error).message ?? "Download failed");
+    } finally {
+      setBundleLoading(false);
+    }
   }
 
   return (
@@ -310,47 +357,65 @@ export default function AegisPage() {
             )}
           </div>
 
-          {/* Format selector */}
+          {/* Format selector — grouped by category */}
           <div className="flex flex-col gap-1.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-muted">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400">
               Export format
             </span>
-            <div className="flex flex-col gap-2">
-              {FORMATS.map((fmt) => {
-                const Icon    = fmt.icon;
-                const active  = format === fmt.id;
+            <div className="flex flex-col gap-4">
+              {(["infrastructure", "logic"] as const).map((cat) => {
+                const catFmts = FORMATS.filter((f) => f.category === cat);
+                const catMeta = CATEGORY_LABELS[cat];
                 return (
-                  <button
-                    key={fmt.id}
-                    onClick={() => { setFormat(fmt.id); setResult(null); setError(null); }}
-                    className={cn(
-                      "flex items-start gap-3 rounded-xs border px-4 py-3 text-left transition-all",
-                      active
-                        ? "border-acid/30 bg-acid/[0.06]"
-                        : "border-white/[0.06] bg-obsidian-800/30 hover:border-white/[0.12]",
-                    )}
-                  >
-                    <div className={cn(
-                      "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-xs border",
-                      active ? "border-acid/30 bg-acid/[0.10]" : "border-white/[0.08] bg-obsidian-700/40",
-                    )}>
-                      <Icon size={11} strokeWidth={1.5} className={active ? "text-acid" : "text-foreground-muted"} />
+                  <div key={cat} className="flex flex-col gap-2">
+                    {/* Category header */}
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-400">
+                        {catMeta.label}
+                      </span>
+                      <div className="flex-1 h-px bg-white/[0.04]" />
                     </div>
-                    <div>
-                      <p className={cn(
-                        "text-[12px] font-medium leading-none",
-                        active ? "text-acid" : "text-foreground-muted",
-                      )}>
-                        {fmt.label}
-                      </p>
-                      <p className="mt-1 font-mono text-[10px] text-foreground-subtle">
-                        {fmt.sublabel}
-                      </p>
-                      <p className="mt-1.5 text-[11px] text-foreground-subtle leading-snug">
-                        {fmt.description}
-                      </p>
-                    </div>
-                  </button>
+                    <p className="text-[10px] text-zinc-400 -mt-1 mb-1">
+                      {catMeta.description}
+                    </p>
+                    {catFmts.map((fmt) => {
+                      const Icon   = fmt.icon;
+                      const active = format === fmt.id;
+                      return (
+                        <button
+                          key={fmt.id}
+                          onClick={() => { setFormat(fmt.id); setResult(null); setError(null); }}
+                          className={cn(
+                            "flex items-start gap-3 rounded-xs border px-4 py-3 text-left transition-all",
+                            active
+                              ? "border-acid/30 bg-acid/[0.06]"
+                              : "border-white/[0.06] bg-obsidian-800/30 hover:border-white/[0.12]",
+                          )}
+                        >
+                          <div className={cn(
+                            "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-xs border",
+                            active ? "border-acid/30 bg-acid/[0.10]" : "border-white/[0.08] bg-obsidian-700/40",
+                          )}>
+                            <Icon size={11} strokeWidth={1.5} className={active ? "text-acid" : "text-zinc-400"} />
+                          </div>
+                          <div>
+                            <p className={cn(
+                              "text-[12px] font-medium leading-none",
+                              active ? "text-acid" : "text-zinc-300",
+                            )}>
+                              {fmt.label}
+                            </p>
+                            <p className="mt-1 font-mono text-[10px] text-zinc-400">
+                              {fmt.sublabel}
+                            </p>
+                            <p className="mt-1.5 text-[11px] text-zinc-400 leading-snug">
+                              {fmt.description}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 );
               })}
             </div>
@@ -378,6 +443,41 @@ export default function AegisPage() {
               </>
             )}
           </button>
+
+          {/* Download Bundle (.zip) */}
+          <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => void handleDownloadBundle()}
+              disabled={!canExport || bundleLoading}
+              className={cn(
+                "flex items-center justify-center gap-2 rounded-sm border px-6 py-2.5 text-sm font-medium transition-all duration-150",
+                "border-steel-600/40 bg-obsidian-800/40 text-foreground-muted",
+                "hover:border-acid/20 hover:text-acid hover:bg-acid/[0.04]",
+                "disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+            >
+              {bundleLoading ? (
+                <>
+                  <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
+                  Packaging bundle…
+                </>
+              ) : (
+                <>
+                  <Archive size={13} strokeWidth={1.5} />
+                  Download Bundle (.zip)
+                </>
+              )}
+            </button>
+            <p className="text-center font-mono text-[9px] text-foreground-subtle">
+              All 3 formats · cloudflare_waf.json · python_middleware.py · nextjs_shield.ts
+            </p>
+            {bundleError && (
+              <p className="flex items-center gap-1.5 font-mono text-[10px] text-threat">
+                <AlertTriangle size={9} strokeWidth={1.5} />
+                {bundleError}
+              </p>
+            )}
+          </div>
 
           {/* How it works */}
           <div className="rounded-sm border border-white/[0.04] bg-obsidian-800/20 px-4 py-4">

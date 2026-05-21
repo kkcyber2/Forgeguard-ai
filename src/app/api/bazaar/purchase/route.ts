@@ -19,6 +19,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -111,21 +112,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Debit buyer
-  const { error: debitErr } = await supabase
-    .from("user_wallets")
-    .update({ balance_usd: balance - priceUsd })
-    .eq("user_id", user.id);
+  // Debit buyer atomically via RPC (supports negative p_amount)
+  const { error: debitErr } = await supabase.rpc("increment_wallet", {
+    p_user_id: user.id,
+    p_amount:  -priceUsd,
+  });
 
   if (debitErr) {
     return NextResponse.json({ ok: false, error: "Payment processing failed" }, { status: 500 });
   }
 
-  // Credit author
+  // Credit author at 90% — platform retains 10% fee
+  const platformFee  = Math.round(priceUsd * 0.10 * 100) / 100;
+  const authorPayout = Math.round((priceUsd - platformFee) * 100) / 100;
+
   await supabase.from("user_wallets").upsert({ user_id: script.author_id }, { onConflict: "user_id" });
   await supabase.rpc("increment_wallet", {
     p_user_id: script.author_id,
-    p_amount:  priceUsd,
+    p_amount:  authorPayout,
   });
 
   // Escrow record (already released — instant commerce)
@@ -137,6 +141,16 @@ export async function POST(req: NextRequest) {
     released_at:   new Date().toISOString(),
     release_note:  `Bazaar purchase by ${user.id}`,
     processor:     "manual",
+  });
+
+  await createAdminSupabase().from("platform_transactions").insert({
+    buyer_id: user.id,
+    seller_id: script.author_id,
+    script_id,
+    amount_usd: priceUsd,
+    platform_fee: platformFee,
+    author_payout: authorPayout,
+    tx_type: "bazaar_purchase",
   });
 
   // Purchase record
@@ -151,9 +165,11 @@ export async function POST(req: NextRequest) {
   await supabase.rpc("increment_purchase", { p_script_id: script_id, p_revenue: priceUsd });
 
   return NextResponse.json({
-    ok:         true,
-    code:       script.code,
-    spent:      priceUsd,
-    new_balance: balance - priceUsd,
+    ok:           true,
+    code:         script.code,
+    spent:        priceUsd,
+    platform_fee: platformFee,
+    author_payout: authorPayout,
+    new_balance:  Math.round((balance - priceUsd) * 100) / 100,
   });
 }

@@ -28,7 +28,7 @@ export default async function HomePage() {
   }
 
   const primaryCta = isAuthenticated
-    ? { href: "/dashboard", label: "Return to Command Center" }
+    ? { href: "/dashboard", label: "Enter Command Center" }
     : { href: "/auth/signup", label: "Join the Stronghold" };
 
   return (

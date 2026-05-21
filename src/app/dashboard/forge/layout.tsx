@@ -1,31 +1,26 @@
 /**
- * /dashboard/forge layout — server-side identity gate.
- *
- * The Forge is restricted to access_level ≥ 2 (Hacker / Developer).
- * This layout runs on the server before any child page component is
- * evaluated, so it acts as a hard perimeter guard — the client page
- * never mounts if the tier check fails.
- *
- * Note: the API route (/api/forge/execute) enforces the same gate
- * independently, so there is defence-in-depth even if this layout is
- * somehow bypassed in future routing changes.
+ * /dashboard/forge layout — server-side rank gate (Stronghold 2.0).
+ * Forge unlocks at rank 3+ (Ghost/Sentinel). API routes enforce the same gate.
  */
 
 import * as React from "react";
 import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/supabase/server";
+import { isPathAllowed, resolveAccessRank } from "@/lib/access/ranks";
+import { getCurrentProfile, getSessionUser } from "@/lib/supabase/server";
 
 export default async function ForgeLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const profile = await getCurrentProfile();
-  const accessLevel = (profile?.access_level as number | undefined) ?? 1;
+  const user = await getSessionUser();
+  if (!user) redirect("/auth/login?next=/dashboard/forge");
 
-  if (accessLevel < 2) {
-    // Redirect to dashboard with a query flag so the overview page can
-    // surface a contextual "upgrade your identity" banner.
+  const profile = await getCurrentProfile();
+  const rank = resolveAccessRank(profile?.access_level ?? 1, profile?.role ?? null);
+  const userType = profile?.user_type ?? "hacker";
+
+  if (!isPathAllowed("/dashboard/forge", rank, userType)) {
     redirect("/dashboard?gate=forge");
   }
 

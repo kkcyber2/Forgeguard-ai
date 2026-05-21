@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
@@ -18,21 +20,69 @@ const columns: Array<{ title: string; items: { label: string; href: string }[] }
     items: [
       { label: "Docs", href: "/#docs" },
       { label: "ATLAS coverage", href: "/#redteam" },
-      { label: "Changelog", href: "/#docs" },
-      { label: "Security", href: "/#security" },
+      { label: "Red-Team Guidelines", href: "/resources/guidelines" },
+      { label: "Security", href: "/contact" },
     ],
   },
   {
     title: "Company",
     items: [
-      { label: "About", href: "/#about" },
-      { label: "Careers", href: "/#careers" },
-      { label: "Contact", href: "mailto:security@forgeguard.ai" },
-      { label: "Legal", href: "/#legal" },
+      { label: "About", href: "/about" },
+      { label: "Careers", href: "/careers" },
+      { label: "Contact", href: "/contact" },
+      { label: "Legal", href: "/legal/terms" },
     ],
   },
 ];
 
+/* ── Footer status badge — polls /api/health/engine every 30 s ─────────── */
+function FooterStatus() {
+  const [lockdown, setLockdown] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function probe() {
+      try {
+        const res = await fetch("/api/health/engine", { cache: "no-store" });
+        if (cancelled) return;
+        if (!res.ok) {
+          // 503 → lockdown
+          setLockdown(true);
+          return;
+        }
+        const data = await res.json();
+        setLockdown(data.status === "lockdown");
+      } catch {
+        if (!cancelled) setLockdown(true);
+      }
+    }
+
+    probe();
+    const id = setInterval(probe, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  if (lockdown) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-sm border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.06)] px-2.5 py-1 font-mono text-xs text-[rgb(239,68,68)]">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[rgb(239,68,68)]" />
+        Status · engine lockdown
+      </span>
+    );
+  }
+
+  return (
+    <Badge tone="live" dot>
+      Status · all systems operational
+    </Badge>
+  );
+}
+
+/* ── Main footer ─────────────────────────────────────────────────────────── */
 export function MarketingFooter() {
   return (
     <footer className="relative border-t-[0.5px] border-white/[0.06] bg-obsidian-950/70 overflow-hidden">
@@ -46,9 +96,7 @@ export function MarketingFooter() {
               LLM deployments.
             </p>
             <div className="mt-6 flex items-center gap-2">
-              <Badge tone="live" dot>
-                Status · all systems operational
-              </Badge>
+              <FooterStatus />
             </div>
           </div>
           {columns.map((col) => (
@@ -75,11 +123,11 @@ export function MarketingFooter() {
             © {new Date().getFullYear()} ForgeGuard AI · All attacks reserved
           </p>
           <div className="flex items-center gap-4 text-xs text-foreground-subtle">
-            <Link href="/#legal" className="hover:text-foreground">Privacy</Link>
+            <Link href="/legal/privacy" className="hover:text-foreground">Privacy</Link>
             <span>·</span>
-            <Link href="/#legal" className="hover:text-foreground">Terms</Link>
+            <Link href="/legal/terms" className="hover:text-foreground">Terms</Link>
             <span>·</span>
-            <Link href="/#security" className="hover:text-foreground">Disclosure</Link>
+            <Link href="/contact" className="hover:text-foreground">Disclosure</Link>
           </div>
         </div>
       </div>

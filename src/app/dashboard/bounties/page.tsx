@@ -516,9 +516,77 @@ const EMPTY_FORM: TriageForm = {
 // after a successful triage submission saves to bounty_escrow via backend
 const MOCK_ESCROW: { status: EscrowStatus; amount: number } | null = null;
 
+// ─── Wizard step config ───────────────────────────────────────────────────────
+
+const WIZARD_STEPS = [
+  { id: 1, label: "Discovery",    hint: "Name and describe the vulnerability" },
+  { id: 2, label: "Exploitation", hint: "Reproduction chain and impact" },
+  { id: 3, label: "Scope",        hint: "Target, component, and scan link" },
+];
+
+// ─── Step indicator ───────────────────────────────────────────────────────────
+
+function WizardProgress({
+  step,
+  onGoTo,
+  canGoTo,
+}: {
+  step: number;
+  onGoTo: (s: number) => void;
+  canGoTo: (s: number) => boolean;
+}) {
+  return (
+    <div className="flex items-center gap-0 mb-6">
+      {WIZARD_STEPS.map((s, i) => {
+        const done    = step > s.id;
+        const active  = step === s.id;
+        const allowed = canGoTo(s.id);
+        return (
+          <React.Fragment key={s.id}>
+            <button
+              type="button"
+              disabled={!allowed}
+              onClick={() => allowed && onGoTo(s.id)}
+              className={cn(
+                "flex flex-col items-center gap-1 px-3 py-2 rounded-xs transition-colors",
+                active  ? "bg-acid/10" : "hover:bg-white/[0.04]",
+                !allowed ? "cursor-default" : "cursor-pointer",
+              )}
+            >
+              <div className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-xs border font-mono text-[11px] font-bold transition-colors",
+                done   ? "border-acid/50 bg-acid/20 text-acid"
+                       : active ? "border-acid/40 bg-acid/[0.08] text-acid"
+                       : "border-white/[0.1] bg-obsidian-800/40 text-zinc-400",
+              )}>
+                {done ? <CheckCircle2 size={12} strokeWidth={2} /> : s.id}
+              </div>
+              <span className={cn(
+                "font-mono text-[9px] uppercase tracking-widest hidden sm:block",
+                active ? "text-acid" : done ? "text-zinc-400" : "text-zinc-600",
+              )}>
+                {s.label}
+              </span>
+            </button>
+            {i < WIZARD_STEPS.length - 1 && (
+              <div className={cn(
+                "flex-1 h-px mx-1 transition-colors",
+                done ? "bg-acid/30" : "bg-white/[0.05]",
+              )} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function BountiesPage() {
   const reduce = useReducedMotion();
 
+  const [step, setStep]             = React.useState(1);
   const [form, setForm]             = React.useState<TriageForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = React.useState(false);
   const [result, setResult]         = React.useState<TriageResponse | null>(null);
@@ -527,16 +595,21 @@ export default function BountiesPage() {
   const [escrow, setEscrow]         = React.useState<{ status: EscrowStatus; amount: number } | null>(MOCK_ESCROW);
 
   function patch(field: keyof TriageForm, value: string) {
-    // Reset domain verification if domain changes
     if (field === "target_domain") setDomainVerified(false);
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  // Whether the submit button should be gated behind domain verification
   const needsDomainVerif = form.target_domain.trim().length > 0 && !domainVerified;
+  const step1Valid = form.title.trim().length > 0 && form.description.trim().length > 0;
+  const step2Valid = true; // reproduction + impact are optional
+  function canGoTo(s: number): boolean {
+    if (s === 1) return true;
+    if (s === 2) return step1Valid;
+    if (s === 3) return step1Valid && step2Valid;
+    return false;
+  }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!form.title || !form.description) return;
     if (needsDomainVerif) {
       setError("Verify your domain ownership before submitting a bounty against it.");
@@ -576,8 +649,6 @@ export default function BountiesPage() {
       }
 
       setResult(json);
-      // After successful triage, create a placeholder escrow entry
-      // (in production the backend would do this automatically)
       setEscrow({ status: "pending", amount: 0 });
     } catch (err: unknown) {
       setError((err as Error).message ?? "Request failed");
@@ -618,24 +689,9 @@ export default function BountiesPage() {
         className="grid grid-cols-3 gap-3"
       >
         {[
-          {
-            label: "AI model",
-            value: "DeepSeek-R1",
-            icon:  Zap,
-            tone:  "acid",
-          },
-          {
-            label: "Scoring standard",
-            value: "CVSS 4.0",
-            icon:  FileSearch,
-            tone:  "neutral",
-          },
-          {
-            label: "Aegis cross-ref",
-            value: "Automatic",
-            icon:  ShieldCheck,
-            tone:  "secure",
-          },
+          { label: "AI model",          value: "DeepSeek-R1", icon: Zap,        tone: "acid"    },
+          { label: "Scoring standard",  value: "CVSS 4.0",   icon: FileSearch,  tone: "neutral" },
+          { label: "Aegis cross-ref",   value: "Automatic",  icon: ShieldCheck, tone: "secure"  },
         ].map(({ label, value, icon: Icon, tone }) => (
           <div
             key={label}
@@ -643,21 +699,11 @@ export default function BountiesPage() {
           >
             <div className={cn(
               "flex h-7 w-7 items-center justify-center rounded-xs border",
-              tone === "secure"
-                ? "border-acid/20 bg-acid/[0.06]"
-                : tone === "acid"
+              tone === "secure" || tone === "acid"
                 ? "border-acid/20 bg-acid/[0.06]"
                 : "border-white/[0.06] bg-obsidian-700/40",
             )}>
-              <Icon
-                size={12}
-                strokeWidth={1.5}
-                className={cn(
-                  tone === "secure" || tone === "acid"
-                    ? "text-acid"
-                    : "text-foreground-muted",
-                )}
-              />
+              <Icon size={12} strokeWidth={1.5} className={cn(tone !== "neutral" ? "text-acid" : "text-foreground-muted")} />
             </div>
             <div>
               <p className="text-sm font-semibold tabular-nums text-foreground">{value}</p>
@@ -667,184 +713,267 @@ export default function BountiesPage() {
         ))}
       </motion.div>
 
-      {/* ── Two-column layout: form left, result right ────────────────── */}
+      {/* ── Two-column layout: wizard left, result right ─────────────────── */}
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-        {/* Submission form */}
+        {/* Multi-step wizard */}
         <motion.div
           initial={reduce ? false : { opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
+          className="rounded-sm border border-white/[0.06] bg-obsidian-800/20 p-6"
         >
-          <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <Upload size={12} strokeWidth={1.5} className="text-foreground-muted" />
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle">
-                  Report Submission
-                </span>
-              </div>
-              <div className="h-px bg-white/[0.04] mt-1" />
+          {/* Progress indicator */}
+          <WizardProgress step={step} onGoTo={setStep} canGoTo={canGoTo} />
+
+          {/* Step label */}
+          <div className="mb-5 flex items-center gap-2 border-b border-white/[0.04] pb-4">
+            <Upload size={12} strokeWidth={1.5} className="text-zinc-400" />
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400">
+                Step {step} — {WIZARD_STEPS[step - 1].label}
+              </p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                {WIZARD_STEPS[step - 1].hint}
+              </p>
             </div>
+          </div>
 
-            <Field label="Vulnerability title" required>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => patch("title", e.target.value)}
-                placeholder="e.g. Prompt injection via tool-call return value"
-                maxLength={200}
-                required
-                className={inputClass}
-              />
-            </Field>
-
-            <Field
-              label="Description"
-              hint="Explain the vulnerability, the affected system, and how it can be exploited."
-              required
-            >
-              <textarea
-                value={form.description}
-                onChange={(e) => patch("description", e.target.value)}
-                placeholder="Describe the vulnerability in detail..."
-                rows={5}
-                maxLength={5000}
-                required
-                className={textareaClass}
-              />
-            </Field>
-
-            <Field
-              label="Reproduction steps"
-              hint="Step-by-step instructions to reproduce the issue."
-            >
-              <textarea
-                value={form.reproduction}
-                onChange={(e) => patch("reproduction", e.target.value)}
-                placeholder="1. Send the following payload to /api/chat...&#10;2. Observe the model outputs..."
-                rows={4}
-                maxLength={3000}
-                className={textareaClass}
-              />
-            </Field>
-
-            <Field
-              label="Impact assessment"
-              hint="What data or capabilities could an attacker access?"
-            >
-              <textarea
-                value={form.impact}
-                onChange={(e) => patch("impact", e.target.value)}
-                placeholder="Attacker can exfiltrate system prompts, bypass content policy..."
-                rows={3}
-                maxLength={2000}
-                className={textareaClass}
-              />
-            </Field>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Affected component">
-                <input
-                  type="text"
-                  value={form.affected_component}
-                  onChange={(e) => patch("affected_component", e.target.value)}
-                  placeholder="LLM endpoint / RAG pipeline / Agent"
-                  maxLength={200}
-                  className={inputClass}
-                />
-              </Field>
-              <Field
-                label="Scan ID (optional)"
-                hint="Link to an existing scan to cross-check Aegis rules."
+          <AnimatePresence mode="wait">
+            {/* ── Step 1: Discovery ─────────────────────────────────── */}
+            {step === 1 && (
+              <motion.div
+                key="step1"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-5"
               >
-                <input
-                  type="text"
-                  value={form.scan_id}
-                  onChange={(e) => patch("scan_id", e.target.value)}
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  maxLength={36}
-                  className={inputClass}
-                />
-              </Field>
-            </div>
-
-            {/* Target domain + ownership verification */}
-            <Field
-              label="Target domain (optional)"
-              hint="Required if submitting a finding against an external target. Proves you own or are authorised to test it."
-            >
-              <input
-                type="text"
-                value={form.target_domain}
-                onChange={(e) => patch("target_domain", e.target.value)}
-                placeholder="api.example.com"
-                maxLength={253}
-                className={inputClass}
-              />
-            </Field>
-            <AnimatePresence>
-              {form.target_domain.trim() && (
-                <DomainVerifier
-                  domain={form.target_domain}
-                  onVerified={setDomainVerified}
-                />
-              )}
-            </AnimatePresence>
-
-            {/* Domain gate warning */}
-            <AnimatePresence>
-              {needsDomainVerif && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-start gap-3 rounded-xs border border-amber-400/30 bg-amber-400/[0.07] px-4 py-3"
+                <Field label="Vulnerability title" required>
+                  <input
+                    type="text"
+                    value={form.title}
+                    onChange={(e) => patch("title", e.target.value)}
+                    placeholder="e.g. Prompt injection via tool-call return value"
+                    maxLength={200}
+                    className={inputClass}
+                  />
+                </Field>
+                <Field
+                  label="Description"
+                  hint="Explain the vulnerability, the affected system, and how it can be exploited."
+                  required
                 >
-                  <Lock size={13} strokeWidth={1.5} className="mt-0.5 shrink-0 text-amber-400" />
-                  <p className="text-sm text-amber-400">
-                    Verify domain ownership before submitting a bounty against this target.
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => patch("description", e.target.value)}
+                    placeholder="Describe the vulnerability in detail..."
+                    rows={6}
+                    maxLength={5000}
+                    className={textareaClass}
+                  />
+                </Field>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={!step1Valid}
+                    onClick={() => setStep(2)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-sm border px-5 py-2 text-sm font-medium transition-all",
+                      "border-acid/30 bg-acid/[0.07] text-acid hover:bg-acid/[0.14]",
+                      "disabled:opacity-40 disabled:cursor-not-allowed",
+                    )}
+                  >
+                    Next: Exploitation
+                    <ChevronRight size={14} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
-            {/* Error */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-start gap-3 rounded-xs border border-threat/30 bg-threat/[0.07] px-4 py-3"
+            {/* ── Step 2: Exploitation ──────────────────────────────── */}
+            {step === 2 && (
+              <motion.div
+                key="step2"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-5"
+              >
+                <Field
+                  label="Reproduction steps"
+                  hint="Step-by-step instructions to reproduce the issue."
                 >
-                  <AlertTriangle size={13} strokeWidth={1.5} className="mt-0.5 shrink-0 text-threat" />
-                  <p className="text-sm text-threat">{error}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <textarea
+                    value={form.reproduction}
+                    onChange={(e) => patch("reproduction", e.target.value)}
+                    placeholder={"1. Send the following payload to /api/chat...\n2. Observe the model outputs..."}
+                    rows={5}
+                    maxLength={3000}
+                    className={textareaClass}
+                  />
+                </Field>
+                <Field
+                  label="Impact assessment"
+                  hint="What data or capabilities could an attacker access?"
+                >
+                  <textarea
+                    value={form.impact}
+                    onChange={(e) => patch("impact", e.target.value)}
+                    placeholder="Attacker can exfiltrate system prompts, bypass content policy..."
+                    rows={4}
+                    maxLength={2000}
+                    className={textareaClass}
+                  />
+                </Field>
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
+                  >
+                    <ChevronDown size={13} strokeWidth={1.5} className="-rotate-90" />
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-sm border px-5 py-2 text-sm font-medium transition-all",
+                      "border-acid/30 bg-acid/[0.07] text-acid hover:bg-acid/[0.14]",
+                    )}
+                  >
+                    Next: Scope
+                    <ChevronRight size={14} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
 
-            <button
-              type="submit"
-              disabled={submitting || !form.title || !form.description || needsDomainVerif}
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-sm border px-6 py-2.5 text-sm font-medium transition-all duration-150",
-                "border-acid/30 bg-acid/[0.07] text-acid",
-                "hover:bg-acid/[0.12] disabled:opacity-40 disabled:cursor-not-allowed",
-              )}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
-                  Analysing with DeepSeek-R1…
-                </>
-              ) : (
-                <>
-                  <ShieldAlert size={13} strokeWidth={1.5} />
-                  Run CVSS Triage
-                </>
-              )}
-            </button>
-          </form>
+            {/* ── Step 3: Scope ─────────────────────────────────────── */}
+            {step === 3 && (
+              <motion.div
+                key="step3"
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-5"
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Affected component">
+                    <input
+                      type="text"
+                      value={form.affected_component}
+                      onChange={(e) => patch("affected_component", e.target.value)}
+                      placeholder="LLM endpoint / RAG pipeline / Agent"
+                      maxLength={200}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field
+                    label="Scan ID (optional)"
+                    hint="Link to an existing scan to cross-check Aegis rules."
+                  >
+                    <input
+                      type="text"
+                      value={form.scan_id}
+                      onChange={(e) => patch("scan_id", e.target.value)}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      maxLength={36}
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
+
+                {/* Target domain */}
+                <Field
+                  label="Target domain (optional)"
+                  hint="Required if submitting a finding against an external target."
+                >
+                  <input
+                    type="text"
+                    value={form.target_domain}
+                    onChange={(e) => patch("target_domain", e.target.value)}
+                    placeholder="api.example.com"
+                    maxLength={253}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <AnimatePresence>
+                  {form.target_domain.trim() && (
+                    <DomainVerifier domain={form.target_domain} onVerified={setDomainVerified} />
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {needsDomainVerif && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="flex items-start gap-3 rounded-xs border border-amber-400/30 bg-amber-400/[0.07] px-4 py-3"
+                    >
+                      <Lock size={13} strokeWidth={1.5} className="mt-0.5 shrink-0 text-amber-400" />
+                      <p className="text-sm text-amber-400">
+                        Verify domain ownership before submitting a bounty against this target.
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Error */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="flex items-start gap-3 rounded-xs border border-threat/30 bg-threat/[0.07] px-4 py-3"
+                    >
+                      <AlertTriangle size={13} strokeWidth={1.5} className="mt-0.5 shrink-0 text-threat" />
+                      <p className="text-sm text-threat">{error}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
+                  >
+                    <ChevronDown size={13} strokeWidth={1.5} className="-rotate-90" />
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting || !form.title || !form.description || needsDomainVerif}
+                    onClick={() => void handleSubmit()}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-sm border px-6 py-2.5 text-sm font-medium transition-all duration-150",
+                      "border-acid/30 bg-acid/[0.07] text-acid",
+                      "hover:bg-acid/[0.12] disabled:opacity-40 disabled:cursor-not-allowed",
+                    )}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
+                        Analysing with DeepSeek-R1…
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert size={13} strokeWidth={1.5} />
+                        Run CVSS Triage
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Result panel */}

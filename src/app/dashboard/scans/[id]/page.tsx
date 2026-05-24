@@ -120,7 +120,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
 
   // Severity breakdown derived from initial logs (the live child keeps
   // its own running totals after that).
-  const sevCounts = aggregateSeverity(logs ?? []);
+  const sevCounts = aggregateSeverity((logs ?? []) as LogRow[]);
 
   return (
     <>
@@ -229,7 +229,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
           </div>
           <ScanLiveLog
             scanId={scan.id}
-            initial={logs ?? []}
+            initial={(logs ?? []) as import("./live-log").ScanLogEntry[]}
             createdAt={scan.created_at}
           />
         </Card>

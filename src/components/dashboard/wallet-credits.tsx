@@ -11,7 +11,7 @@
  */
 
 import * as React from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { Coins, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,10 +31,10 @@ export function WalletCredits() {
 
   const supabase = React.useMemo(
     () =>
-      createBrowserClient<Database>(
+      createClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      ),
+      ) as SupabaseClient<Database>,
     [],
   );
 

@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import {
+  resolveEngineAuthToken,
+  resolveEngineBaseUrl,
+} from "@/lib/agathon-config";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { runScan } from "@/lib/runner/runner";
@@ -144,10 +148,32 @@ export async function POST(req: NextRequest) {
   // server-side on Railway: we just decrypt the credential, validate env,
   // transition the scan to "probing", and POST to /scan/start which
   // Railway acknowledges in <500ms before running the scan asynchronously.
+  const engineUrl = resolveEngineBaseUrl();
+  const engineToken = resolveEngineAuthToken();
+  if (!engineUrl) {
+    console.error(
+      "[api/scan/start] Missing engine URL: set PYTHON_ENGINE_URL or AGATHON_ORCHESTRATOR_URL on Vercel",
+    );
+  }
+  if (!engineToken) {
+    console.error(
+      "[api/scan/start] Missing auth token: set INTERNAL_SCAN_TOKEN or AGATHON_INTERNAL_SECRET on Vercel",
+    );
+  }
+
   try {
     await runScan({ scanId: scan.id, userId: user.id });
   } catch (err) {
-    console.error("[api/scan/start] runScan rejected:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error("[api/scan/start] runScan rejected:", {
+      scan_id: scan.id,
+      engineUrl: engineUrl ?? "<unset>",
+      hasToken: Boolean(engineToken),
+      message,
+      stack,
+      err,
+    });
     // The runScan helper has already markFailure'd the scan row, so the
     // user sees a "failed" status with the actual reason. We just bubble
     // a 500 here so the Server Action knows something went wrong.

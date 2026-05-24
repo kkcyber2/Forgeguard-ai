@@ -243,7 +243,7 @@ function CommunityChat() {
       .order("created_at", { ascending: true })
       .limit(50)
       .then(({ data }) => {
-        if (data) setMessages(data as ChatMessage[]);
+        if (data) setMessages(data as unknown as ChatMessage[]);
       });
 
     // Realtime subscription — watches the base table; display_name is

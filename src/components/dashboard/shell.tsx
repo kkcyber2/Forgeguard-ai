@@ -2,6 +2,8 @@ import * as React from "react";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { CommandBar } from "@/components/dashboard/command-bar";
 import { EngineStatus } from "@/components/dashboard/engine-status";
+import { DashboardHolographicMonolith } from "@/components/dashboard/holographic-monolith";
+import type { ViewMode } from "@/lib/access/parallel-sovereignty";
 import {
   Activity,
   CalendarClock,
@@ -97,13 +99,19 @@ export interface ShellUser {
 export function DashboardShell({
   children,
   nav,
+  primaryNav,
+  secondaryNav,
   user,
   scope,
   activePath: _activePath,
+  viewMode = "hacker",
+  identityChosen = true,
   systemDegraded = false,
 }: {
   children: React.ReactNode;
   nav: NavItem[];
+  primaryNav?: NavItem[];
+  secondaryNav?: NavItem[];
   user: ShellUser;
   scope: "user" | "admin";
   /**
@@ -111,6 +119,8 @@ export function DashboardShell({
    * Kept for backward-compat with ActivePath wrapper.
    */
   activePath?: string;
+  viewMode?: ViewMode;
+  identityChosen?: boolean;
   /** Set to true when Railway reports infrastructure degradation. */
   systemDegraded?: boolean;
 }) {
@@ -119,25 +129,31 @@ export function DashboardShell({
       className="relative min-h-screen bg-[#050505] text-white transition-colors duration-300"
       suppressHydrationWarning
     >
-      {/* Global command palette */}
-      <CommandBar />
+      {/* Ambient layer — behind top nav (z-0), content above (z-10) */}
+      {scope === "user" && <DashboardHolographicMonolith viewMode={viewMode} />}
 
-      {/* Full-width top navigation header */}
+      <CommandBar viewMode={viewMode} />
+
       <TopBar
         nav={nav}
+        primaryNav={primaryNav}
+        secondaryNav={secondaryNav}
         user={user}
         scope={scope}
+        viewMode={viewMode}
+        identityChosen={identityChosen}
         systemDegraded={systemDegraded}
       />
 
-      {/* Page content — padded below the fixed header */}
       <main
-        className="pt-14"
+        className="relative z-10 pt-14"
         style={systemDegraded ? { paddingTop: "calc(56px + 28px)" } : undefined}
       >
         <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
           <EngineStatus />
-          {children}
+          <div className="mt-4 rounded-[6px] border-[0.5px] border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl md:p-6">
+            {children}
+          </div>
         </div>
       </main>
     </div>

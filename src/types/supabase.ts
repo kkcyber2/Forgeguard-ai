@@ -7,421 +7,13 @@ export type Json =
   | Json[]
 
 export type Database = {
-  __InternalSupabase: { PostgrestVersion: "14.5" }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          company_domain: string | null
-          company_name: string | null
-          company_tag: string | null
-          created_at: string | null
-          domain_verified: boolean
-          domain_token: string | null
-          domain_verify_token: string | null
-          email: string
-          full_name: string | null
-          hacker_rank: "RECRUIT" | "HACKER" | "ELITE" | "TRAITOR"
-          id: string
-          identity_proofed: boolean | null
-          is_verified: boolean | null
-          phone: string | null
-          reputation: number | null
-          role: string | null
-          signature_at: string | null
-          signature_data: string | null
-          stripe_customer_id: string | null
-          updated_at: string | null
-          user_type: "client" | "hacker" | "developer"
-          access_level: number
-          username: string | null
-          phone_verified: boolean
-          identity_verified: boolean
-          clearance_tier: "pending" | "tactical" | "professional" | "sovereign"
-          identity_document_path: string | null
-          identity_audit_score: number | null
-          identity_audit_status: "none" | "pending" | "passed" | "failed" | "review"
-          identity_audit_notes: string | null
-          sovereign_pending: boolean
-        }
-        Insert: {
-          avatar_url?: string | null
-          company_domain?: string | null
-          company_name?: string | null
-          company_tag?: string | null
-          created_at?: string | null
-          domain_verified?: boolean
-          domain_token?: string | null
-          domain_verify_token?: string | null
-          email: string
-          full_name?: string | null
-          hacker_rank?: "RECRUIT" | "HACKER" | "ELITE" | "TRAITOR"
-          id: string
-          identity_proofed?: boolean | null
-          is_verified?: boolean | null
-          phone?: string | null
-          reputation?: number | null
-          role?: string | null
-          signature_at?: string | null
-          signature_data?: string | null
-          stripe_customer_id?: string | null
-          updated_at?: string | null
-          user_type?: "client" | "hacker" | "developer"
-          access_level?: number
-          username?: string | null
-          phone_verified?: boolean
-          identity_verified?: boolean
-          clearance_tier?: "pending" | "tactical" | "professional" | "sovereign"
-          identity_document_path?: string | null
-          identity_audit_score?: number | null
-          identity_audit_status?: "none" | "pending" | "passed" | "failed" | "review"
-          identity_audit_notes?: string | null
-          sovereign_pending?: boolean
-        }
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>
-        Relationships: []
-      }
-      projects: {
-        Row: {
-          id: string
-          client_id: string
-          title: string
-          description: string | null
-          status: "pending" | "in_progress" | "review" | "completed" | "cancelled"
-          project_type: "ai_red_teaming" | "llm_security_audit" | "secure_agent_development" | "ml_model_hardening" | "prompt_engineering" | "consultation" | "other"
-          budget_range: string | null
-          deadline: string | null
-          progress: number
-          github_url: string | null
-          demo_url: string | null
-          loom_url: string | null
-          admin_notes: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          title: string
-          description?: string | null
-          status?: "pending" | "in_progress" | "review" | "completed" | "cancelled"
-          project_type: "ai_red_teaming" | "llm_security_audit" | "secure_agent_development" | "ml_model_hardening" | "prompt_engineering" | "consultation" | "other"
-          budget_range?: string | null
-          deadline?: string | null
-          progress?: number
-          github_url?: string | null
-          demo_url?: string | null
-          loom_url?: string | null
-          admin_notes?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["projects"]["Insert"]>
-        Relationships: []
-      }
-      project_files: {
-        Row: {
-          id: string
-          project_id: string
-          file_name: string
-          file_url: string
-          file_type: string | null
-          file_size: number | null
-          uploaded_by: string | null
-          description: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          file_name: string
-          file_url: string
-          file_type?: string | null
-          file_size?: number | null
-          uploaded_by?: string | null
-          description?: string | null
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["project_files"]["Insert"]>
-        Relationships: []
-      }
-      messages: {
-        Row: {
-          id: string
-          sender_id: string
-          receiver_id: string | null
-          project_id: string | null
-          content: string
-          is_read: boolean
-          attachments: Json | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          sender_id: string
-          receiver_id?: string | null
-          project_id?: string | null
-          content: string
-          is_read?: boolean
-          attachments?: Json | null
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["messages"]["Insert"]>
-        Relationships: []
-      }
-      bookings: {
-        Row: {
-          id: string
-          client_id: string
-          project_type: "ai_red_teaming" | "llm_security_audit" | "secure_agent_development" | "ml_model_hardening" | "prompt_engineering" | "consultation" | "other"
-          title: string
-          description: string
-          budget_range: string | null
-          preferred_start_date: string | null
-          urgency: "low" | "normal" | "high" | "urgent"
-          status: "pending" | "approved" | "rejected" | "completed"
-          admin_response: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          project_type: "ai_red_teaming" | "llm_security_audit" | "secure_agent_development" | "ml_model_hardening" | "prompt_engineering" | "consultation" | "other"
-          title: string
-          description: string
-          budget_range?: string | null
-          preferred_start_date?: string | null
-          urgency?: "low" | "normal" | "high" | "urgent"
-          status?: "pending" | "approved" | "rejected" | "completed"
-          admin_response?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["bookings"]["Insert"]>
-        Relationships: []
-      }
-      services: {
-        Row: {
-          id: string
-          name: string
-          slug: string
-          description: string
-          short_description: string | null
-          features: Json
-          starting_price: number | null
-          estimated_duration: string | null
-          icon: string | null
-          is_active: boolean
-          display_order: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          slug: string
-          description: string
-          short_description?: string | null
-          features?: Json
-          starting_price?: number | null
-          estimated_duration?: string | null
-          icon?: string | null
-          is_active?: boolean
-          display_order?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>
-        Relationships: []
-      }
-      skills: {
-        Row: {
-          id: string
-          name: string
-          category: "ai_ml_tools" | "red_teaming_tools" | "programming" | "deployment" | "security" | "other"
-          proficiency: number | null
-          icon: string | null
-          description: string | null
-          display_order: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          category: "ai_ml_tools" | "red_teaming_tools" | "programming" | "deployment" | "security" | "other"
-          proficiency?: number | null
-          icon?: string | null
-          description?: string | null
-          display_order?: number
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["skills"]["Insert"]>
-        Relationships: []
-      }
-      showcase_projects: {
-        Row: {
-          id: string
-          title: string
-          slug: string
-          description: string
-          short_description: string | null
-          thumbnail_url: string | null
-          images: Json
-          technologies: Json
-          github_url: string | null
-          demo_url: string | null
-          loom_url: string | null
-          category: string | null
-          is_featured: boolean
-          is_active: boolean
-          display_order: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          title: string
-          slug: string
-          description: string
-          short_description?: string | null
-          thumbnail_url?: string | null
-          images?: Json
-          technologies?: Json
-          github_url?: string | null
-          demo_url?: string | null
-          loom_url?: string | null
-          category?: string | null
-          is_featured?: boolean
-          is_active?: boolean
-          display_order?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["showcase_projects"]["Insert"]>
-        Relationships: []
-      }
-      contact_submissions: {
-        Row: {
-          id: string
-          name: string
-          email: string
-          subject: string
-          message: string
-          is_read: boolean
-          ip_address: string | null
-          user_agent: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          email: string
-          subject: string
-          message: string
-          is_read?: boolean
-          ip_address?: string | null
-          user_agent?: string | null
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["contact_submissions"]["Insert"]>
-        Relationships: []
-      }
-      project_submissions: {
-        Row: {
-          id: string
-          client_id: string
-          github_url: string | null
-          service_type: "ai_red_teaming" | "secure_ai_agents" | "ml_hardening" | "prompt_engineering" | "consultation"
-          description: string
-          budget_range: string | null
-          timeline: string | null
-          status: "pending" | "in_progress" | "completed" | "rejected"
-          admin_notes: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          github_url?: string | null
-          service_type: "ai_red_teaming" | "secure_ai_agents" | "ml_hardening" | "prompt_engineering" | "consultation"
-          description: string
-          budget_range?: string | null
-          timeline?: string | null
-          status?: "pending" | "in_progress" | "completed" | "rejected"
-          admin_notes?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["project_submissions"]["Insert"]>
-        Relationships: []
-      }
-      scans: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          finding_count: number
-          high_severity_count: number
-          id: string
-          notes: string | null
-          progress_pct: number
-          started_at: string | null
-          status: "queued" | "probing" | "triage" | "sealed" | "failed"
-          target_credential_encrypted: string | null
-          target_model: string
-          target_url: string
-          user_id: string
-          discovery_report: Json | null
-          ale_usd: number | null
-          social_templates: Json | null
-          aegis_zip_b64: string | null
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          finding_count?: number
-          high_severity_count?: number
-          id?: string
-          notes?: string | null
-          progress_pct?: number
-          started_at?: string | null
-          status?: "queued" | "probing" | "triage" | "sealed" | "failed"
-          target_credential_encrypted?: string | null
-          target_model: string
-          target_url: string
-          user_id: string
-          discovery_report?: Json | null
-          ale_usd?: number | null
-          social_templates?: Json | null
-          aegis_zip_b64?: string | null
-        }
-        Update: Partial<Database["public"]["Tables"]["scans"]["Insert"]>
-        Relationships: []
-      }
-      scan_logs: {
-        Row: {
-          attack_name: string | null
-          created_at: string
-          id: number
-          payload: Json
-          scan_id: string
-          severity: "info" | "low" | "medium" | "high" | "critical"
-          type: "progress" | "finding" | "attempt" | "audit" | "error" | "info"
-        }
-        Insert: {
-          attack_name?: string | null
-          created_at?: string
-          id?: number
-          payload?: Json
-          scan_id: string
-          severity?: "info" | "low" | "medium" | "high" | "critical"
-          type: "progress" | "finding" | "attempt" | "audit" | "error" | "info"
-        }
-        Update: Partial<Database["public"]["Tables"]["scan_logs"]["Insert"]>
-        Relationships: []
-      }
       activity_logs: {
         Row: {
           action: string
@@ -443,853 +35,2904 @@ export type Database = {
           ip_address?: string | null
           user_id?: string | null
         }
-        Update: Partial<Database["public"]["Tables"]["activity_logs"]["Insert"]>
-        Relationships: []
-      }
-      user_wallets: {
-        Row: {
-          id: string
-          user_id: string
-          balance_usd: number
-          is_frozen: boolean
-          frozen_reason: string | null
-          frozen_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
           id?: string
-          user_id: string
-          balance_usd?: number
-          is_frozen?: boolean
-          frozen_reason?: string | null
-          frozen_at?: string | null
-          created_at?: string
-          updated_at?: string
+          ip_address?: string | null
+          user_id?: string | null
         }
-        Update: Partial<Database["public"]["Tables"]["user_wallets"]["Insert"]>
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      bazaar_scripts: {
+      aegis_rules: {
         Row: {
-          id: string
-          author_id: string
-          name: string
+          action: string
+          created_at: string
           description: string
-          language: "python" | "bash" | "javascript" | "rust"
-          tags: string[]
-          code: string
-          price_usd: number
-          is_free: boolean
-          purchase_count: number
-          revenue_usd: number
-          audit_verdict: "pending" | "cleared" | "flagged" | "rejected" | "pending_audit"
-          audit_risk_score: number
-          audit_findings: Json | null
-          audit_reason: string | null
-          audited_at: string | null
-          is_published: boolean
-          is_removed: boolean
-          created_at: string
+          enabled: boolean
+          format: string
+          id: number
+          pattern: string
+          rule_id: string
+          scan_id: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          author_id: string
-          name: string
-          description?: string
-          language?: "python" | "bash" | "javascript" | "rust"
-          tags?: string[]
-          code: string
-          price_usd?: number
-          purchase_count?: number
-          revenue_usd?: number
-          audit_verdict?: "pending" | "cleared" | "flagged" | "rejected" | "pending_audit"
-          audit_risk_score?: number
-          audit_findings?: Json | null
-          audit_reason?: string | null
-          audited_at?: string | null
-          is_published?: boolean
-          is_removed?: boolean
+          action: string
           created_at?: string
+          description: string
+          enabled?: boolean
+          format?: string
+          id?: number
+          pattern: string
+          rule_id: string
+          scan_id: string
           updated_at?: string
         }
-        Update: Partial<Database["public"]["Tables"]["bazaar_scripts"]["Insert"]>
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string
+          enabled?: boolean
+          format?: string
+          id?: number
+          pattern?: string
+          rule_id?: string
+          scan_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aegis_rules_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_memories: {
+        Row: {
+          action_taken: string | null
+          agent_role: string | null
+          created_at: string | null
+          id: string
+          scan_id: string | null
+          thought_process: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          agent_role?: string | null
+          created_at?: string | null
+          id?: string
+          scan_id?: string | null
+          thought_process?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          agent_role?: string | null
+          created_at?: string | null
+          id?: string
+          scan_id?: string | null
+          thought_process?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_memories_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_tasks: {
+        Row: {
+          agent_type: string | null
+          created_at: string | null
+          id: string
+          results: Json | null
+          status: string | null
+          target_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          agent_type?: string | null
+          created_at?: string | null
+          id?: string
+          results?: Json | null
+          status?: string | null
+          target_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          agent_type?: string | null
+          created_at?: string | null
+          id?: string
+          results?: Json | null
+          status?: string | null
+          target_email?: string | null
+          user_id?: string | null
+        }
         Relationships: []
       }
       bazaar_purchases: {
         Row: {
+          amount_usd: number | null
+          author_id: string | null
+          buyer_id: string | null
+          created_at: string | null
           id: string
-          script_id: string
-          buyer_id: string
-          author_id: string
-          amount_usd: number
-          created_at: string
+          script_id: string | null
         }
         Insert: {
+          amount_usd?: number | null
+          author_id?: string | null
+          buyer_id?: string | null
+          created_at?: string | null
           id?: string
-          script_id: string
-          buyer_id: string
-          author_id: string
-          amount_usd?: number
-          created_at?: string
+          script_id?: string | null
         }
-        Update: Partial<Database["public"]["Tables"]["bazaar_purchases"]["Insert"]>
-        Relationships: []
+        Update: {
+          amount_usd?: number | null
+          author_id?: string | null
+          buyer_id?: string | null
+          created_at?: string | null
+          id?: string
+          script_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bazaar_purchases_script_id_fkey"
+            columns: ["script_id"]
+            isOneToOne: false
+            referencedRelation: "bazaar_scripts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      hacker_repos: {
+      bazaar_scripts: {
         Row: {
-          id: string
-          owner_id: string
-          name: string
+          audit_findings: Json | null
+          audit_reason: string | null
+          audit_risk_score: number
+          audit_verdict: string
+          audited_at: string | null
+          author_id: string
+          code: string
+          code_content: string | null
+          created_at: string
           description: string
+          id: string
+          is_free: boolean
+          is_published: boolean
+          is_removed: boolean
           language: string
+          name: string
+          price_usd: number
+          purchase_count: number
+          revenue_usd: number
+          safety_score: number | null
+          status: string | null
           tags: string[]
-          code: string
-          is_public: boolean
-          is_archived: boolean
-          star_count: number
-          version: string
-          commit_count: number
-          access_level: string | null
-          created_at: string
+          title: string | null
           updated_at: string
         }
         Insert: {
-          id?: string
-          owner_id: string
-          name: string
+          audit_findings?: Json | null
+          audit_reason?: string | null
+          audit_risk_score?: number
+          audit_verdict?: string
+          audited_at?: string | null
+          author_id: string
+          code: string
+          code_content?: string | null
+          created_at?: string
           description?: string
+          id?: string
+          is_published?: boolean
+          is_removed?: boolean
           language?: string
+          name: string
+          price_usd?: number
+          purchase_count?: number
+          revenue_usd?: number
+          safety_score?: number | null
+          status?: string | null
           tags?: string[]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          audit_findings?: Json | null
+          audit_reason?: string | null
+          audit_risk_score?: number
+          audit_verdict?: string
+          audited_at?: string | null
+          author_id?: string
           code?: string
-          is_public?: boolean
-          is_archived?: boolean
-          star_count?: number
-          version?: string
-          commit_count?: number
-          access_level?: string | null
+          code_content?: string | null
           created_at?: string
+          description?: string
+          id?: string
+          is_published?: boolean
+          is_removed?: boolean
+          language?: string
+          name?: string
+          price_usd?: number
+          purchase_count?: number
+          revenue_usd?: number
+          safety_score?: number | null
+          status?: string | null
+          tags?: string[]
+          title?: string | null
           updated_at?: string
         }
-        Update: Partial<Database["public"]["Tables"]["hacker_repos"]["Insert"]>
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bazaar_scripts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      repos: {
+      bazaar_tools: {
         Row: {
-          id: string
-          owner_id: string
-          user_id: string | null
-          name: string
+          author_id: string | null
+          category: string | null
+          code_content: string | null
+          created_at: string | null
           description: string | null
-          language: string | null
-          tags: string[] | null
-          code: string | null
-          is_public: boolean
-          is_archived: boolean
-          star_count: number
-          access_level: string | null
-          version: string | null
-          commit_count: number | null
-          created_at: string
-          updated_at: string
+          id: string
+          price_usd: number | null
+          status: string | null
+          title: string
         }
         Insert: {
-          id?: string
-          owner_id: string
-          user_id?: string | null
-          name: string
+          author_id?: string | null
+          category?: string | null
+          code_content?: string | null
+          created_at?: string | null
           description?: string | null
-          language?: string | null
-          tags?: string[] | null
-          code?: string | null
-          is_public?: boolean
-          is_archived?: boolean
-          star_count?: number
-          access_level?: string | null
-          version?: string | null
-          commit_count?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["repos"]["Insert"]>
-        Relationships: []
-      }
-      repo_stars: {
-        Row: {
-          id: string
-          repo_id: string
-          user_id: string
-          created_at: string
-        }
-        Insert: {
           id?: string
-          repo_id: string
-          user_id: string
-          created_at?: string
+          price_usd?: number | null
+          status?: string | null
+          title: string
         }
-        Update: Partial<Database["public"]["Tables"]["repo_stars"]["Insert"]>
-        Relationships: []
-      }
-      repo_files: {
-        Row: {
-          id: string
-          repo_id: string
-          user_id: string
-          path: string
-          name: string
-          size_bytes: number
-          mime_type: string
-          storage_key: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
+        Update: {
+          author_id?: string | null
+          category?: string | null
+          code_content?: string | null
+          created_at?: string | null
+          description?: string | null
           id?: string
-          repo_id: string
-          user_id: string
-          path: string
-          name: string
-          size_bytes?: number
-          mime_type?: string
-          storage_key: string
-          created_at?: string
-          updated_at?: string
+          price_usd?: number | null
+          status?: string | null
+          title?: string
         }
-        Update: Partial<Database["public"]["Tables"]["repo_files"]["Insert"]>
         Relationships: []
       }
-      enterprise_api_keys: {
+      bookings: {
         Row: {
+          admin_response: string | null
+          budget_range: string | null
+          client_id: string
+          created_at: string | null
+          description: string
+          duration_hours: number | null
           id: string
-          org_id: string
-          api_key: string
-          plan: "starter" | "professional" | "enterprise" | "admin"
-          is_active: boolean
-          hit_count: number
-          last_hit: string | null
-          expires_at: string | null
           notes: string | null
-          created_at: string
+          preferred_start_date: string | null
+          project_type: string
+          scheduled_date: string | null
+          service_type: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          urgency: string | null
         }
         Insert: {
+          admin_response?: string | null
+          budget_range?: string | null
+          client_id: string
+          created_at?: string | null
+          description: string
+          duration_hours?: number | null
           id?: string
-          org_id: string
-          api_key: string
-          plan?: "starter" | "professional" | "enterprise" | "admin"
-          is_active?: boolean
-          hit_count?: number
-          last_hit?: string | null
-          expires_at?: string | null
           notes?: string | null
-          created_at?: string
+          preferred_start_date?: string | null
+          project_type: string
+          scheduled_date?: string | null
+          service_type?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          urgency?: string | null
         }
-        Update: Partial<Database["public"]["Tables"]["enterprise_api_keys"]["Insert"]>
-        Relationships: []
+        Update: {
+          admin_response?: string | null
+          budget_range?: string | null
+          client_id?: string
+          created_at?: string | null
+          description?: string
+          duration_hours?: number | null
+          id?: string
+          notes?: string | null
+          preferred_start_date?: string | null
+          project_type?: string
+          scheduled_date?: string | null
+          service_type?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          urgency?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      subscriptions: {
+      bounties: {
         Row: {
+          company_name: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string
           id: string
-          user_id: string
-          status: "active" | "cancelled" | "past_due" | "trialing"
-          plan: "free" | "pro" | "enterprise"
-          started_at: string
-          expires_at: string | null
-          created_at: string
+          reward_amount: string | null
+          reward_usd: number
+          severity: string
+          status: string | null
+          target_system: string
+          target_url: string | null
+          title: string
           updated_at: string
         }
         Insert: {
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
           id?: string
-          user_id: string
-          status?: "active" | "cancelled" | "past_due" | "trialing"
-          plan?: "free" | "pro" | "enterprise"
-          started_at?: string
-          expires_at?: string | null
-          created_at?: string
+          reward_amount?: string | null
+          reward_usd?: number
+          severity?: string
+          status?: string | null
+          target_system?: string
+          target_url?: string | null
+          title: string
           updated_at?: string
         }
-        Update: Partial<Database["public"]["Tables"]["subscriptions"]["Insert"]>
-        Relationships: []
-      }
-      promo_codes: {
-        Row: {
-          id: string
-          code: string
-          reward_type: string
-          target_plan: "startup" | "enterprise"
-          scans_to_add: number
-          uses_left: number
-          expires_at: string | null
-          created_at: string
-        }
-        Insert: {
+        Update: {
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
           id?: string
-          code: string
-          reward_type?: string
-          target_plan: "startup" | "enterprise"
-          scans_to_add?: number
-          uses_left?: number
-          expires_at?: string | null
-          created_at?: string
+          reward_amount?: string | null
+          reward_usd?: number
+          severity?: string
+          status?: string | null
+          target_system?: string
+          target_url?: string | null
+          title?: string
+          updated_at?: string
         }
-        Update: Partial<Database["public"]["Tables"]["promo_codes"]["Insert"]>
-        Relationships: []
-      }
-      redeemed_codes: {
-        Row: {
-          id: string
-          code_id: string
-          user_id: string
-          redeemed_at: string
-        }
-        Insert: {
-          id?: string
-          code_id: string
-          user_id: string
-          redeemed_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["redeemed_codes"]["Insert"]>
-        Relationships: []
-      }
-      agent_memories: {
-        Row: {
-          id: string
-          scan_id: string
-          user_id: string
-          agent_role: "general" | "soldier_payload" | "soldier_recon" | "reporter"
-          model_id: string
-          thought: string
-          tool_call: Json | null
-          tool_result: Json | null
-          step_index: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          scan_id: string
-          user_id: string
-          agent_role: "general" | "soldier_payload" | "soldier_recon" | "reporter"
-          model_id: string
-          thought: string
-          tool_call?: Json | null
-          tool_result?: Json | null
-          step_index?: number
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["agent_memories"]["Insert"]>
-        Relationships: []
-      }
-      target_verifications: {
-        Row: {
-          id: string
-          user_id: string
-          target_domain: string
-          method: "dns_txt" | "file_upload" | "email_confirm"
-          token: string
-          verified: boolean
-          verified_at: string | null
-          expires_at: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          target_domain: string
-          method: "dns_txt" | "file_upload" | "email_confirm"
-          token: string
-          verified?: boolean
-          verified_at?: string | null
-          expires_at?: string
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["target_verifications"]["Insert"]>
         Relationships: []
       }
       bounty_escrow: {
         Row: {
-          id: string
-          submission_id: string
-          user_id: string
           amount_usd: number
+          created_at: string
           currency: string
-          status: "held" | "released" | "refunded" | "pending"
           held_at: string
-          released_at: string | null
-          release_note: string | null
+          id: string
+          mission_id: string | null
           processor: string | null
           processor_ref: string | null
-          created_at: string
+          release_note: string | null
+          released_at: string | null
+          status: string
+          submission_id: string | null
           updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          submission_id: string
-          user_id: string
           amount_usd?: number
+          created_at?: string
           currency?: string
-          status?: "held" | "released" | "refunded" | "pending"
           held_at?: string
-          released_at?: string | null
-          release_note?: string | null
+          id?: string
+          mission_id?: string | null
           processor?: string | null
           processor_ref?: string | null
-          created_at?: string
+          release_note?: string | null
+          released_at?: string | null
+          status?: string
+          submission_id?: string | null
           updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["bounty_escrow"]["Insert"]>
-        Relationships: []
-      }
-      terminal_inputs: {
-        Row: {
-          id: string
           user_id: string
-          session_id: string
+        }
+        Update: {
+          amount_usd?: number
+          created_at?: string
+          currency?: string
+          held_at?: string
+          id?: string
+          mission_id?: string | null
+          processor?: string | null
+          processor_ref?: string | null
+          release_note?: string | null
+          released_at?: string | null
+          status?: string
+          submission_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bounty_escrow_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bounty_escrows: {
+        Row: {
+          amount_usd: number | null
+          bounty_id: string | null
+          created_at: string | null
+          hacker_id: string | null
+          id: string
+          payout_reference: string | null
+          status: string | null
+        }
+        Insert: {
+          amount_usd?: number | null
+          bounty_id?: string | null
+          created_at?: string | null
+          hacker_id?: string | null
+          id?: string
+          payout_reference?: string | null
+          status?: string | null
+        }
+        Update: {
+          amount_usd?: number | null
+          bounty_id?: string | null
+          created_at?: string | null
+          hacker_id?: string | null
+          id?: string
+          payout_reference?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bounty_escrows_bounty_id_fkey"
+            columns: ["bounty_id"]
+            isOneToOne: false
+            referencedRelation: "bounties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_transcripts: {
+        Row: {
+          cache_read_tokens: number | null
+          cache_write_tokens: number | null
+          content: Json
+          created_at: string
+          id: number
+          input_tokens: number | null
+          latency_ms: number | null
+          model: string | null
+          output_tokens: number | null
+          role: string
+          scan_id: string
+          turn_index: number | null
+          user_id: string | null
+        }
+        Insert: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content: Json
+          created_at?: string
+          id?: number
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          role: string
+          scan_id: string
+          turn_index?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          cache_read_tokens?: number | null
+          cache_write_tokens?: number | null
+          content?: Json
+          created_at?: string
+          id?: number
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          role?: string
+          scan_id?: string
+          turn_index?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_transcripts_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_messages: {
+        Row: {
           content: string
-          consumed: boolean
-          created_at: string
+          created_at: string | null
+          id: string
+          user_id: string | null
         }
         Insert: {
-          id?: string
-          user_id: string
-          session_id: string
           content: string
-          consumed?: boolean
-          created_at?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
         }
-        Update: Partial<Database["public"]["Tables"]["terminal_inputs"]["Insert"]>
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string | null
+        }
         Relationships: []
       }
-      recon_targets: {
+      contact_submissions: {
         Row: {
+          created_at: string | null
+          email: string
           id: string
-          user_id: string
-          target: string
-          status: "queued" | "running" | "done" | "failed"
-          surface_map: Json | null
-          scan_depth: number
-          started_at: string | null
-          completed_at: string | null
-          error_msg: string | null
-          created_at: string
+          ip_address: string | null
+          is_read: boolean | null
+          message: string
+          name: string
+          subject: string
+          user_agent: string | null
         }
         Insert: {
+          created_at?: string | null
+          email: string
           id?: string
-          user_id: string
-          target: string
-          status?: "queued" | "running" | "done" | "failed"
-          surface_map?: Json | null
-          scan_depth?: number
-          started_at?: string | null
-          completed_at?: string | null
-          error_msg?: string | null
-          created_at?: string
+          ip_address?: string | null
+          is_read?: boolean | null
+          message: string
+          name: string
+          subject: string
+          user_agent?: string | null
         }
-        Update: Partial<Database["public"]["Tables"]["recon_targets"]["Insert"]>
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          ip_address?: string | null
+          is_read?: boolean | null
+          message?: string
+          name?: string
+          subject?: string
+          user_agent?: string | null
+        }
         Relationships: []
       }
-      scheduled_scans: {
+      custom_tools: {
         Row: {
-          id: string
-          user_id: string
-          name: string
-          target_model: string
-          target_url: string
-          target_credential_encrypted: string
-          frequency: "daily" | "weekly" | "monthly"
-          active: boolean
-          last_run_at: string | null
-          next_run_at: string
           created_at: string
+          description: string | null
+          executions_count: number
+          id: string
+          is_archived: boolean
+          name: string
+          origin_scan_id: string | null
+          safety_review: Json | null
+          safety_status: Database["public"]["Enums"]["tool_safety_status"]
+          spec: Json
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          name: string
-          target_model: string
-          target_url: string
-          target_credential_encrypted: string
-          frequency?: "daily" | "weekly" | "monthly"
-          active?: boolean
-          last_run_at?: string | null
-          next_run_at: string
           created_at?: string
+          description?: string | null
+          executions_count?: number
+          id?: string
+          is_archived?: boolean
+          name: string
+          origin_scan_id?: string | null
+          safety_review?: Json | null
+          safety_status?: Database["public"]["Enums"]["tool_safety_status"]
+          spec: Json
+          updated_at?: string
+          user_id: string
         }
-        Update: Partial<Database["public"]["Tables"]["scheduled_scans"]["Insert"]>
-        Relationships: []
+        Update: {
+          created_at?: string
+          description?: string | null
+          executions_count?: number
+          id?: string
+          is_archived?: boolean
+          name?: string
+          origin_scan_id?: string | null
+          safety_review?: Json | null
+          safety_status?: Database["public"]["Enums"]["tool_safety_status"]
+          spec?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_tools_origin_scan_id_fkey"
+            columns: ["origin_scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      user_api_keys: {
+      hacker_repos: {
         Row: {
-          id: string
-          user_id: string
-          name: string
-          key_prefix: string
-          key_hash: string
+          code: string
+          commit_count: number
           created_at: string
-          last_used_at: string | null
-          revoked_at: string | null
+          description: string
+          id: string
+          is_archived: boolean
+          is_public: boolean
+          language: string
+          name: string
+          owner_id: string
+          star_count: number
+          tags: string[]
+          updated_at: string
+          version: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          name: string
-          key_prefix: string
-          key_hash: string
+          code?: string
+          commit_count?: number
           created_at?: string
-          last_used_at?: string | null
-          revoked_at?: string | null
+          description?: string
+          id?: string
+          is_archived?: boolean
+          is_public?: boolean
+          language?: string
+          name: string
+          owner_id: string
+          star_count?: number
+          tags?: string[]
+          updated_at?: string
+          version?: string
         }
-        Update: Partial<Database["public"]["Tables"]["user_api_keys"]["Insert"]>
+        Update: {
+          code?: string
+          commit_count?: number
+          created_at?: string
+          description?: string
+          id?: string
+          is_archived?: boolean
+          is_public?: boolean
+          language?: string
+          name?: string
+          owner_id?: string
+          star_count?: number
+          tags?: string[]
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hacker_repos_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enterprise_api_keys: {
+        Row: {
+          api_key: string
+          created_at: string
+          expires_at: string | null
+          hit_count: number
+          id: string
+          is_active: boolean
+          last_hit: string | null
+          notes: string | null
+          org_id: string
+          plan: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          expires_at?: string | null
+          hit_count?: number
+          id?: string
+          is_active?: boolean
+          last_hit?: string | null
+          notes?: string | null
+          org_id: string
+          plan?: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          expires_at?: string | null
+          hit_count?: number
+          id?: string
+          is_active?: boolean
+          last_hit?: string | null
+          notes?: string | null
+          org_id?: string
+          plan?: string
+        }
         Relationships: []
       }
       intel_messages: {
         Row: {
-          id: number
-          user_id: string
           content: string
           created_at: string
+          id: number
+          user_id: string
         }
         Insert: {
-          id?: number
-          user_id: string
           content: string
           created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["intel_messages"]["Insert"]>
-        Relationships: []
-      }
-      missions: {
-        Row: {
-          id: string
-          client_id: string
-          title: string
-          description: string
-          scope: string | null
-          budget_credits: number
-          required_rank: string
-          company_tag: string | null
-          domain_verified: boolean
-          status: "open" | "in_progress" | "completed" | "cancelled"
-          selected_hacker_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          client_id: string
-          title: string
-          description: string
-          scope?: string | null
-          budget_credits?: number
-          required_rank?: string
-          company_tag?: string | null
-          domain_verified?: boolean
-          status?: "open" | "in_progress" | "completed" | "cancelled"
-          selected_hacker_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["missions"]["Insert"]>
-        Relationships: []
-      }
-      mission_proposals: {
-        Row: {
-          id: string
-          mission_id: string
-          hacker_id: string
-          pitch: string
-          timeline: string | null
-          ask_credits: number
-          status: "pending" | "accepted" | "rejected"
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          mission_id: string
-          hacker_id: string
-          pitch: string
-          timeline?: string | null
-          ask_credits?: number
-          status?: "pending" | "accepted" | "rejected"
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["mission_proposals"]["Insert"]>
-        Relationships: []
-      }
-      /** Alias for mission_proposals (Stronghold 2.0 naming) */
-      mission_applications: {
-        Row: Database["public"]["Tables"]["mission_proposals"]["Row"]
-        Insert: Database["public"]["Tables"]["mission_proposals"]["Insert"]
-        Update: Partial<Database["public"]["Tables"]["mission_proposals"]["Insert"]>
-        Relationships: []
-      }
-      mission_messages: {
-        Row: {
-          id: string
-          mission_id: string
-          sender_id: string
-          body: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          mission_id: string
-          sender_id: string
-          body: string
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["mission_messages"]["Insert"]>
-        Relationships: []
-      }
-      aegis_rules: {
-        Row: {
-          id: number
-          scan_id: string
-          rule_id: string
-          pattern: string
-          description: string
-          action: "block" | "challenge" | "log"
-          format: "cloudflare" | "python"
-          enabled: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
           id?: number
-          scan_id: string
-          rule_id: string
-          pattern: string
-          description: string
-          action: "block" | "challenge" | "log"
-          format?: "cloudflare" | "python"
-          enabled?: boolean
-          created_at?: string
-          updated_at?: string
+          user_id: string
         }
-        Update: Partial<Database["public"]["Tables"]["aegis_rules"]["Insert"]>
+        Update: {
+          content?: string
+          created_at?: string
+          id?: number
+          user_id?: string
+        }
         Relationships: []
       }
-      legal_authorizations: {
+      invoices: {
         Row: {
-          id: string
-          user_id: string
-          scan_id: string | null
-          full_name: string
-          ip_address: string
-          user_agent: string | null
-          intensity: "high" | "nuclear"
-          consented: boolean
+          amount_due_cents: number
+          amount_paid_cents: number
           created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          scan_id?: string | null
-          full_name: string
-          ip_address: string
-          user_agent?: string | null
-          intensity: "high" | "nuclear"
-          consented?: boolean
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["legal_authorizations"]["Insert"]>
-        Relationships: []
-      }
-      legal_signatures: {
-        Row: {
+          currency: string
+          hosted_invoice_url: string | null
           id: string
+          invoice_pdf_url: string | null
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          status: string
+          stripe_invoice_id: string
           user_id: string
-          signature_data: string
-          custody_hash: string
-          signed_at: string
-          ip_address: string | null
-          user_agent: string | null
-          created_at: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          signature_data: string
-          custody_hash: string
-          signed_at?: string
-          ip_address?: string | null
-          user_agent?: string | null
+          amount_due_cents?: number
+          amount_paid_cents?: number
           created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["legal_signatures"]["Insert"]>
-        Relationships: []
-      }
-      platform_transactions: {
-        Row: {
-          id: string
-          buyer_id: string | null
-          seller_id: string | null
-          script_id: string | null
-          amount_usd: number
-          platform_fee: number
-          author_payout: number
-          tx_type: "bazaar_purchase" | "bounty_release" | "top_up" | "refund"
-          created_at: string
-        }
-        Insert: {
+          currency?: string
+          hosted_invoice_url?: string | null
           id?: string
-          buyer_id?: string | null
-          seller_id?: string | null
-          script_id?: string | null
-          amount_usd?: number
-          platform_fee?: number
-          author_payout?: number
-          tx_type?: "bazaar_purchase" | "bounty_release" | "top_up" | "refund"
-          created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["platform_transactions"]["Insert"]>
-        Relationships: []
-      }
-      verification_otps: {
-        Row: {
-          id: string
+          invoice_pdf_url?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status: string
+          stripe_invoice_id: string
           user_id: string
-          phone: string
-          code_hash: string
-          expires_at: string
-          consumed: boolean
-          created_at: string
         }
-        Insert: {
-          id?: string
-          user_id: string
-          phone: string
-          code_hash: string
-          expires_at: string
-          consumed?: boolean
+        Update: {
+          amount_due_cents?: number
+          amount_paid_cents?: number
           created_at?: string
-        }
-        Update: Partial<Database["public"]["Tables"]["verification_otps"]["Insert"]>
-        Relationships: []
-      }
-      scan_reports: {
-        Row: {
-          id: string
-          scan_id: string
-          generated_at: string
-          generator_model: string
-          executive_summary_md: string
-          cvss_overall: number
-          risk_label: "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
-          findings: Json
-          attack_path: Json
-          optimization_suggestions_md: string | null
-          owasp_coverage: Json | null
-          pdf_storage_key: string | null
-          generation_input_tokens: number | null
-          generation_output_tokens: number | null
-          generation_cost_usd: number | null
-          audit_report_md: string | null
-          discovery_report: Json | null
-          ale_usd: number | null
-          social_templates: Json | null
-          aegis_zip_b64: string | null
-        }
-        Insert: {
+          currency?: string
+          hosted_invoice_url?: string | null
           id?: string
-          scan_id: string
-          generated_at?: string
-          generator_model?: string
-          executive_summary_md: string
-          cvss_overall: number
-          risk_label: "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
-          findings?: Json
-          attack_path?: Json
-          optimization_suggestions_md?: string | null
-          owasp_coverage?: Json | null
-          pdf_storage_key?: string | null
-          generation_input_tokens?: number | null
-          generation_output_tokens?: number | null
-          generation_cost_usd?: number | null
-          audit_report_md?: string | null
-          discovery_report?: Json | null
-          ale_usd?: number | null
-          social_templates?: Json | null
-          aegis_zip_b64?: string | null
+          invoice_pdf_url?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: string
+          stripe_invoice_id?: string
+          user_id?: string
         }
-        Update: Partial<Database["public"]["Tables"]["scan_reports"]["Insert"]>
         Relationships: []
       }
       leads: {
         Row: {
-          id: string
+          click_token: string | null
           company_name: string
-          website_url: string | null
-          founder_name: string | null
-          email: string | null
+          created_at: string | null
           description: string | null
-          source: "yc" | "producthunt" | "x" | "manual"
-          batch: string | null
-          rank: "Recruit" | "Lieutenant" | "Admiral"
-          scare_hook: string | null
-          vulnerability: string | null
-          subject_line: string | null
-          status: "new" | "emailed" | "clicked" | "responded" | "converted" | "bounced" | "unsubscribed"
-          click_token: string
+          emails_sent_count: number | null
+          founder_name: string | null
+          id: string
+          last_email_sent_at: string | null
+          rank: string | null
+          status: string | null
+          vulnerability_summary: string | null
+          website_url: string | null
+        }
+        Insert: {
+          click_token?: string | null
+          company_name: string
+          created_at?: string | null
+          description?: string | null
+          emails_sent_count?: number | null
+          founder_name?: string | null
+          id?: string
+          last_email_sent_at?: string | null
+          rank?: string | null
+          status?: string | null
+          vulnerability_summary?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          click_token?: string | null
+          company_name?: string
+          created_at?: string | null
+          description?: string | null
+          emails_sent_count?: number | null
+          founder_name?: string | null
+          id?: string
+          last_email_sent_at?: string | null
+          rank?: string | null
+          status?: string | null
+          vulnerability_summary?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      legal_acceptance: {
+        Row: {
+          accepted_at: string | null
+          id: string
+          policy_version: string | null
+          user_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          id?: string
+          policy_version?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          id?: string
+          policy_version?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      legal_authorizations: {
+        Row: {
+          consented: boolean
           created_at: string
-          emailed_at: string | null
-          clicked_at: string | null
-          responded_at: string | null
-          resend_msg_id: string | null
+          full_name: string
+          id: string
+          intensity: string
+          ip_address: string
+          scan_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          consented?: boolean
+          created_at?: string
+          full_name: string
+          id?: string
+          intensity: string
+          ip_address: string
+          scan_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          consented?: boolean
+          created_at?: string
+          full_name?: string
+          id?: string
+          intensity?: string
+          ip_address?: string
+          scan_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      legal_signatures: {
+        Row: {
+          created_at: string | null
+          custody_hash: string | null
+          id: string
+          ip_address: string | null
+          mission_id: string | null
+          signature_data: string | null
+          signature_svg: string | null
+          signed_at: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          custody_hash?: string | null
+          id?: string
+          ip_address?: string | null
+          mission_id?: string | null
+          signature_data?: string | null
+          signature_svg?: string | null
+          signed_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          custody_hash?: string | null
+          id?: string
+          ip_address?: string | null
+          mission_id?: string | null
+          signature_data?: string | null
+          signature_svg?: string | null
+          signed_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_signatures_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_tools: {
+        Row: {
+          author_id: string | null
+          code_content: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          price_usd: number | null
+          sales_count: number | null
+          status: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          code_content?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          price_usd?: number | null
+          sales_count?: number | null
+          status?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          code_content?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          price_usd?: number | null
+          sales_count?: number | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          attachments: Json | null
+          content: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          project_id: string | null
+          receiver_id: string | null
+          sender_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          content: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          project_id?: string | null
+          receiver_id?: string | null
+          sender_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          project_id?: string | null
+          receiver_id?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_applications: {
+        Row: {
+          created_at: string | null
+          hacker_id: string | null
+          id: string
+          mission_id: string | null
+          proposal_text: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hacker_id?: string | null
+          id?: string
+          mission_id?: string | null
+          proposal_text?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hacker_id?: string | null
+          id?: string
+          mission_id?: string | null
+          proposal_text?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_applications_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_chats: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          mission_id: string | null
+          sender_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          mission_id?: string | null
+          sender_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          mission_id?: string | null
+          sender_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_chats_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          mission_id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          mission_id: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          mission_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_messages_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_proposals: {
+        Row: {
+          ask_credits: number
+          created_at: string
+          hacker_id: string
+          id: string
+          mission_id: string
+          pitch: string
+          status: string
+          timeline: string | null
+        }
+        Insert: {
+          ask_credits?: number
+          created_at?: string
+          hacker_id: string
+          id?: string
+          mission_id: string
+          pitch?: string
+          status?: string
+          timeline?: string | null
+        }
+        Update: {
+          ask_credits?: number
+          created_at?: string
+          hacker_id?: string
+          id?: string
+          mission_id?: string
+          pitch?: string
+          status?: string
+          timeline?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_proposals_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions: {
+        Row: {
+          budget_credits: number | null
+          client_id: string | null
+          company_tag: string | null
+          created_at: string | null
+          description: string | null
+          domain_verified: boolean | null
+          id: string
+          required_rank: string | null
+          scope: string | null
+          selected_hacker_id: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          budget_credits?: number | null
+          client_id?: string | null
+          company_tag?: string | null
+          created_at?: string | null
+          description?: string | null
+          domain_verified?: boolean | null
+          id?: string
+          required_rank?: string | null
+          scope?: string | null
+          selected_hacker_id?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          budget_credits?: number | null
+          client_id?: string | null
+          company_tag?: string | null
+          created_at?: string | null
+          description?: string | null
+          domain_verified?: boolean | null
+          id?: string
+          required_rank?: string | null
+          scope?: string | null
+          selected_hacker_id?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      payment_methods: {
+        Row: {
+          brand: string | null
+          created_at: string
+          exp_month: number | null
+          exp_year: number | null
+          id: string
+          is_default: boolean
+          last4: string | null
+          stripe_pm_id: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_default?: boolean
+          last4?: string | null
+          stripe_pm_id: string
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_default?: boolean
+          last4?: string | null
+          stripe_pm_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      phishing_audits: {
+        Row: {
+          created_at: string | null
+          generated_templates: Json | null
+          id: string
+          status: string | null
+          target_org: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          generated_templates?: Json | null
+          id?: string
+          status?: string | null
+          target_org?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          generated_templates?: Json | null
+          id?: string
+          status?: string | null
+          target_org?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      platform_transactions: {
+        Row: {
+          amount_credits: number | null
+          amount_usd: number | null
+          author_payout: number | null
+          buyer_id: string | null
+          created_at: string | null
+          id: string
+          platform_fee: number | null
+          receiver_id: string | null
+          script_id: string | null
+          seller_id: string | null
+          sender_id: string | null
+          transaction_type: string | null
+          tx_type: string | null
+        }
+        Insert: {
+          amount_credits?: number | null
+          amount_usd?: number | null
+          author_payout?: number | null
+          buyer_id?: string | null
+          created_at?: string | null
+          id?: string
+          platform_fee?: number | null
+          receiver_id?: string | null
+          script_id?: string | null
+          seller_id?: string | null
+          sender_id?: string | null
+          transaction_type?: string | null
+          tx_type?: string | null
+        }
+        Update: {
+          amount_credits?: number | null
+          amount_usd?: number | null
+          author_payout?: number | null
+          buyer_id?: string | null
+          created_at?: string | null
+          id?: string
+          platform_fee?: number | null
+          receiver_id?: string | null
+          script_id?: string | null
+          seller_id?: string | null
+          sender_id?: string | null
+          transaction_type?: string | null
+          tx_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_transactions_script_id_fkey"
+            columns: ["script_id"]
+            isOneToOne: false
+            referencedRelation: "bazaar_scripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          access_level: number | null
+          active_view_mode: "client" | "hacker" | null
+          ai_audit_score: number | null
+          avatar_url: string | null
+          bio: string | null
+          clearance_tier: string | null
+          company_name: string | null
+          company_tag: string | null
+          company_domain: string | null
+          created_at: string | null
+          current_plan: string
+          domain_token: string | null
+          domain_verified: boolean | null
+          email: string
+          entitlements: Json
+          full_name: string | null
+          hacker_rank: string | null
+          id: string
+          identity_audit_notes: string | null
+          identity_audit_score: number | null
+          identity_audit_status: string | null
+          identity_document_path: string | null
+          identity_status: string | null
+          identity_verified: boolean | null
+          identity_proofed: boolean | null
+          is_admin: boolean | null
+          is_verified: boolean | null
+          job_title: string | null
+          period_resets_at: string | null
+          phone: string | null
+          phone_number: string | null
+          phone_verified: boolean | null
+          profile_completeness: number | null
+          reputation: number | null
+          role: string | null
+          scans_used_this_period: number
+          signature_data: string | null
+          signature_at: string | null
+          sovereign_pending: boolean | null
+          theme_preference: string | null
+          updated_at: string | null
+          user_type: "client" | "hacker" | "developer" | null
+          verification_data: Json | null
+        }
+        Insert: {
+          access_level?: number | null
+          active_view_mode?: "client" | "hacker" | null
+          ai_audit_score?: number | null
+          avatar_url?: string | null
+          bio?: string | null
+          clearance_tier?: string | null
+          company_name?: string | null
+          company_tag?: string | null
+          company_domain?: string | null
+          created_at?: string | null
+          current_plan?: string
+          domain_token?: string | null
+          domain_verified?: boolean | null
+          email: string
+          entitlements?: Json
+          full_name?: string | null
+          hacker_rank?: string | null
+          id: string
+          identity_audit_notes?: string | null
+          identity_audit_score?: number | null
+          identity_audit_status?: string | null
+          identity_document_path?: string | null
+          identity_status?: string | null
+          identity_verified?: boolean | null
+          identity_proofed?: boolean | null
+          is_admin?: boolean | null
+          is_verified?: boolean | null
+          job_title?: string | null
+          period_resets_at?: string | null
+          phone?: string | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          profile_completeness?: number | null
+          reputation?: number | null
+          role?: string | null
+          scans_used_this_period?: number
+          signature_data?: string | null
+          signature_at?: string | null
+          sovereign_pending?: boolean | null
+          theme_preference?: string | null
+          updated_at?: string | null
+          user_type?: "client" | "hacker" | "developer" | null
+          verification_data?: Json | null
+        }
+        Update: {
+          access_level?: number | null
+          active_view_mode?: "client" | "hacker" | null
+          ai_audit_score?: number | null
+          avatar_url?: string | null
+          bio?: string | null
+          clearance_tier?: string | null
+          company_name?: string | null
+          company_tag?: string | null
+          company_domain?: string | null
+          created_at?: string | null
+          current_plan?: string
+          domain_token?: string | null
+          domain_verified?: boolean | null
+          email?: string
+          entitlements?: Json
+          full_name?: string | null
+          hacker_rank?: string | null
+          id?: string
+          identity_audit_notes?: string | null
+          identity_audit_score?: number | null
+          identity_audit_status?: string | null
+          identity_document_path?: string | null
+          identity_status?: string | null
+          identity_verified?: boolean | null
+          identity_proofed?: boolean | null
+          is_admin?: boolean | null
+          is_verified?: boolean | null
+          job_title?: string | null
+          period_resets_at?: string | null
+          phone?: string | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          profile_completeness?: number | null
+          reputation?: number | null
+          role?: string | null
+          scans_used_this_period?: number
+          signature_data?: string | null
+          signature_at?: string | null
+          sovereign_pending?: boolean | null
+          theme_preference?: string | null
+          updated_at?: string | null
+          user_type?: "client" | "hacker" | "developer" | null
+          verification_data?: Json | null
+        }
+        Relationships: []
+      }
+      project_files: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          file_name: string
+          file_path: string | null
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          project_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          file_name: string
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          project_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          file_name?: string
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          project_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_submissions: {
+        Row: {
+          admin_notes: string | null
+          budget_range: string | null
+          client_id: string
+          created_at: string | null
+          description: string
+          github_url: string | null
+          id: string
+          service_type: string
+          status: string | null
+          timeline: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          budget_range?: string | null
+          client_id: string
+          created_at?: string | null
+          description: string
+          github_url?: string | null
+          id?: string
+          service_type: string
+          status?: string | null
+          timeline?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          budget_range?: string | null
+          client_id?: string
+          created_at?: string | null
+          description?: string
+          github_url?: string | null
+          id?: string
+          service_type?: string
+          status?: string | null
+          timeline?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          admin_notes: string | null
+          budget_range: string | null
+          client_id: string
+          created_at: string | null
+          deadline: string | null
+          demo_url: string | null
+          description: string | null
+          github_url: string | null
+          id: string
+          loom_url: string | null
+          progress: number | null
+          project_type: string
+          status: string | null
+          submission_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          budget_range?: string | null
+          client_id: string
+          created_at?: string | null
+          deadline?: string | null
+          demo_url?: string | null
+          description?: string | null
+          github_url?: string | null
+          id?: string
+          loom_url?: string | null
+          progress?: number | null
+          project_type: string
+          status?: string | null
+          submission_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          budget_range?: string | null
+          client_id?: string
+          created_at?: string | null
+          deadline?: string | null
+          demo_url?: string | null
+          description?: string | null
+          github_url?: string | null
+          id?: string
+          loom_url?: string | null
+          progress?: number | null
+          project_type?: string
+          status?: string | null
+          submission_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "project_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          reward_type: string
+          scans_to_add: number
+          target_plan: string
+          uses_left: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reward_type?: string
+          scans_to_add?: number
+          target_plan: string
+          uses_left?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reward_type?: string
+          scans_to_add?: number
+          target_plan?: string
+          uses_left?: number
+        }
+        Relationships: []
+      }
+      recon_results: {
+        Row: {
+          created_at: string | null
+          id: string
+          status: string | null
+          surface_map: Json | null
+          target_url: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          status?: string | null
+          surface_map?: Json | null
+          target_url: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          status?: string | null
+          surface_map?: Json | null
+          target_url?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      recon_targets: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_msg: string | null
+          id: string
+          scan_depth: number
+          started_at: string | null
+          status: string
+          surface_map: Json | null
+          target: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_msg?: string | null
+          id?: string
+          scan_depth?: number
+          started_at?: string | null
+          status?: string
+          surface_map?: Json | null
+          target: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_msg?: string | null
+          id?: string
+          scan_depth?: number
+          started_at?: string | null
+          status?: string
+          surface_map?: Json | null
+          target?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      redeemed_codes: {
+        Row: {
+          code_id: string
+          id: string
+          redeemed_at: string
+          user_id: string
+        }
+        Insert: {
+          code_id: string
+          id?: string
+          redeemed_at?: string
+          user_id: string
+        }
+        Update: {
+          code_id?: string
+          id?: string
+          redeemed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "redeemed_codes_code_id_fkey"
+            columns: ["code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repo_files: {
+        Row: {
+          created_at: string
+          id: string
+          mime_type: string
+          name: string
+          path: string
+          repo_id: string
+          size_bytes: number
+          storage_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mime_type?: string
+          name: string
+          path: string
+          repo_id: string
+          size_bytes?: number
+          storage_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mime_type?: string
+          name?: string
+          path?: string
+          repo_id?: string
+          size_bytes?: number
+          storage_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repo_files_repo_id_fkey"
+            columns: ["repo_id"]
+            isOneToOne: false
+            referencedRelation: "hacker_repos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repo_stars: {
+        Row: {
+          created_at: string
+          id: string
+          repo_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          repo_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          repo_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repo_stars_repo_id_fkey"
+            columns: ["repo_id"]
+            isOneToOne: false
+            referencedRelation: "hacker_repos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_logs: {
+        Row: {
+          attack_name: string | null
+          created_at: string
+          id: number
+          payload: Json
+          scan_id: string
+          severity: string
+          type: string
+        }
+        Insert: {
+          attack_name?: string | null
+          created_at?: string
+          id?: number
+          payload?: Json
+          scan_id: string
+          severity?: string
+          type: string
+        }
+        Update: {
+          attack_name?: string | null
+          created_at?: string
+          id?: number
+          payload?: Json
+          scan_id?: string
+          severity?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_logs_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_reports: {
+        Row: {
+          aegis_zip_b64: string | null
+          ale_usd: number | null
+          attacks_run: number | null
+          attack_path: Json
+          cvss_overall: number
+          discovery_report: Json | null
+          executive_summary_md: string
+          findings: Json
+          generated_at: string
+          generation_cost_usd: number | null
+          generation_input_tokens: number | null
+          generation_output_tokens: number | null
+          generator_model: string
+          id: string
+          optimization_suggestions_md: string | null
+          owasp_coverage: Json | null
+          pdf_storage_key: string | null
+          risk_label: string
+          scan_id: string
+        }
+        Insert: {
+          aegis_zip_b64?: string | null
+          ale_usd?: number | null
+          attack_path?: Json
+          cvss_overall: number
+          discovery_report?: Json | null
+          executive_summary_md: string
+          findings?: Json
+          generated_at?: string
+          generation_cost_usd?: number | null
+          generation_input_tokens?: number | null
+          generation_output_tokens?: number | null
+          generator_model?: string
+          id?: string
+          optimization_suggestions_md?: string | null
+          owasp_coverage?: Json | null
+          pdf_storage_key?: string | null
+          risk_label: string
+          scan_id: string
+        }
+        Update: {
+          aegis_zip_b64?: string | null
+          ale_usd?: number | null
+          attack_path?: Json
+          cvss_overall?: number
+          discovery_report?: Json | null
+          executive_summary_md?: string
+          findings?: Json
+          generated_at?: string
+          generation_cost_usd?: number | null
+          generation_input_tokens?: number | null
+          generation_output_tokens?: number | null
+          generator_model?: string
+          id?: string
+          optimization_suggestions_md?: string | null
+          owasp_coverage?: Json | null
+          pdf_storage_key?: string | null
+          risk_label?: string
+          scan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_reports_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: true
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scans: {
+        Row: {
+          ale_usd: number | null
+          brain_input_tokens_used: number
+          brain_output_tokens_used: number
+          completed_at: string | null
+          compute_seconds_used: number
+          created_at: string
+          custom_tools_count: number
+          finding_count: number
+          high_severity_count: number
+          id: string
+          intensity: Database["public"]["Enums"]["scan_intensity"]
+          notes: string | null
+          progress_pct: number
+          report_id: string | null
+          started_at: string | null
+          status: string
+          surface_kind: Database["public"]["Enums"]["scan_surface_kind"]
+          target_credential_encrypted: string | null
+          target_model: string
+          target_url: string
+          user_id: string
+        }
+        Insert: {
+          brain_input_tokens_used?: number
+          brain_output_tokens_used?: number
+          completed_at?: string | null
+          compute_seconds_used?: number
+          created_at?: string
+          custom_tools_count?: number
+          finding_count?: number
+          high_severity_count?: number
+          id?: string
+          intensity?: Database["public"]["Enums"]["scan_intensity"]
+          notes?: string | null
+          progress_pct?: number
+          report_id?: string | null
+          started_at?: string | null
+          status?: string
+          surface_kind?: Database["public"]["Enums"]["scan_surface_kind"]
+          target_credential_encrypted?: string | null
+          target_model: string
+          target_url: string
+          user_id: string
+        }
+        Update: {
+          brain_input_tokens_used?: number
+          brain_output_tokens_used?: number
+          completed_at?: string | null
+          compute_seconds_used?: number
+          created_at?: string
+          custom_tools_count?: number
+          finding_count?: number
+          high_severity_count?: number
+          id?: string
+          intensity?: Database["public"]["Enums"]["scan_intensity"]
+          notes?: string | null
+          progress_pct?: number
+          report_id?: string | null
+          started_at?: string | null
+          status?: string
+          surface_kind?: Database["public"]["Enums"]["scan_surface_kind"]
+          target_credential_encrypted?: string | null
+          target_model?: string
+          target_url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scans_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "scan_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_scans: {
+        Row: {
+          active: boolean
+          created_at: string
+          frequency: string
+          id: string
+          last_run_at: string | null
+          name: string
+          next_run_at: string
+          target_credential_encrypted: string
+          target_model: string
+          target_url: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          name: string
+          next_run_at: string
+          target_credential_encrypted: string
+          target_model: string
+          target_url: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string
+          target_credential_encrypted?: string
+          target_model?: string
+          target_url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string
+          display_order: number | null
+          estimated_duration: string | null
+          features: Json | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          short_description: string | null
+          slug: string
+          starting_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description: string
+          display_order?: number | null
+          estimated_duration?: string | null
+          features?: Json | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          short_description?: string | null
+          slug: string
+          starting_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string
+          display_order?: number | null
+          estimated_duration?: string | null
+          features?: Json | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          short_description?: string | null
+          slug?: string
+          starting_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      showcase_projects: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          demo_url: string | null
+          description: string
+          display_order: number | null
+          featured: boolean | null
+          github_url: string | null
+          id: string
+          image_url: string | null
+          images: Json | null
+          is_active: boolean | null
+          is_featured: boolean | null
+          loom_url: string | null
+          short_description: string | null
+          slug: string
+          technologies: Json | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          demo_url?: string | null
+          description: string
+          display_order?: number | null
+          featured?: boolean | null
+          github_url?: string | null
+          id?: string
+          image_url?: string | null
+          images?: Json | null
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          loom_url?: string | null
+          short_description?: string | null
+          slug: string
+          technologies?: Json | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          demo_url?: string | null
+          description?: string
+          display_order?: number | null
+          featured?: boolean | null
+          github_url?: string | null
+          id?: string
+          image_url?: string | null
+          images?: Json | null
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          loom_url?: string | null
+          short_description?: string | null
+          slug?: string
+          technologies?: Json | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      skills: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          name: string
+          proficiency: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          name: string
+          proficiency?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          name?: string
+          proficiency?: number | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          id: string
+          ls_customer_id: string | null
+          ls_order_id: string | null
+          ls_subscription_id: string | null
+          ls_variant_id: string | null
+          period_ends_at: string | null
+          period_starts_at: string | null
+          plan: string
+          scans_used_this_period: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ls_customer_id?: string | null
+          ls_order_id?: string | null
+          ls_subscription_id?: string | null
+          ls_variant_id?: string | null
+          period_ends_at?: string | null
+          period_starts_at?: string | null
+          plan?: string
+          scans_used_this_period?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ls_customer_id?: string | null
+          ls_order_id?: string | null
+          ls_subscription_id?: string | null
+          ls_variant_id?: string | null
+          period_ends_at?: string | null
+          period_starts_at?: string | null
+          plan?: string
+          scans_used_this_period?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      target_verifications: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          method: string
+          target_domain: string
+          token: string
+          user_id: string
+          verified: boolean
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          method: string
+          target_domain: string
+          token: string
+          user_id: string
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          method?: string
+          target_domain?: string
+          token?: string
+          user_id?: string
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
+      terminal_inputs: {
+        Row: {
+          consumed: boolean
+          content: string | null
+          created_at: string | null
+          id: string
+          input_text: string | null
+          session_id: string
+          user_id: string | null
+        }
+        Insert: {
+          consumed?: boolean
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          input_text?: string | null
+          session_id: string
+          user_id?: string | null
+        }
+        Update: {
+          consumed?: boolean
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          input_text?: string | null
+          session_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      terminal_sessions: {
+        Row: {
+          container_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          container_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          container_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      tool_audits: {
+        Row: {
+          ai_decision: string | null
+          created_at: string | null
+          id: string
+          safety_score: number | null
+          tool_id: string | null
+          vulnerabilities_found: Json | null
+        }
+        Insert: {
+          ai_decision?: string | null
+          created_at?: string | null
+          id?: string
+          safety_score?: number | null
+          tool_id?: string | null
+          vulnerabilities_found?: Json | null
+        }
+        Update: {
+          ai_decision?: string | null
+          created_at?: string | null
+          id?: string
+          safety_score?: number | null
+          tool_id?: string | null
+          vulnerabilities_found?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_audits_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_executions: {
+        Row: {
+          duration_ms: number | null
+          ended_at: string | null
+          exit_code: number | null
+          id: number
+          result: Json | null
+          sandbox_image: string | null
+          sandbox_runtime_s: number | null
+          scan_id: string | null
+          started_at: string
+          stderr_preview: string | null
+          stdout_preview: string | null
+          tool_id: string
+        }
+        Insert: {
+          duration_ms?: number | null
+          ended_at?: string | null
+          exit_code?: number | null
+          id?: number
+          result?: Json | null
+          sandbox_image?: string | null
+          sandbox_runtime_s?: number | null
+          scan_id?: string | null
+          started_at?: string
+          stderr_preview?: string | null
+          stdout_preview?: string | null
+          tool_id: string
+        }
+        Update: {
+          duration_ms?: number | null
+          ended_at?: string | null
+          exit_code?: number | null
+          id?: number
+          result?: Json | null
+          sandbox_image?: string | null
+          sandbox_runtime_s?: number | null
+          scan_id?: string | null
+          started_at?: string
+          stderr_preview?: string | null
+          stdout_preview?: string | null
+          tool_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_executions_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_executions_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "custom_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_events: {
+        Row: {
+          created_at: string
+          id: number
+          kind: Database["public"]["Enums"]["usage_kind"]
+          quantity: number
+          reported_to_stripe_at: string | null
+          scan_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          kind: Database["public"]["Enums"]["usage_kind"]
+          quantity: number
+          reported_to_stripe_at?: string | null
+          scan_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          kind?: Database["public"]["Enums"]["usage_kind"]
+          quantity?: number
+          reported_to_stripe_at?: string | null
+          scan_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_events_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_api_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_wallets: {
+        Row: {
+          balance: number | null
+          balance_usd: number | null
+          created_at: string | null
+          frozen_at: string | null
+          frozen_reason: string | null
+          id: string
+          is_frozen: boolean
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          balance?: number | null
+          balance_usd?: number | null
+          created_at?: string | null
+          frozen_at?: string | null
+          frozen_reason?: string | null
+          id?: string
+          is_frozen?: boolean
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          balance?: number | null
+          balance_usd?: number | null
+          created_at?: string | null
+          frozen_at?: string | null
+          frozen_reason?: string | null
+          id?: string
+          is_frozen?: boolean
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      verification_otps: {
+        Row: {
+          code_hash: string
+          consumed: boolean
+          created_at: string
+          expires_at: string
+          id: string
+          phone: string
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          consumed?: boolean
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone: string
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          consumed?: boolean
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      war_machine_stats: {
+        Row: {
+          id: string
+          total_clicks: number | null
+          total_emailed: number | null
+          total_scraped: number | null
+          updated_at: string | null
         }
         Insert: {
           id?: string
-          company_name: string
-          website_url?: string | null
-          founder_name?: string | null
-          email?: string | null
-          description?: string | null
-          source?: "yc" | "producthunt" | "x" | "manual"
-          batch?: string | null
-          rank?: "Recruit" | "Lieutenant" | "Admiral"
-          scare_hook?: string | null
-          vulnerability?: string | null
-          subject_line?: string | null
-          status?: "new" | "emailed" | "clicked" | "responded" | "converted" | "bounced" | "unsubscribed"
-          click_token?: string
-          created_at?: string
-          emailed_at?: string | null
-          clicked_at?: string | null
-          responded_at?: string | null
-          resend_msg_id?: string | null
+          total_clicks?: number | null
+          total_emailed?: number | null
+          total_scraped?: number | null
+          updated_at?: string | null
         }
-        Update: Partial<Database["public"]["Tables"]["leads"]["Insert"]>
+        Update: {
+          id?: string
+          total_clicks?: number | null
+          total_emailed?: number | null
+          total_scraped?: number | null
+          updated_at?: string | null
+        }
         Relationships: []
       }
     }
-    Views: Record<string, { Row: Record<string, unknown>; Relationships: never[] }>
+    Views: {
+      intel_messages_with_profile: {
+        Row: {
+          content: string
+          created_at: string
+          display_name: string | null
+          id: number
+          user_id: string
+        }
+        Relationships: []
+      }
+      my_scan_quota: {
+        Row: {
+          period_ends_at: string | null
+          period_expired: boolean | null
+          plan: string | null
+          scans_allowed: number | null
+          scans_used_this_period: number | null
+          status: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+    }
     Functions: {
-      is_admin: { Args: Record<string, never>; Returns: boolean }
-      increment_wallet: {
-        Args: { p_user_id: string; p_amount: number }
+      generate_domain_token: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
+      freeze_wallet: {
+        Args: { p_reason?: string; p_user_id: string }
         Returns: undefined
       }
       increment_purchase: {
-        Args: { p_script_id: string; p_revenue: number }
+        Args: { p_revenue: number; p_script_id: string }
         Returns: undefined
       }
-      freeze_wallet: {
-        Args: { p_user_id: string; p_reason?: string }
+      increment_wallet:
+        | { Args: { p_amount: number; p_user_id: string }; Returns: undefined }
+        | { Args: { amount: number; user_id: string }; Returns: undefined }
+      is_admin: { Args: never; Returns: boolean }
+      log_activity: {
+        Args: {
+          p_action: string
+          p_details?: Json
+          p_entity_id?: string
+          p_entity_type: string
+          p_user_id: string
+        }
         Returns: undefined
+      }
+      purchase_bazaar_script: {
+        Args: { p_buyer_id: string; p_script_id: string }
+        Returns: Json
       }
     }
-    Enums: Record<string, string>
-    CompositeTypes: Record<string, Record<string, unknown>>
+    Enums: {
+      scan_intensity: "recon" | "standard" | "aggressive" | "greasy"
+      scan_surface_kind: "llm" | "web" | "mobile" | "code"
+      tool_safety_status: "approved" | "rejected" | "pending"
+      usage_kind:
+        | "compute_seconds"
+        | "brain_input_tokens"
+        | "brain_output_tokens"
+        | "custom_tool_runs"
+        | "scans"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
 
-// Convenience row-type aliases
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      scan_intensity: ["recon", "standard", "aggressive", "greasy"],
+      scan_surface_kind: ["llm", "web", "mobile", "code"],
+      tool_safety_status: ["approved", "rejected", "pending"],
+      usage_kind: [
+        "compute_seconds",
+        "brain_input_tokens",
+        "brain_output_tokens",
+        "custom_tool_runs",
+        "scans",
+      ],
+    },
+  },
+} as const
+
+
+// Convenience row aliases
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
-export type ScanRow = Database["public"]["Tables"]["scans"]["Row"]
-export type ActivityLogRow = Database["public"]["Tables"]["activity_logs"]["Row"]
-export type WalletRow = Database["public"]["Tables"]["user_wallets"]["Row"]
+export type UserWalletRow = Database["public"]["Tables"]["user_wallets"]["Row"]
 export type BazaarScriptRow = Database["public"]["Tables"]["bazaar_scripts"]["Row"]
-export type HackerRepoRow = Database["public"]["Tables"]["hacker_repos"]["Row"]
-export type SubscriptionRow = Database["public"]["Tables"]["subscriptions"]["Row"]
-export type AegisRuleRow = Database["public"]["Tables"]["aegis_rules"]["Row"]
+export type BazaarPurchaseRow = Database["public"]["Tables"]["bazaar_purchases"]["Row"]
 export type MissionRow = Database["public"]["Tables"]["missions"]["Row"]
 export type MissionProposalRow = Database["public"]["Tables"]["mission_proposals"]["Row"]
+export type MissionApplicationRow = Database["public"]["Tables"]["mission_applications"]["Row"]
+export type LegalSignatureRow = Database["public"]["Tables"]["legal_signatures"]["Row"]
+export type PlatformTransactionRow = Database["public"]["Tables"]["platform_transactions"]["Row"]
+export type BountyEscrowRow = Database["public"]["Tables"]["bounty_escrow"]["Row"]
+export type SubscriptionRow = Database["public"]["Tables"]["subscriptions"]["Row"]
+export type ScanRow = Database["public"]["Tables"]["scans"]["Row"]

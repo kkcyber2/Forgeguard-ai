@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  engineAuthHeaders,
+  resolveEngineAuthToken,
+  resolveEngineBaseUrl,
+} from "@/lib/agathon-config";
 
 /**
  * GET /api/health/engine
@@ -7,7 +12,7 @@ import { NextResponse } from "next/server";
  * Called by the dashboard's <EngineStatus /> component every 30 seconds.
  *
  * Status semantics:
- *   "unconfigured" — AGATHON_ORCHESTRATOR_URL is absent (dev / preview env).
+ *   "unconfigured" — PYTHON_ENGINE_URL / AGATHON_ORCHESTRATOR_URL absent.
  *                    Client should stay silent; this is expected in local dev.
  *                    Returns HTTP 200.
  *   "healthy"      — Orchestrator responded 2xx within the timeout window.
@@ -20,11 +25,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const baseUrl = process.env.AGATHON_ORCHESTRATOR_URL?.replace(/\/$/, "");
-  const secret  = process.env.INTERNAL_SCAN_TOKEN;
+  const baseUrl = resolveEngineBaseUrl();
+  const authHeader = engineAuthHeaders();
 
-  // Not wired up yet (local dev / preview deployment).
   if (!baseUrl) {
+    console.warn(
+      "[api/health/engine] Unconfigured: set PYTHON_ENGINE_URL or AGATHON_ORCHESTRATOR_URL on Vercel",
+    );
     return NextResponse.json({
       ok: true,
       status: "unconfigured",
@@ -32,16 +39,23 @@ export async function GET() {
     });
   }
 
+  if (!resolveEngineAuthToken()) {
+    console.warn(
+      "[api/health/engine] No auth token: set INTERNAL_SCAN_TOKEN or AGATHON_INTERNAL_SECRET on Vercel",
+    );
+  }
+
   const t0 = Date.now();
+  const healthUrl = `${baseUrl}/health`;
 
   try {
-    const resp = await fetch(`${baseUrl}/health`, {
+    const resp = await fetch(healthUrl, {
       method: "GET",
       headers: {
-        ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
+        ...(authHeader ?? {}),
         "Cache-Control": "no-store",
       },
-      signal: AbortSignal.timeout(5_000),   // 5 s hard cap
+      signal: AbortSignal.timeout(5_000),
       cache: "no-store",
     });
 
@@ -51,7 +65,15 @@ export async function GET() {
       return NextResponse.json({ ok: true, status: "healthy", latencyMs });
     }
 
-    // Non-2xx from Railway → engine overload / lockdown
+    const body = await resp.text().catch(() => "<no body>");
+    console.error("[api/health/engine] Engine returned non-2xx:", {
+      url: healthUrl,
+      httpStatus: resp.status,
+      statusText: resp.statusText,
+      body: body.slice(0, 500),
+      latencyMs,
+    });
+
     return NextResponse.json(
       {
         ok: false,
@@ -64,10 +86,17 @@ export async function GET() {
     );
   } catch (err) {
     const latencyMs = Date.now() - t0;
-    const message =
-      err instanceof Error ? err.message : "Unknown error";
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const stack = err instanceof Error ? err.stack : undefined;
 
-    // Network error / timeout → engine offline → lockdown
+    console.error("[api/health/engine] Engine ping failed:", {
+      url: healthUrl,
+      message,
+      stack,
+      latencyMs,
+      err,
+    });
+
     return NextResponse.json(
       {
         ok: false,

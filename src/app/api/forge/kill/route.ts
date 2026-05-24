@@ -13,6 +13,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { engineAuthHeaders, resolveEngineBaseUrl } from "@/lib/agathon-config";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -68,16 +69,15 @@ export async function POST(req: NextRequest) {
   const { session_id } = parsed.data;
 
   // ── Forward kill signal to Railway engine ─────────────────────────────────
-  const orchestratorUrl    = process.env.AGATHON_ORCHESTRATOR_URL;
-  const orchestratorSecret = process.env.AGATHON_INTERNAL_SECRET;
+  const orchestratorUrl = resolveEngineBaseUrl();
 
-  if (orchestratorUrl && orchestratorSecret) {
+  if (orchestratorUrl && engineAuthHeaders()) {
     try {
       const resp = await fetch(`${orchestratorUrl}/forge/kill`, {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization:  `Bearer ${orchestratorSecret}`,
+          ...engineAuthHeaders(),
         },
         body: JSON.stringify({ session_id, user_id: user.id }),
         signal: AbortSignal.timeout(8_000),

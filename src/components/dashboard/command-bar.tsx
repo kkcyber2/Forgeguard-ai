@@ -39,6 +39,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ViewMode } from "@/lib/access/parallel-sovereignty";
 
 // ─── Command definitions ──────────────────────────────────────────────────────
 
@@ -154,6 +155,42 @@ const STATIC_COMMANDS: Command[] = [
   },
 ];
 
+const CLIENT_COMMAND_IDS = new Set([
+  "nav-overview",
+  "nav-aegis",
+  "nav-bounties",
+  "nav-scans",
+  "nav-billing",
+  "nav-settings",
+  "action-export-cf",
+  "action-bounty",
+  "action-topup",
+  "action-verify-domain",
+  "action-verify-portal",
+  "action-post-mission",
+]);
+
+const HACKER_COMMAND_IDS = new Set([
+  "nav-overview",
+  "nav-forge",
+  "nav-bazaar",
+  "nav-missions",
+  "nav-intel",
+  "nav-scheduled",
+  "nav-new-scan",
+  "nav-scans",
+  "nav-billing",
+  "nav-settings",
+  "action-new-scan",
+  "action-topup",
+  "action-post-mission",
+]);
+
+function commandsForView(viewMode: ViewMode): Command[] {
+  const allowed = viewMode === "client" ? CLIENT_COMMAND_IDS : HACKER_COMMAND_IDS;
+  return STATIC_COMMANDS.filter((cmd) => allowed.has(cmd.id));
+}
+
 // ─── Fuzzy match ──────────────────────────────────────────────────────────────
 
 function fuzzyMatch(query: string, cmd: Command): boolean {
@@ -236,7 +273,7 @@ function CommandItem({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CommandBar() {
+export function CommandBar({ viewMode = "hacker" }: { viewMode?: ViewMode }) {
   const router   = useRouter();
   const pathname = usePathname();
 
@@ -277,7 +314,8 @@ export function CommandBar() {
 
   // ── Filtered results ──────────────────────────────────────────────────────
   const filtered = React.useMemo(() => {
-    const base = STATIC_COMMANDS.filter((c) => fuzzyMatch(query.startsWith("/") ? slashQuery : query, c));
+    const pool = commandsForView(viewMode);
+    const base = pool.filter((c) => fuzzyMatch(query.startsWith("/") ? slashQuery : query, c));
     if (isVerifySlash || slashQuery === "verify") {
       const verifyCmd: Command = {
         id: "slash-verify",
@@ -291,7 +329,7 @@ export function CommandBar() {
       if (!base.some((c) => c.id === "slash-verify")) return [verifyCmd, ...base];
     }
     return base;
-  }, [query, slashQuery, isVerifySlash]);
+  }, [query, slashQuery, isVerifySlash, viewMode]);
 
   // ── Group results ─────────────────────────────────────────────────────────
   const grouped = React.useMemo(() => {

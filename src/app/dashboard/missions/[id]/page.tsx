@@ -6,6 +6,7 @@ import { createServerSupabase, getSessionUser, getCurrentProfile } from "@/lib/s
 import { ProposalForm } from "@/components/missions/proposal-form";
 import { ProposalList } from "@/components/missions/proposal-list";
 import { MissionChat } from "@/components/missions/mission-chat";
+import { CompleteMissionButton } from "@/components/missions/complete-mission-button";
 
 /**
  * /dashboard/missions/[id] — Mission detail page
@@ -90,7 +91,7 @@ export default async function MissionDetailPage({ params }: Props) {
     }),
   );
 
-  const senderIds = [...new Set(initialMessages.map((m) => m.senderId))];
+  const senderIds = [...new Set(initialMessages.map((m: { senderId: string }) => m.senderId))];
   const { data: senderProfiles } =
     senderIds.length > 0
       ? await db
@@ -166,12 +167,17 @@ export default async function MissionDetailPage({ params }: Props) {
             <h1 className="text-xl font-semibold text-white">{mission.title}</h1>
           </div>
 
-          <span
-            className="font-mono text-[10px] uppercase tracking-[0.15em] mt-1"
-            style={{ color: mission.status === "open" ? "#D1FF00" : "rgba(255,255,255,0.3)" }}
-          >
-            ● {mission.status?.toUpperCase()}
-          </span>
+          <div className="flex flex-col items-end gap-2">
+            <span
+              className="font-mono text-[10px] uppercase tracking-[0.15em]"
+              style={{ color: mission.status === "open" ? "#D1FF00" : "rgba(255,255,255,0.3)" }}
+            >
+              ● {mission.status?.toUpperCase()}
+            </span>
+            {isOwner && mission.status === "in_progress" && (
+              <CompleteMissionButton missionId={id} />
+            )}
+          </div>
         </div>
 
         {/* Description */}

@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("access_level, hacker_rank")
-    .eq("user_id", user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   if (((profile?.access_level as number | undefined) ?? 1) < 2) {

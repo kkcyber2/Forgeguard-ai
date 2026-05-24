@@ -102,12 +102,12 @@ export default async function ComparePage({ searchParams }: PageProps) {
       .from("scans")
       .select("id, target_model, target_url, status, created_at")
       .eq("id", a)
-      .maybeSingle() as Promise<{ data: ScanRow | null }>,
+      .maybeSingle(),
     supabase
       .from("scans")
       .select("id, target_model, target_url, status, created_at")
       .eq("id", b)
-      .maybeSingle() as Promise<{ data: ScanRow | null }>,
+      .maybeSingle(),
   ]);
 
   if (!scanA || !scanB) {
@@ -133,16 +133,16 @@ export default async function ComparePage({ searchParams }: PageProps) {
       .from("scan_reports")
       .select("scan_id, cvss_overall, risk_label, findings, attacks_run")
       .eq("scan_id", a)
-      .maybeSingle() as Promise<{ data: ReportRow | null }>,
+      .maybeSingle(),
     supabase
       .from("scan_reports")
       .select("scan_id, cvss_overall, risk_label, findings, attacks_run")
       .eq("scan_id", b)
-      .maybeSingle() as Promise<{ data: ReportRow | null }>,
+      .maybeSingle(),
   ]);
 
-  const findingsA: Finding[] = reportA?.findings ?? [];
-  const findingsB: Finding[] = reportB?.findings ?? [];
+  const findingsA: Finding[] = (reportA?.findings as Finding[] | undefined) ?? [];
+  const findingsB: Finding[] = (reportB?.findings as Finding[] | undefined) ?? [];
 
   // Build sets of family keys for diff
   const familiesA = new Set(findingsA.map((f) => `${f.family}:${f.severity}`));
@@ -273,8 +273,8 @@ export default async function ComparePage({ searchParams }: PageProps) {
                 {/* Severity breakdown */}
                 <div className="mt-3 grid grid-cols-5 gap-1">
                   {SEVERITY_ORDER.map((sev) => {
-                    const count = (report.findings ?? []).filter(
-                      (f) => f.severity === sev,
+                    const count = ((report.findings as unknown as Finding[] | undefined) ?? []).filter(
+                      (f: Finding) => f.severity === sev,
                     ).length;
                     return (
                       <div key={sev} className="text-center">

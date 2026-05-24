@@ -117,7 +117,7 @@ function MissionRow({
 
         {/* Description — single line */}
         {m.description && (
-          <p className="mt-0.5 truncate font-mono text-[10px] text-white/30">
+          <p className="mt-0.5 truncate font-mono text-[10px] text-white/45">
             {m.description}
           </p>
         )}
@@ -145,7 +145,7 @@ function MissionRow({
             <p className="font-mono text-[13px] font-semibold tabular-nums text-[#D1FF00]">
               {Number(m.budget_credits).toLocaleString()}
             </p>
-            <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-white/25">
+            <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-white/45">
               Credits
             </p>
           </div>
@@ -175,7 +175,17 @@ export default async function MissionsPage() {
     .select("id, identity_verified, company_tag, domain_verified, full_name")
     .limit(500);
 
-  const clientMap = new Map((clientProfiles ?? []).map((p) => [p.id, p]));
+  type ClientProfileRow = {
+    id: string;
+    identity_verified: boolean | null;
+    company_tag: string | null;
+    domain_verified: boolean | null;
+    full_name: string | null;
+  };
+
+  const clientMap = new Map<string, ClientProfileRow>(
+    ((clientProfiles ?? []) as ClientProfileRow[]).map((p) => [p.id, p]),
+  );
 
   const query = db
     .from("missions")
@@ -241,7 +251,7 @@ export default async function MissionsPage() {
               <p className={`font-mono text-sm font-semibold tabular-nums ${color}`}>
                 {value}
               </p>
-              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/25">
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/45">
                 {label}
               </p>
             </div>
@@ -253,10 +263,10 @@ export default async function MissionsPage() {
       <div className="border border-white/[0.06] bg-[#050505]">
         {/* Table header */}
         <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-white/[0.06] px-4 py-2">
-          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/40">
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/55">
             Mission
           </span>
-          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/40">
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/55">
             Reward
           </span>
         </div>
@@ -287,7 +297,20 @@ export default async function MissionsPage() {
               m={m}
               isOwner={m.client_id === user.id}
               userId={user.id}
-              clientProfile={clientMap.get(m.client_id as string)}
+              clientProfile={
+                clientMap.get(m.client_id as string)
+                  ? {
+                      identity_verified:
+                        clientMap.get(m.client_id as string)?.identity_verified ?? undefined,
+                      company_tag:
+                        clientMap.get(m.client_id as string)?.company_tag ?? null,
+                      domain_verified:
+                        clientMap.get(m.client_id as string)?.domain_verified ?? undefined,
+                      full_name:
+                        clientMap.get(m.client_id as string)?.full_name ?? null,
+                    }
+                  : undefined
+              }
             />
           ))
         )}
@@ -296,7 +319,7 @@ export default async function MissionsPage() {
       {/* ── Footer count ── */}
       {missions.length > 0 && (
         <div className="border-x border-b border-white/[0.06] px-4 py-2">
-          <p className="font-mono text-[9px] text-white/40">
+          <p className="font-mono text-[9px] tabular-nums text-white/50">
             {missions.length} record{missions.length !== 1 ? "s" : ""} — sorted by newest
           </p>
         </div>

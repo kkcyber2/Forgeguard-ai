@@ -156,13 +156,27 @@ export function redirectForBlockedPath(pathname: string): string {
   return "/dashboard";
 }
 
+/** Map numeric access_level to display tier */
+export function accessRankLabel(accessLevel: number, role: string | null): string {
+  const rank = resolveAccessRank(accessLevel, role);
+  if (rank >= 5) return "Legend";
+  if (rank >= 4) return "Sentinel";
+  if (rank >= 3) return "Ghost";
+  return "Recruit";
+}
+
 /** Color-coded hacker rank badge */
 export function rankBadgeClass(hackerRank: string | null): string {
   switch ((hackerRank ?? "RECRUIT").toUpperCase()) {
+    case "GHOST":
     case "HACKER":
       return "text-blue-400 border-blue-400/30 bg-blue-400/10";
+    case "PHANTOM":
+    case "SENTINEL":
     case "ELITE":
       return "text-[#D1FF00] border-[#D1FF00]/30 bg-[#D1FF00]/10";
+    case "LEGEND":
+      return "text-purple-400 border-purple-400/30 bg-purple-400/10";
     case "TRAITOR":
       return "text-red-400 border-red-400/30 bg-red-400/10";
     default:

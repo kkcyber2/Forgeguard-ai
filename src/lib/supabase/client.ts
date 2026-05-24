@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
 import type { Database } from "@/types/supabase";
 
@@ -12,9 +13,9 @@ import type { Database } from "@/types/supabase";
  * hooks. The anon key in NEXT_PUBLIC_SUPABASE_ANON_KEY is only useful
  * when Row Level Security is enabled on every table — which it must be.
  */
-export function createClient() {
+export function createClient(): SupabaseClient<Database> {
   return createBrowserClient<Database>(
     publicEnv.NEXT_PUBLIC_SUPABASE_URL,
     publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
+  ) as unknown as SupabaseClient<Database>;
 }

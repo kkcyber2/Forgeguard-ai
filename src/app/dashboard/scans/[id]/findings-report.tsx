@@ -224,7 +224,7 @@ const SCARY_PATTERNS = [
   /policy\s*violation/i,
   /exfiltrat/i,
   /injection\s*(success|achieved|confirmed)/i,
-  /\u26A1|\u26D4|\uD83D\uDD34|\uD83D\uDEA8/u,
+  /\u26A1|\u26D4|\uD83D\uDD34|\uD83D\uDEA8/,
   /ACTIVELY\s*EXPLOIT/i,
   /HIGH\s*SEVERITY/i,
   /SEVERE/i,

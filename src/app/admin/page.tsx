@@ -79,7 +79,7 @@ export default async function AdminOverviewPage() {
   const scanIndex = new Map(
     (scans ?? []).map((s) => [s.id, { user: s.user_id, target: s.target_url }]),
   );
-  const threats = rollupThreats(rawLogs ?? [], scanIndex);
+  const threats = rollupThreats((rawLogs ?? []) as Parameters<typeof rollupThreats>[0], scanIndex);
 
   // -- Users panel --------------------------------------------------------
   // Supabase returns `role` as the broader `string | null` (the column has a

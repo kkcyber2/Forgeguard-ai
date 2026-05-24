@@ -32,25 +32,18 @@ import { Logo } from "@/components/ui/logo";
 import { Badge } from "@/components/ui/badge";
 import { cn, getInitials } from "@/lib/utils";
 import { IdentityBadge } from "@/components/dashboard/identity-badge";
+import { IdentitySwitcher } from "@/components/dashboard/identity-switcher";
 import { WalletCredits } from "@/components/dashboard/wallet-credits";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NAV_ICONS, type NavItem, type ShellUser } from "@/components/dashboard/shell";
+import {
+  VIEW_MODE_ACCENTS,
+  type ViewMode,
+} from "@/lib/access/parallel-sovereignty";
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                   */
 /* -------------------------------------------------------------------------- */
-
-/** Nav items that always appear in the top bar (by href) */
-const PRIMARY_HREFS = new Set([
-  "/dashboard",
-  "/dashboard/scans",
-  "/dashboard/missions",
-  "/dashboard/forge",
-  "/dashboard/aegis",
-  "/dashboard/bounties",
-  "/dashboard/bazaar",
-  "/dashboard/intel",
-]);
 
 /** Account section items — rendered in a right-side user dropdown */
 const ACCOUNT_HREFS = new Set([
@@ -95,7 +88,13 @@ function useTheme() {
 /* Quick-action dropdown                                                       */
 /* -------------------------------------------------------------------------- */
 
-function QuickActionMenu({ scope }: { scope: "user" | "admin" }) {
+function QuickActionMenu({
+  scope,
+  accentHex,
+}: {
+  scope: "user" | "admin";
+  accentHex: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -120,9 +119,18 @@ function QuickActionMenu({ scope }: { scope: "user" | "admin" }) {
           open
             ? scope === "admin"
               ? "border-violet-400/60 bg-violet-400/10 text-violet-300"
-              : "border-[#D1FF00]/60 bg-[#D1FF00]/10 text-[#D1FF00]"
+              : "text-white"
             : "border-white/[0.12] text-white/50 hover:border-white/25 hover:text-white/80",
         )}
+        style={
+          open && scope !== "admin"
+            ? {
+                borderColor: `${accentHex}99`,
+                backgroundColor: `${accentHex}18`,
+                color: accentHex,
+              }
+            : undefined
+        }
       >
         <Zap size={11} strokeWidth={2} className="flex-shrink-0" />
         <span>Launch</span>
@@ -301,10 +309,12 @@ function OverflowMenu({
   items,
   scope,
   pathname,
+  accentHex,
 }: {
   items: NavItem[];
   scope: "user" | "admin";
   pathname: string;
+  accentHex: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -344,10 +354,8 @@ function OverflowMenu({
         {(hasActive || open) && (
           <motion.span
             layoutId="nav-underline"
-            className={cn(
-              "absolute bottom-0 left-0 right-0 h-[1.5px]",
-              scope === "admin" ? "bg-violet-400" : "bg-[#D1FF00]",
-            )}
+            className="absolute bottom-0 left-0 right-0 h-[1.5px]"
+            style={{ backgroundColor: scope === "admin" ? "#A78BFA" : accentHex }}
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
           />
         )}
@@ -386,10 +394,8 @@ function OverflowMenu({
                     </span>
                     {active && (
                       <span
-                        className={cn(
-                          "ml-auto h-1 w-1 rounded-full",
-                          scope === "admin" ? "bg-violet-400" : "bg-[#D1FF00]",
-                        )}
+                        className="ml-auto h-1 w-1 rounded-full"
+                        style={{ backgroundColor: scope === "admin" ? "#A78BFA" : accentHex }}
                       />
                     )}
                   </Link>
@@ -409,26 +415,35 @@ function OverflowMenu({
 
 export function TopBar({
   nav,
+  primaryNav,
+  secondaryNav,
   user,
   scope,
+  viewMode = "hacker",
+  identityChosen = true,
   systemDegraded = false,
 }: {
   nav: NavItem[];
+  primaryNav?: NavItem[];
+  secondaryNav?: NavItem[];
   user: ShellUser;
   scope: "user" | "admin";
+  viewMode?: ViewMode;
+  identityChosen?: boolean;
   systemDegraded?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
   const { theme, toggle: toggleTheme } = useTheme();
 
-  // Split nav into primary (top bar), overflow (More dropdown), account (user menu)
-  const primaryNav = nav.filter((item) => PRIMARY_HREFS.has(item.href));
-  const overflowNav = nav.filter(
-    (item) => !PRIMARY_HREFS.has(item.href) && !ACCOUNT_HREFS.has(item.href),
+  const resolvedPrimary = primaryNav ?? nav;
+  const resolvedSecondary = secondaryNav ?? [];
+  const overflowNav = resolvedSecondary.filter(
+    (item) => !ACCOUNT_HREFS.has(item.href),
   );
   const accountNav = nav.filter((item) => ACCOUNT_HREFS.has(item.href));
 
-  const accentClass = scope === "admin" ? "bg-violet-400" : "bg-[#D1FF00]";
+  const accentHex =
+    scope === "admin" ? "#A78BFA" : VIEW_MODE_ACCENTS[viewMode].primary;
 
   return (
     <>
@@ -445,7 +460,7 @@ export function TopBar({
       {/* ── Main header ───────────────────────────────────────────────────── */}
       <header
         className={cn(
-          "fixed inset-x-0 z-40 flex h-14 items-stretch border-b-[0.5px] border-white/[0.06] bg-[#050505]/96 backdrop-blur-md",
+          "fixed inset-x-0 z-40 flex h-14 items-stretch border-b-[0.5px] border-white/10 bg-[#050505]/80 backdrop-blur-xl",
           systemDegraded ? "top-7" : "top-0",
         )}
       >
@@ -453,7 +468,14 @@ export function TopBar({
         <div className="flex items-center gap-2.5 border-r-[0.5px] border-white/[0.06] px-5">
           {/* Hamburger — mobile only */}
           <div className="lg:hidden">
-            <MobileNav nav={nav} user={user} scope={scope} activePath={pathname} />
+            <MobileNav
+              nav={nav}
+              user={user}
+              scope={scope}
+              activePath={pathname}
+              viewMode={viewMode}
+              identityChosen={identityChosen}
+            />
           </div>
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
             <Logo />
@@ -467,7 +489,7 @@ export function TopBar({
 
         {/* Primary nav tabs — desktop only */}
         <nav className="hidden h-full flex-1 items-stretch overflow-x-auto scrollbar-none lg:flex">
-          {primaryNav.map((item) => {
+          {resolvedPrimary.map((item) => {
             const active =
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -491,7 +513,8 @@ export function TopBar({
                 {active && (
                   <motion.span
                     layoutId="nav-underline"
-                    className={cn("absolute bottom-0 left-0 right-0 h-[1.5px]", accentClass)}
+                    className="absolute bottom-0 left-0 right-0 h-[1.5px]"
+                    style={{ backgroundColor: accentHex }}
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
                 )}
@@ -500,13 +523,23 @@ export function TopBar({
           })}
 
           {/* Overflow → "More" */}
-          <OverflowMenu items={overflowNav} scope={scope} pathname={pathname} />
+          <OverflowMenu
+            items={overflowNav}
+            scope={scope}
+            pathname={pathname}
+            accentHex={accentHex}
+          />
         </nav>
 
-        {/* Right controls */}
         <div className="ml-auto flex items-center gap-1.5 border-l-[0.5px] border-white/[0.06] px-3">
-          {/* Quick Action */}
-          <QuickActionMenu scope={scope} />
+          {scope === "user" && (
+            <IdentitySwitcher
+              activeMode={viewMode}
+              canSwitch={identityChosen}
+            />
+          )}
+
+          <QuickActionMenu scope={scope} accentHex={accentHex} />
 
           {/* Theme toggle */}
           <button

@@ -124,10 +124,10 @@ export async function GET(
 
   // Verify ownership
   const { data: repo } = await supabase
-    .from("repos")
+    .from("hacker_repos")
     .select("id, name")
     .eq("id", repoId)
-    .eq("user_id", user.id)
+    .eq("owner_id", user.id)
     .single();
 
   if (!repo) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -160,7 +160,7 @@ export async function GET(
   const zip      = buildZip(files);
   const safeSlug = (repo.name as string).replace(/[^a-z0-9_\-]/gi, "_");
 
-  return new NextResponse(zip, {
+  return new NextResponse(zip as BodyInit, {
     status: 200,
     headers: {
       "Content-Type":        "application/zip",

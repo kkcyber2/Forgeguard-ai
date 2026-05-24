@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("access_level")
-    .eq("user_id", user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   const level = (profile?.access_level as number | undefined) ?? 1;

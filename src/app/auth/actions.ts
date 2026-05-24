@@ -52,9 +52,22 @@ export async function login(
   }
 
   const supabase = await createServerSupabase();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data: authData, error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     return { ok: false, error: "Invalid credentials." };
+  }
+
+  const userId = authData.user?.id;
+  if (userId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("user_type")
+      .eq("id", userId)
+      .single();
+    if (!profile?.user_type) {
+      revalidatePath("/", "layout");
+      redirect("/auth/signup/identity");
+    }
   }
 
   revalidatePath("/", "layout");

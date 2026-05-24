@@ -25,11 +25,14 @@ export async function setUserIdentity(userType: UserType): Promise<void> {
 
   const admin = createAdminSupabase();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const activeViewMode = userType === "client" ? "client" : "hacker";
+
   await (admin as any)
     .from("profiles")
     .update({
-      user_type:    userType,
-      access_level: ACCESS_LEVELS[userType],
+      user_type:         userType,
+      access_level:      ACCESS_LEVELS[userType],
+      active_view_mode:  activeViewMode,
     })
     .eq("id", user.id);
 

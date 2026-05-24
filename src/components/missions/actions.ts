@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
 /* ── submitProposal ─────────────────────────────────────────── */
@@ -77,6 +78,93 @@ export async function acceptProposal({
   await supabase
     .from("missions")
     .update({ status: "in_progress", selected_hacker_id: proposal.hacker_id })
+    .eq("id", missionId);
+
+  const { data: missionFull } = await supabase
+    .from("missions")
+    .select("budget_credits")
+    .eq("id", missionId)
+    .single();
+
+  const amount = Number(missionFull?.budget_credits ?? 0);
+  if (amount > 0) {
+    const admin = createAdminSupabase();
+    await admin.from("bounty_escrow").insert({
+      mission_id: missionId,
+      user_id: proposal.hacker_id,
+      submission_id: missionId,
+      amount_usd: amount,
+      status: "held",
+    });
+  }
+
+  revalidatePath(`/dashboard/missions/${missionId}`);
+  revalidatePath("/dashboard/missions");
+  return {};
+}
+
+/* ── completeMission — release escrow to hacker wallet ─────── */
+export async function completeMission(
+  missionId: string,
+): Promise<{ error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "Not authenticated." };
+
+  const supabase = await createServerSupabase();
+  const { data: mission } = await supabase
+    .from("missions")
+    .select("id, client_id, status, selected_hacker_id, budget_credits")
+    .eq("id", missionId)
+    .single();
+
+  if (!mission || mission.client_id !== user.id) return { error: "Unauthorized." };
+  if (mission.status !== "in_progress") return { error: "Mission is not in progress." };
+  if (!mission.selected_hacker_id) return { error: "No operator assigned." };
+
+  const admin = createAdminSupabase();
+
+  const { data: escrow } = await admin
+    .from("bounty_escrow")
+    .select("id, amount_usd, status")
+    .eq("mission_id", missionId)
+    .eq("user_id", mission.selected_hacker_id)
+    .maybeSingle();
+
+  const amount = Number(escrow?.amount_usd ?? mission.budget_credits ?? 0);
+  const hackerId = mission.selected_hacker_id;
+
+  await admin.from("user_wallets").upsert({ user_id: hackerId }, { onConflict: "user_id" });
+
+  const { error: creditErr } = await admin.rpc("increment_wallet", {
+    p_user_id: hackerId,
+    p_amount: amount,
+  });
+  if (creditErr) return { error: creditErr.message };
+
+  if (escrow) {
+    await admin
+      .from("bounty_escrow")
+      .update({
+        status: "released",
+        released_at: new Date().toISOString(),
+        release_note: "Mission approved by client",
+      })
+      .eq("id", escrow.id);
+  }
+
+  await admin.from("platform_transactions").insert({
+    buyer_id: user.id,
+    seller_id: hackerId,
+    amount_usd: amount,
+    amount_credits: Math.round(amount),
+    author_payout: amount,
+    platform_fee: 0,
+    tx_type: "bounty_release",
+  });
+
+  await supabase
+    .from("missions")
+    .update({ status: "completed" })
     .eq("id", missionId);
 
   revalidatePath(`/dashboard/missions/${missionId}`);

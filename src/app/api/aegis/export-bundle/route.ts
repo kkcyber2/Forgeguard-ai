@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
 
   // Verify scan belongs to user
   const { data: scan, error: scanErr } = await supabase
-    .from("ai_scans")
+    .from("scans")
     .select("id, user_id, status")
     .eq("id", scanId)
     .single();
@@ -193,16 +193,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
-  // Fetch findings
-  const { data: rawFindings } = await supabase
-    .from("scan_findings")
-    .select("id, type, severity, attack_name, payload, created_at")
+  const { data: report } = await supabase
+    .from("scan_reports")
+    .select("findings")
     .eq("scan_id", scanId)
-    .neq("severity", "info");
+    .maybeSingle();
 
   const findings: ScanFinding[] =
-    rawFindings && rawFindings.length > 0
-      ? (rawFindings as ScanFinding[])
+    report?.findings && Array.isArray(report.findings) && report.findings.length > 0
+      ? (report.findings as unknown as ScanFinding[])
       : DEFAULT_SEED_FINDINGS;
 
   // Generate all three rule sets
@@ -210,36 +209,19 @@ export async function POST(req: NextRequest) {
   const pyMiddle  = buildPythonMiddleware(scanId, findings);
   const njsShield = buildNextjsShield(scanId, findings);
 
-  // Persist to aegis_rules (non-fatal if table schema differs)
-  const rulesBatch = [
-    {
-      scan_id:      scanId,
-      user_id:      user.id,
-      format:       "cloudflare",
-      rule_json:    cfRuleset,
-      generated_at: new Date().toISOString(),
-    },
-    {
-      scan_id:      scanId,
-      user_id:      user.id,
-      format:       "python",
-      rule_json:    { code: pyMiddle },
-      generated_at: new Date().toISOString(),
-    },
-    {
-      scan_id:      scanId,
-      user_id:      user.id,
-      format:       "nextjs",
-      rule_json:    { code: njsShield },
-      generated_at: new Date().toISOString(),
-    },
-  ];
-
-  await supabase
+  // Persist rules is best-effort — skip if schema mismatch
+  void supabase
     .from("aegis_rules")
-    .upsert(rulesBatch, { onConflict: "scan_id, format", ignoreDuplicates: false })
-    .then(() => undefined)
-    .catch(() => undefined);
+    .insert({
+      scan_id: scanId,
+      rule_id: `bundle-${scanId.slice(0, 8)}`,
+      pattern: (findings[0]?.attack_name ?? "forgeguard-export").slice(0, 500),
+      description: "Aegis bundle export",
+      action: "block",
+      format: "cloudflare",
+      enabled: true,
+    })
+    .then(() => undefined, () => undefined);
 
   // Assemble ZIP entries
   const entries: ZipEntry[] = [
@@ -258,7 +240,7 @@ export async function POST(req: NextRequest) {
     zipBuffer.byteLength,
   );
 
-  return new NextResponse(responseBody, {
+  return new NextResponse(responseBody as BodyInit, {
     status: 200,
     headers: {
       "Content-Type":        "application/zip",

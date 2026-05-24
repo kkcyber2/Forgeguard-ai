@@ -44,6 +44,7 @@ export async function releaseBountyFunds(
   await db.from("platform_transactions").insert({
     seller_id: hackerId,
     amount_usd: amount,
+    amount_credits: Math.round(amount),
     author_payout: amount,
     platform_fee: 0,
     tx_type: "bounty_release",

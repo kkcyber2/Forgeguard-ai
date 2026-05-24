@@ -12,7 +12,7 @@ const nextConfig = {
   // Without this, webpack emits "SyntaxError: Cannot use import statement
   // outside a module" and "ReactCurrentBatchConfig" crashes because the
   // ESM module graph gets broken mid-bundle.
-  transpilePackages: ["three", "@react-three/fiber", "@react-three/drei"],
+  transpilePackages: ["three", "@react-three/fiber", "@react-three/drei", "framer-motion"],
 
   // ── Build leniency ──────────────────────────────────────────────────────
   // Don't fail production builds on TS / ESLint warnings from cross-package
@@ -20,7 +20,7 @@ const nextConfig = {
   // Runtime correctness is enforced by Postgres + RLS + Zod at API boundary.
   // Re-enable once Supabase packages are upgraded to aligned versions.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
     ignoreDuringBuilds: true,

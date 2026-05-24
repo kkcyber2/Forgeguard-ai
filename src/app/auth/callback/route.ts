@@ -6,9 +6,8 @@ import { createServerSupabase } from "@/lib/supabase/server";
  * Exchanges the short-lived `code` param for a session cookie, then
  * redirects to the requested `next` path (safelisted to same-origin).
  *
- * Sprint 8: New accounts that haven't chosen their identity are redirected
- * to /auth/signup/identity. Detected via account age < 10 min AND
- * access_level still at default (1).
+ * Parallel Sovereignty: users with NULL user_type MUST complete identity
+ * selection before entering the dashboard — no bypass.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -27,21 +26,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/auth/login?error=exchange_failed`);
   }
 
-  // ── Sprint 8: Route new users to identity selection ───────────────
-  const accountAge = Date.now() - new Date(user.created_at).getTime();
-  const isVeryNew  = accountAge < 10 * 60 * 1000; // 10 minutes
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("user_type, access_level")
+    .eq("id", user.id)
+    .single();
 
-  if (isVeryNew) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("access_level")
-      .eq("id", user.id)
-      .single();
+  if (!profile?.user_type) {
+    return NextResponse.redirect(`${origin}/auth/signup/identity`);
+  }
 
-    // access_level 1 = still at default, identity not chosen yet
-    if (!profile || profile.access_level === 1) {
-      return NextResponse.redirect(`${origin}/auth/signup/identity`);
-    }
+  if (next.startsWith("/dashboard")) {
+    return NextResponse.redirect(`${origin}${next}`);
   }
 
   return NextResponse.redirect(`${origin}${next}`);

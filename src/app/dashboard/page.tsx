@@ -7,10 +7,10 @@ import { SectionCard, SectionLink } from "@/components/dashboard/section-card";
 import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { ScanCard } from "@/components/dashboard/scan-card";
 import { RedTeamFeed, type RedTeamLog } from "@/components/dashboard/red-team-feed";
-import { Sparkline } from "@/components/dashboard/sparkline";
+import { OverviewKpis, ScanOpsKpis } from "@/components/dashboard/overview-kpis";
 import { VerificationStatus } from "@/components/dashboard/VerificationStatus";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { StatTile } from "@/components/ui/stat-tile";
+import { resolveViewMode, type ViewMode } from "@/lib/access/parallel-sovereignty";
 import { buttonStyles } from "@/components/ui/button";
 import { scansTableToCards } from "@/lib/scans/adapt";
 import {
@@ -60,7 +60,9 @@ export default async function UserDashboardPage({
   // -- Identity fields (Sprint 8) ----------------------------------------
   const { data: identityRow } = await supabase
     .from("profiles")
-    .select("user_type, access_level, domain_verified, domain_token")
+    .select(
+      "user_type, access_level, domain_verified, domain_token, active_view_mode, reputation",
+    )
     .eq("id", user.id)
     .single();
   const userType      = (identityRow?.user_type as "client" | "hacker" | "developer" | null) ?? null;
@@ -68,6 +70,60 @@ export default async function UserDashboardPage({
   const domainVerified= Boolean(identityRow?.domain_verified);
   const domainToken   = (identityRow?.domain_token as string | null) ?? null;
   const handle        = (user.email ?? "").split("@")[0];
+  const viewMode: ViewMode = resolveViewMode(
+    identityRow?.active_view_mode,
+    userType,
+  );
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: userScanIds } = await supabase
+    .from("scans")
+    .select("id")
+    .eq("user_id", user.id);
+  const scanIds = (userScanIds ?? []).map((s) => s.id);
+
+  const [
+    { count: activeMissionCount },
+    { count: recentBazaarSales },
+    { count: aegisRuleCount },
+    { data: escrowRows },
+    { data: aleScans },
+  ] = await Promise.all([
+    supabase
+      .from("missions")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "in_progress"),
+    supabase
+      .from("bazaar_purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("author_id", user.id)
+      .gte("created_at", sevenDaysAgo),
+    scanIds.length > 0
+      ? supabase
+          .from("aegis_rules")
+          .select("id", { count: "exact", head: true })
+          .in("scan_id", scanIds)
+      : Promise.resolve({ count: 0, data: null, error: null }),
+    supabase
+      .from("bounty_escrow")
+      .select("amount_usd, status")
+      .eq("user_id", user.id)
+      .eq("status", "held"),
+    supabase
+      .from("scans")
+      .select("ale_usd")
+      .eq("user_id", user.id),
+  ]);
+
+  const activeBountySpend = (escrowRows ?? []).reduce(
+    (sum, row) => sum + Number(row.amount_usd ?? 0),
+    0,
+  );
+  const totalAleRisk = (aleScans ?? []).reduce(
+    (sum, row) => sum + Number(row.ale_usd ?? 0),
+    0,
+  );
 
   // -- Scans --------------------------------------------------------------
   const { data: scanRows, error: scanErr } = await supabase
@@ -95,7 +151,7 @@ export default async function UserDashboardPage({
   if (logErr) console.error("[dashboard] scan_logs:", logErr.message);
 
   const logs: RedTeamLog[] = (rawLogs ?? [])
-    .map(toRedTeamLog)
+    .map((row) => toRedTeamLog(row as Parameters<typeof toRedTeamLog>[0]))
     .filter((l): l is RedTeamLog => l !== null);
 
   // -- KPIs derived from real rows ---------------------------------------
@@ -121,9 +177,13 @@ export default async function UserDashboardPage({
   return (
     <>
       <PageHeader
-        eyebrow="Operator"
+        eyebrow={viewMode === "client" ? "Client Sovereign" : "Hacker Sovereign"}
         title={greeting(profile?.full_name ?? user.email ?? "Operator")}
-        description="Live posture across your AI surfaces. Probes run server-side and only RLS-scoped rows reach this view."
+        description={
+          viewMode === "client"
+            ? "Aegis shield, bounty programs, and financial risk across your AI estate."
+            : "REP, missions, and bazaar velocity in your hacker workspace."
+        }
         actions={
           <>
             <Link
@@ -159,63 +219,30 @@ export default async function UserDashboardPage({
         </div>
       )}
 
-      {/* KPI strip */}
-      <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StaggerItem>
-          <StatTile
-            label="Active scans"
-            value={activeCount}
-            tone="neutral"
-            icon={Radar}
-            footer={
-              <Sparkline
-                data={lastSevenDayCounts(scanRows ?? [], (r) =>
-                  Boolean(r.created_at),
-                )}
-                stroke="muted"
-              />
-            }
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatTile
-            label="Probes / 24h"
-            value={blockedCount}
-            tone="secure"
-            icon={ShieldCheck}
-            footer={
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                {(rawLogs ?? []).length} log lines
-              </span>
-            }
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatTile
-            label="High-sev findings"
-            value={breachCount}
-            tone="threat"
-            icon={Activity}
-            footer={
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                {totalFindings} total
-              </span>
-            }
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatTile
-            label="Sealed coverage"
-            value={coveragePct}
-            tone={sealed > 0 ? "secure" : "neutral"}
-            footer={
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                {sealed} of {(scanRows ?? []).length} scans
-              </span>
-            }
-          />
-        </StaggerItem>
-      </Stagger>
+      <OverviewKpis
+        viewMode={viewMode}
+        hacker={{
+          reputation: identityRow?.reputation ?? 0,
+          activeMissions: activeMissionCount ?? 0,
+          recentBazaarSales: recentBazaarSales ?? 0,
+        }}
+        client={{
+          aegisRules: aegisRuleCount ?? 0,
+          activeBountySpend,
+          totalAleRisk,
+        }}
+      />
+
+      <ScanOpsKpis
+        activeCount={activeCount}
+        blockedCount={blockedCount}
+        breachCount={breachCount}
+        totalFindings={totalFindings}
+        coveragePct={coveragePct}
+        sealed={sealed}
+        scanTotal={(scanRows ?? []).length}
+        logCount={(rawLogs ?? []).length}
+      />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         <SectionCard
@@ -302,23 +329,6 @@ function greeting(name: string): string {
   const tod =
     h < 5 ? "Late shift" : h < 12 ? "Morning" : h < 17 ? "Afternoon" : "Evening";
   return `${tod}, ${cap}.`;
-}
-
-/** Bucket a list of rows into the last 7 days for sparkline rendering. */
-function lastSevenDayCounts<T extends { created_at: string }>(
-  rows: T[],
-  predicate: (r: T) => boolean,
-): number[] {
-  const buckets = new Array(7).fill(0) as number[];
-  const now = new Date();
-  for (const r of rows) {
-    if (!predicate(r)) continue;
-    const days = Math.floor(
-      (now.getTime() - new Date(r.created_at).getTime()) / (24 * 60 * 60 * 1000),
-    );
-    if (days >= 0 && days < 7) buckets[6 - days] += 1;
-  }
-  return buckets;
 }
 
 /** Map a `scan_logs` row → the RedTeamFeed shape. */

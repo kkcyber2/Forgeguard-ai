@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { type NavItem, type ShellUser, NAV_ICONS } from "@/components/dashboard/shell";
+import { IdentitySwitcher } from "@/components/dashboard/identity-switcher";
+import type { ViewMode } from "@/lib/access/parallel-sovereignty";
 
 /**
  * MobileNav — hamburger sheet for sub-lg viewports.
@@ -16,11 +18,15 @@ export function MobileNav({
   user,
   scope,
   activePath,
+  viewMode = "hacker",
+  identityChosen = true,
 }: {
   nav: NavItem[];
   user: ShellUser;
   scope: "user" | "admin";
   activePath: string;
+  viewMode?: ViewMode;
+  identityChosen?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -80,6 +86,12 @@ export function MobileNav({
             <X size={15} strokeWidth={1.75} />
           </button>
         </div>
+
+        {scope === "user" && (
+          <div className="border-b-[0.5px] border-white/[0.06] px-5 py-3">
+            <IdentitySwitcher activeMode={viewMode} canSwitch={identityChosen} compact />
+          </div>
+        )}
 
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto px-3 py-5">

@@ -46,7 +46,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createHash, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
+import { sha256hex } from "@/lib/crypto/hash";
 import { z } from "zod";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { sealCredential } from "@/lib/crypto/credentials";
@@ -224,16 +225,9 @@ export async function POST(req: NextRequest) {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function sha256hex(input: string): string {
-  return createHash("sha256").update(input, "utf8").digest("hex");
-}
-
 function json(body: unknown, status: number): NextResponse {
   return NextResponse.json(body, { status });
 }
-
-// Expose key generation helper for the settings server action
-export { sha256hex };
 
 // ── GET — documentation stub ──────────────────────────────────────────────────
 export async function GET() {

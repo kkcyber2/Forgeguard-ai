@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { PlanId } from "@/lib/plans";
+
 import { createHmac, timingSafeEqual } from "crypto";
 
 /* ─────────────────────────────────────────────────────────────────────────── */

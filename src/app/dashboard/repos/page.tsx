@@ -320,7 +320,7 @@ export default function ReposPage() {
     try {
       const enc  = new TextEncoder();
       const buf  = enc.encode(fileContent);
-      const b64  = btoa(String.fromCharCode(...buf));
+      const b64  = btoa(String.fromCharCode(...Array.from(buf)));
       const name = filePath.split("/").pop() ?? filePath;
 
       const res  = await fetch("/api/repos/files", {

@@ -376,7 +376,7 @@ function CodeViewerModal({
     const ext      = LANG_EXT[language] ?? ".txt";
     const filename = `${scriptName}${ext}`;
     const zip      = buildClientZip(filename, code);
-    const blob     = new Blob([zip], { type: "application/zip" });
+    const blob = new Blob([zip as BlobPart], { type: "application/zip" });
     const url      = URL.createObjectURL(blob);
     const a        = document.createElement("a");
     a.href         = url;

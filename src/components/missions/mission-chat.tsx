@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useTransition, useCallback } from "react";
-import { createBrowserClient } from "@supabase/ssr";
-import type { Database } from "@/types/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { Send, Loader2 } from "lucide-react";
 import { OperatorNameBadge } from "@/components/dashboard/verified-badge";
 import { rankBadgeClass } from "@/lib/access/ranks";
@@ -44,10 +43,7 @@ export function MissionChat({
   const [isPending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const supabase = createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  const supabase = createClient();
 
   const loadSender = useCallback(
     async (senderId: string) => {

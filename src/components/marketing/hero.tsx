@@ -328,7 +328,7 @@ export function HeroSection({
         animate="show"
       >
         <motion.div variants={ITEM}>
-          <Badge variant="outline" className="gap-1.5 border-white/10 bg-white/[0.04] text-white/50">
+          <Badge tone="neutral" className="gap-1.5 border-white/10 bg-white/[0.04] text-white/50">
             <span
               className="h-1.5 w-1.5 rounded-full bg-[#D1FF00]"
               style={{ boxShadow: "0 0 6px rgba(209,255,0,0.8)" }}

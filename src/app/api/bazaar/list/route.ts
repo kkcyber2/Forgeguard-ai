@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       audit_verdict, audit_risk_score,
       is_published, created_at, updated_at,
       author:author_id (
-        full_name, username, rank
+        full_name, hacker_rank
       )
     `, { count: "exact" })
     .eq("is_published", true)
@@ -58,7 +58,11 @@ export async function GET(req: NextRequest) {
       .from("bazaar_purchases")
       .select("script_id")
       .eq("buyer_id", user.id);
-    purchased = new Set((purchaseRows ?? []).map((r: { script_id: string }) => r.script_id));
+    purchased = new Set(
+      (purchaseRows ?? [])
+        .map((r) => r.script_id)
+        .filter((id): id is string => id != null),
+    );
   }
 
   const enriched = (scripts ?? []).map((s) => ({

@@ -5,6 +5,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import type { TablesUpdate } from "@/types/supabase";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("access_level")
-    .eq("user_id", user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   if (((profile?.access_level as number | undefined) ?? 1) < 2) {
@@ -170,7 +171,7 @@ export async function PUT(req: NextRequest) {
   const { id, ...updates } = parsed.data;
 
   // Build update patch — commit_count increment handled server-side via DB trigger if needed
-  const patch: Record<string, unknown> = { ...updates };
+  const patch = { ...updates } as TablesUpdate<"hacker_repos">;
 
   const { data: repo, error: updateErr } = await supabase
     .from("hacker_repos")

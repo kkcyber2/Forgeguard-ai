@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  resolveEngineAuthToken,
+  resolveEngineBaseUrl,
+  engineAuthHeaders,
+} from "@/lib/agathon-config";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { openCredential } from "@/lib/crypto/credentials";
 import type { Database } from "@/types/supabase";
@@ -24,8 +29,8 @@ import type { Database } from "@/types/supabase";
  *      We just need to mark the scan as "probing" and return.
  *
  * Required env vars (Vercel side):
- *   - AGATHON_ORCHESTRATOR_URL : your Railway service public URL
- *   - AGATHON_INTERNAL_SECRET  : bearer token shared with Railway
+ *   - PYTHON_ENGINE_URL (or AGATHON_ORCHESTRATOR_URL) : Railway public URL
+ *   - INTERNAL_SCAN_TOKEN (or AGATHON_INTERNAL_SECRET) : bearer shared w/ Railway
  *   - SCAN_CREDENTIAL_SECRET   : AES key for unsealing the API key
  *   - SUPABASE_SERVICE_ROLE_KEY : service-role for admin DB writes
  */
@@ -100,24 +105,27 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   const normalizedUrl = normalizeTargetUrl(scan.target_url);
 
   // 4. Validate Railway env vars before dispatch -------------------------
-  const orchestratorUrl = process.env.AGATHON_ORCHESTRATOR_URL?.replace(
-    /\/$/,
-    "",
-  );
-  const internalSecret = process.env.AGATHON_INTERNAL_SECRET;
+  const orchestratorUrl = resolveEngineBaseUrl();
+  const internalSecret = resolveEngineAuthToken();
   if (!orchestratorUrl) {
+    console.error(
+      "[runner] Missing PYTHON_ENGINE_URL (or AGATHON_ORCHESTRATOR_URL fallback)",
+    );
     await markFailure(
       admin,
       scanId,
-      "AGATHON_ORCHESTRATOR_URL is not configured on Vercel.",
+      "PYTHON_ENGINE_URL (or AGATHON_ORCHESTRATOR_URL) is not configured on Vercel.",
     );
     return;
   }
   if (!internalSecret) {
+    console.error(
+      "[runner] Missing INTERNAL_SCAN_TOKEN (or AGATHON_INTERNAL_SECRET fallback)",
+    );
     await markFailure(
       admin,
       scanId,
-      "AGATHON_INTERNAL_SECRET is not configured on Vercel.",
+      "INTERNAL_SCAN_TOKEN (or AGATHON_INTERNAL_SECRET) is not configured on Vercel.",
     );
     return;
   }
@@ -141,7 +149,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${internalSecret}`,
+        ...engineAuthHeaders(),
       },
       body: JSON.stringify({
         scan_id: scan.id,
@@ -178,7 +186,15 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       },
     });
   } catch (err) {
-    console.error("[runner] dispatch failed:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error("[runner] dispatch failed:", {
+      url: `${orchestratorUrl}/scan/start`,
+      scan_id: scanId,
+      message,
+      stack,
+      err,
+    });
     await markFailure(
       admin,
       scanId,

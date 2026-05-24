@@ -32,9 +32,9 @@ function getAdminClient() {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { token: string } },
+  { params }: { params: Promise<{ token: string }> },
 ) {
-  const { token } = params;
+  const { token } = await params;
 
   // Validate UUID format to block probing
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

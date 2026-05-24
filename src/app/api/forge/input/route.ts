@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 
+export const runtime = "nodejs";
+
 const BodySchema = z.object({
   session_id: z.string().min(1).max(128),
   content:    z.string().min(1).max(4096),

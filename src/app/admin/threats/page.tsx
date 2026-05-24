@@ -44,7 +44,7 @@ function rollupThreats(
       existing.count += 1;
       if (new Date(r.created_at) > new Date(existing.at)) existing.at = r.created_at;
     } else {
-      groups.set(key, { id: String(r.id), technique, surface, origin, severity: r.severity, count: 1, at: r.created_at });
+      groups.set(key, { id: String(r.id), technique, surface, origin, severity: r.severity as ThreatRow["severity"], count: 1, at: r.created_at });
     }
   }
 

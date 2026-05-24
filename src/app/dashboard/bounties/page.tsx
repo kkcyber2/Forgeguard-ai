@@ -14,6 +14,7 @@
  */
 
 import * as React from "react";
+import { createClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
@@ -139,7 +140,7 @@ function CvssRow({ label, value }: { label: string; value: string }) {
       <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-foreground-subtle">
         {label}
       </span>
-      <span className="font-mono text-[11px] text-foreground-muted">{value || "—"}</span>
+      <span className="font-mono text-[11px] tabular-nums text-white/60">{value || "—"}</span>
     </div>
   );
 }
@@ -512,8 +513,7 @@ const EMPTY_FORM: TriageForm = {
   scan_id:            "",
 };
 
-// Mock escrow data — in production this would be fetched from Supabase
-// after a successful triage submission saves to bounty_escrow via backend
+// Escrow loaded from bounty_escrow on mount
 const MOCK_ESCROW: { status: EscrowStatus; amount: number } | null = null;
 
 // ─── Wizard step config ───────────────────────────────────────────────────────
@@ -593,6 +593,27 @@ export default function BountiesPage() {
   const [error, setError]           = React.useState<string | null>(null);
   const [domainVerified, setDomainVerified] = React.useState(false);
   const [escrow, setEscrow]         = React.useState<{ status: EscrowStatus; amount: number } | null>(MOCK_ESCROW);
+
+  React.useEffect(() => {
+    async function loadEscrow() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("bounty_escrow")
+        .select("status, amount_usd")
+        .eq("user_id", user.id)
+        .eq("status", "held")
+        .maybeSingle();
+      if (data) {
+        setEscrow({
+          status: (data.status ?? "held") as EscrowStatus,
+          amount: Number(data.amount_usd ?? 0),
+        });
+      }
+    }
+    void loadEscrow();
+  }, []);
 
   function patch(field: keyof TriageForm, value: string) {
     if (field === "target_domain") setDomainVerified(false);
@@ -706,8 +727,8 @@ export default function BountiesPage() {
               <Icon size={12} strokeWidth={1.5} className={cn(tone !== "neutral" ? "text-acid" : "text-foreground-muted")} />
             </div>
             <div>
-              <p className="text-sm font-semibold tabular-nums text-foreground">{value}</p>
-              <p className="text-[11px] text-foreground-muted">{label}</p>
+              <p className="font-mono text-sm font-semibold tabular-nums text-white/90">{value}</p>
+              <p className="font-mono text-[11px] text-white/50">{label}</p>
             </div>
           </div>
         ))}

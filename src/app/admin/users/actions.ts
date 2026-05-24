@@ -51,8 +51,9 @@ export async function setHackerRank(formData: FormData): Promise<void> {
   if (error) console.error("[admin/users] setHackerRank:", error.message);
 
   // Freeze wallet via SECURITY DEFINER RPC (mirrors Traitor Protocol)
-  await admin.rpc("freeze_wallet", { target_user_id: userId }).catch((e: Error) =>
-    console.error("[admin/users] freeze_wallet:", e.message),
+  await admin.rpc("freeze_wallet", { p_user_id: userId }).then(
+    () => undefined,
+    (e: Error) => console.error("[admin/users] freeze_wallet:", e.message),
   );
 
   revalidatePath("/admin/users");

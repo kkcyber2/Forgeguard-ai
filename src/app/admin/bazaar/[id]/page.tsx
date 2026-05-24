@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type AuditVerdict = "pending_audit" | "cleared" | "rejected" | null;
+type AuditVerdict = "pending" | "pending_audit" | "cleared" | "rejected" | "flagged" | null;
 
 interface BazaarScript {
   id: string;
@@ -15,10 +15,12 @@ interface BazaarScript {
   description: string | null;
   language: string | null;
   tags: string[] | null;
-  price_credits: number | null;
-  risk_score: number | null;
+  price_usd: number | null;
+  audit_risk_score: number | null;
   audit_verdict: AuditVerdict;
   is_published: boolean;
+  is_certified: boolean | null;
+  audit_reason: string | null;
   created_at: string;
   code: string | null;
   author_id: string;
@@ -27,14 +29,23 @@ interface BazaarScript {
 function RiskBadge({ score }: { score: number | null }) {
   if (score === null)
     return <span className="font-mono text-[10px] text-steel-600">N/A</span>;
+  const normalized = score > 10 ? score / 10 : score;
   const cls =
-    score >= 8 ? "text-threat border-threat/30 bg-threat/5"
-    : score >= 5 ? "text-amber-400 border-amber-400/30 bg-amber-400/5"
+    normalized >= 8 ? "text-threat border-threat/30 bg-threat/5"
+    : normalized >= 5 ? "text-amber-400 border-amber-400/30 bg-amber-400/5"
     : "text-acid border-acid/30 bg-acid/5";
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[10px] tracking-widest", cls)}>
-      {score >= 8 && <AlertTriangle size={9} />}
-      {score.toFixed(1)} / 10
+      {normalized >= 8 && <AlertTriangle size={9} />}
+      {normalized.toFixed(1)} / 10
+    </span>
+  );
+}
+
+function CertifiedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-sm border border-acid/40 bg-acid/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-acid">
+      <ShieldCheck size={9} /> ForgeGuard Certified
     </span>
   );
 }
@@ -146,7 +157,12 @@ export default function AdminBazaarScriptPage() {
       const j = await res.json();
       if (!res.ok || !j.ok) { setActionError(j.error ?? "Action failed."); return; }
       setActionDone(verdict);
-      setScript((prev) => prev ? { ...prev, audit_verdict: verdict, is_published: verdict === "cleared" } : prev);
+      setScript((prev) => prev ? {
+        ...prev,
+        audit_verdict: verdict,
+        is_published: verdict === "cleared",
+        is_certified: verdict === "cleared",
+      } : prev);
     } catch {
       setActionError("Network error.");
     } finally {
@@ -200,6 +216,7 @@ export default function AdminBazaarScriptPage() {
           </div>
         </div>
         <VerdictBadge verdict={currentVerdict} />
+        {script.is_certified && <CertifiedBadge />}
       </div>
 
       {/* Meta grid */}
@@ -215,12 +232,12 @@ export default function AdminBazaarScriptPage() {
           <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-steel-600">Price</p>
           <div className="flex items-center gap-1">
             <DollarSign size={10} className="text-steel-500" />
-            <span className="font-mono text-[12px] text-steel-200">{script.price_credits ?? 0} cr</span>
+            <span className="font-mono text-[12px] text-steel-200">${Number(script.price_usd ?? 0).toFixed(2)}</span>
           </div>
         </div>
         <div>
           <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-steel-600">Risk Score</p>
-          <RiskBadge score={script.risk_score} />
+          <RiskBadge score={script.audit_risk_score} />
         </div>
         <div>
           <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-steel-600">Submitted</p>
@@ -263,7 +280,7 @@ export default function AdminBazaarScriptPage() {
             ? <ShieldCheck size={14} className="shrink-0 text-acid" />
             : <XCircle size={14} className="shrink-0 text-threat" />}
           <p className={cn("font-mono text-[12px] font-semibold", actionDone === "cleared" ? "text-acid" : "text-threat")}>
-            {actionDone === "cleared" ? "Script verified and published." : "Script rejected and hidden from marketplace."}
+            {actionDone === "cleared" ? "Script verified, published, and ForgeGuard Certified." : "Script rejected and hidden from marketplace."}
           </p>
         </div>
       )}

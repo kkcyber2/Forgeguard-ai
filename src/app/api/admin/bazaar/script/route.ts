@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from("bazaar_scripts")
     .select(
-      "id, name, description, language, tags, price_credits, risk_score, audit_verdict, is_published, created_at, code, author_id",
+      "id, name, description, language, tags, price_usd, audit_risk_score, audit_verdict, is_published, is_certified, created_at, code, author_id, audit_reason, audit_findings",
     )
     .eq("id", id)
     .single();

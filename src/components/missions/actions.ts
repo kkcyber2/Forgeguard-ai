@@ -89,12 +89,52 @@ export async function acceptProposal({
   const amount = Number(missionFull?.budget_credits ?? 0);
   if (amount > 0) {
     const admin = createAdminSupabase();
-    await admin.from("bounty_escrow").insert({
+    const clientId = mission.client_id;
+
+    await admin.from("user_wallets").upsert({ user_id: clientId }, { onConflict: "user_id" });
+
+    const { data: wallet } = await admin
+      .from("user_wallets")
+      .select("balance_usd, is_frozen")
+      .eq("user_id", clientId)
+      .single();
+
+    if (wallet?.is_frozen) {
+      return { error: "Client wallet is frozen. Cannot assign mission." };
+    }
+
+    const balance = Number(wallet?.balance_usd ?? 0);
+    if (balance < amount) {
+      return { error: `Insufficient credits. Need $${amount.toFixed(2)}, have $${balance.toFixed(2)}.` };
+    }
+
+    const { error: debitErr } = await admin.rpc("increment_wallet", {
+      p_user_id: clientId,
+      p_amount: -amount,
+    });
+    if (debitErr) return { error: debitErr.message };
+
+    const { error: escrowErr } = await admin.from("bounty_escrow").insert({
       mission_id: missionId,
       user_id: proposal.hacker_id,
       submission_id: missionId,
       amount_usd: amount,
       status: "held",
+    });
+
+    if (escrowErr) {
+      await admin.rpc("increment_wallet", { p_user_id: clientId, p_amount: amount });
+      return { error: escrowErr.message };
+    }
+
+    await admin.from("platform_transactions").insert({
+      buyer_id: clientId,
+      seller_id: proposal.hacker_id,
+      amount_usd: amount,
+      amount_credits: Math.round(amount),
+      author_payout: 0,
+      platform_fee: 0,
+      tx_type: "escrow_hold",
     });
   }
 

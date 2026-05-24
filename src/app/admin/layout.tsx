@@ -27,6 +27,7 @@ const adminNav: NavItem[] = [
   { href: "/admin/threats", label: "Global threats", icon: "shield-alert" },
   { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store" },
   { href: "/admin/bounties", label: "Bounty Escrow", icon: "credit-card" },
+  { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark" },
   { href: "/admin/users", label: "Users", icon: "users" },
   { href: "/admin/verification", label: "Verification", icon: "shield-check" },
   { href: "/admin/system", label: "System health", icon: "activity" },

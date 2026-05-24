@@ -12,6 +12,7 @@ import {
   FlaskConical,
   GitBranch,
   Globe,
+  Landmark,
   LayoutDashboard,
   Radar,
   Settings,
@@ -49,6 +50,7 @@ export type NavIconName =
   | "globe"
   | "store"
   | "git-branch"
+  | "landmark"
   | "zap"
   | "swords";
 
@@ -67,6 +69,7 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   globe: Globe,
   store: Store,
   "git-branch": GitBranch,
+  landmark: Landmark,
   zap: Zap,
   swords: Swords,
 };

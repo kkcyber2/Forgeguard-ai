@@ -217,6 +217,7 @@ export type Database = {
           id: string
           is_free: boolean
           is_published: boolean
+          is_certified: boolean
           is_removed: boolean
           language: string
           name: string
@@ -242,6 +243,7 @@ export type Database = {
           description?: string
           id?: string
           is_published?: boolean
+          is_certified?: boolean
           is_removed?: boolean
           language?: string
           name: string
@@ -267,6 +269,7 @@ export type Database = {
           description?: string
           id?: string
           is_published?: boolean
+          is_certified?: boolean
           is_removed?: boolean
           language?: string
           name?: string

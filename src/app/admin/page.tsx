@@ -1,4 +1,3 @@
-import * as React from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -22,7 +21,8 @@ import {
   type SystemHealthMetrics,
 } from "@/components/dashboard/system-health";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { LiveWorldMap } from "@/components/dashboard/live-world-map";
+import { LiveWorldMap, type ScanTargetPulse } from "@/components/dashboard/live-world-map";
+import { resolveScanTargets, type PopNodeId } from "@/lib/admin/resolve-scan-node";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
@@ -43,6 +43,7 @@ import { severityWeight } from "@/lib/utils";
  */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const runtime = "nodejs";
 
 export default async function AdminOverviewPage() {
   const supabase = await createServerSupabase();
@@ -103,6 +104,17 @@ export default async function AdminOverviewPage() {
   const activeScans = (scans ?? []).filter(
     (s) => s.status === "queued" || s.status === "probing",
   ).length;
+
+  const scanTargets: ScanTargetPulse[] = (scans ?? [])
+    .filter((s) => s.status === "queued" || s.status === "probing")
+    .slice(0, 5)
+    .map((s) => ({
+      id: s.id,
+      target_url: s.target_url,
+      target_model: s.target_model,
+    }));
+
+  const pulseNodeIds: PopNodeId[] = resolveScanTargets(scanTargets);
 
   // Severity breakdown across the rolled-up threats.
   const sevSummary: Record<ThreatRow["severity"], number> = {
@@ -234,7 +246,11 @@ export default async function AdminOverviewPage() {
           description="Live PoP nodes light up as findings are emitted. Pulses are seeded from active scan locations."
           density="flush"
         >
-          <LiveWorldMap activeScans={activeScans} />
+          <LiveWorldMap
+            activeScans={activeScans}
+            scanTargets={scanTargets}
+            pulseNodeIds={pulseNodeIds}
+          />
         </SectionCard>
       </div>
 

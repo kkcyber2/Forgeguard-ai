@@ -51,5 +51,6 @@ export async function releaseBountyFunds(
   });
 
   revalidatePath("/admin/bounties");
+  revalidatePath("/admin/ledger");
   return {};
 }

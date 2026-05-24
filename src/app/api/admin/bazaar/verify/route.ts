@@ -46,6 +46,8 @@ export async function PUT(req: NextRequest) {
     .update({
       audit_verdict: parsed.data.verdict,
       is_published: parsed.data.verdict === "cleared",
+      is_certified: parsed.data.verdict === "cleared",
+      audited_at: new Date().toISOString(),
     })
     .eq("id", parsed.data.script_id)
     .select("id, name, audit_verdict, is_published")

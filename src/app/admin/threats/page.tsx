@@ -21,6 +21,7 @@ import type { Database } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const runtime = "nodejs";
 export const metadata = { title: "Global Threat Board" };
 
 type ScanLogRow = Database["public"]["Tables"]["scan_logs"]["Row"];

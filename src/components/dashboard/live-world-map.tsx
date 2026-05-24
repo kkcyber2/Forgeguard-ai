@@ -18,12 +18,24 @@
 
 import * as React from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import type { PopNodeId } from "@/lib/admin/resolve-scan-node";
+import { resolveScanNode } from "@/lib/admin/resolve-scan-node";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface LiveWorldMapProps {
   /** Count of currently queued/probing scans from the server render. */
   activeScans: number;
+  /** Last 5 active scan targets — mapped to PoP nodes when provided. */
+  scanTargets?: ScanTargetPulse[];
+  /** Pre-resolved node ids from server (optional). */
+  pulseNodeIds?: readonly PopNodeId[];
+}
+
+export interface ScanTargetPulse {
+  id: string;
+  target_url: string;
+  target_model?: string | null;
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -61,7 +73,7 @@ const NODES = [
   { id: "syd",  x: 845, y: 372 },   // Sydney
 ] as const;
 
-type NodeId = (typeof NODES)[number]["id"];
+type NodeId = PopNodeId;
 
 /**
  * Simplified continent/island polygon paths in the 1000 × 500 SVG viewport.
@@ -127,15 +139,35 @@ function pickActiveIds(count: number, seed: number): NodeId[] {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function LiveWorldMap({ activeScans }: LiveWorldMapProps) {
-  const [activeIds, setActiveIds] = React.useState<NodeId[]>(() =>
-    pickActiveIds(activeScans, 0xf06e42),
-  );
+export function LiveWorldMap({
+  activeScans,
+  scanTargets = [],
+  pulseNodeIds,
+}: LiveWorldMapProps) {
+  const [activeIds, setActiveIds] = React.useState<PopNodeId[]>(() => {
+    if (pulseNodeIds && pulseNodeIds.length > 0) return [...pulseNodeIds];
+    if (scanTargets.length > 0) {
+      return scanTargets
+        .slice(0, 5)
+        .map((s, i) => resolveScanNode(s.target_url, i));
+    }
+    return pickActiveIds(activeScans, 0xf06e42);
+  });
 
-  // Re-pick when the server-supplied count changes
+  // Re-pick when server-supplied scan targets change
   React.useEffect(() => {
+    if (pulseNodeIds && pulseNodeIds.length > 0) {
+      setActiveIds([...pulseNodeIds]);
+      return;
+    }
+    if (scanTargets.length > 0) {
+      setActiveIds(
+        scanTargets.slice(0, 5).map((s, i) => resolveScanNode(s.target_url, i)),
+      );
+      return;
+    }
     setActiveIds(pickActiveIds(activeScans, Date.now() % 99991));
-  }, [activeScans]);
+  }, [activeScans, scanTargets, pulseNodeIds]);
 
   // Supabase Realtime — add a random node flash on each new finding
   React.useEffect(() => {
@@ -158,9 +190,9 @@ export function LiveWorldMap({ activeScans }: LiveWorldMapProps) {
         () => {
           setActiveIds((prev) => {
             const candidate = NODES[Math.floor(Math.random() * NODES.length)];
-            if (!candidate || prev.includes(candidate.id)) return prev;
+            if (!candidate || prev.includes(candidate.id as NodeId)) return prev;
             // Cap at 10 simultaneous pulses
-            return [...prev.slice(-9), candidate.id];
+            return [...prev.slice(-9), candidate.id as NodeId];
           });
         },
       )

@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     .eq("id", user.id)
     .maybeSingle()) as { data: ProfileRow | null };
 
-  if (!profile || (profile.access_level ?? 0) < 2) {
+  if (!profile || (profile.access_level ?? 0) < 3) {
     return NextResponse.json(
       { ok: false, error: "Forge access required.", code: "IDENTITY_GATE" },
       { status: 403 },

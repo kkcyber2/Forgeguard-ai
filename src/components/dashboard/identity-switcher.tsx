@@ -26,20 +26,25 @@ export function IdentitySwitcher({
 }) {
   const router = useRouter();
   const [pending, setPending] = React.useState<ViewMode | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   async function handleSwitch(mode: ViewMode) {
     if (!canSwitch || mode === activeMode || pending) return;
     setPending(mode);
+    setError(null);
     const result = await switchViewMode(mode);
     setPending(null);
-    if (!result.error) {
-      router.refresh();
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    router.refresh();
   }
 
   const accent = VIEW_MODE_ACCENTS[activeMode].primary;
 
   return (
+    <div className="flex flex-col items-end gap-1">
     <div
       className={cn(
         "relative items-center rounded-[4px] border-[0.5px] border-white/[0.1] bg-white/[0.03] p-0.5 backdrop-blur-md",
@@ -91,6 +96,12 @@ export function IdentitySwitcher({
           </button>
         );
       })}
+    </div>
+    {error && (
+      <span className="max-w-[180px] truncate font-mono text-[8px] text-red-400/90" title={error}>
+        {error}
+      </span>
+    )}
     </div>
   );
 }

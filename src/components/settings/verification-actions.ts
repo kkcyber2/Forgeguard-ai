@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { buildCustodyHash } from "@/lib/verify/custody-hash";
+import { sendOtpSms } from "@/lib/sms/send-otp-sms";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 
@@ -23,20 +24,25 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
   const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
-  const supabase = await createServerSupabase();
-  await supabase.from("profiles").update({ phone: normalized }).eq("id", user.id);
-
   const admin = createAdminSupabase();
-  await admin.from("verification_otps").insert({
+  const { error: insertErr } = await admin.from("verification_otps").insert({
     user_id: user.id,
     phone: normalized,
     code_hash: hashOtp(code),
     expires_at: expiresAt,
   });
 
-  // Production: integrate Twilio / SNS here.
+  if (insertErr) {
+    console.error("[verify:otp] insert failed:", insertErr.message);
+    return { error: "Could not queue OTP. Try again." };
+  }
+
+  const sms = await sendOtpSms(normalized, code);
+  if (!sms.ok) {
+    return { error: sms.error ?? "SMS delivery failed." };
+  }
+
   if (process.env.NODE_ENV === "development") {
-    console.log(`[verify:otp] ${normalized} → ${code}`);
     return { devCode: code };
   }
 
@@ -101,7 +107,11 @@ export async function saveSignatureSeal(
   const supabase = await createServerSupabase();
   await supabase
     .from("profiles")
-    .update({ signature_data: dataUrl, signature_at: signedAt })
+    .update({
+      signature_data: dataUrl,
+      signature_at: signedAt,
+      identity_verified: true,
+    })
     .eq("id", user.id);
 
   const admin = createAdminSupabase();
@@ -117,7 +127,47 @@ export async function saveSignatureSeal(
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
   return { custodyHash };
+}
+
+export async function saveWebcamCapture(
+  dataUrl: string,
+): Promise<{ error?: string; verified?: boolean }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "Not authenticated." };
+  if (!dataUrl.startsWith("data:image/")) {
+    return { error: "Invalid capture format." };
+  }
+
+  const path = `${user.id}/webcam-${Date.now()}.jpg`;
+  const base64 = dataUrl.split(",")[1];
+  if (!base64) return { error: "Empty capture." };
+
+  const buffer = Buffer.from(base64, "base64");
+  const admin = createAdminSupabase();
+
+  const { error: uploadErr } = await admin.storage
+    .from("verification-docs")
+    .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
+
+  if (uploadErr) {
+    console.warn("[verify:webcam] storage:", uploadErr.message);
+  }
+
+  const supabase = await createServerSupabase();
+  await supabase
+    .from("profiles")
+    .update({
+      identity_proofed: true,
+      identity_document_path: path,
+      identity_verified: true,
+    })
+    .eq("id", user.id);
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+  return { verified: true };
 }
 
 export async function uploadIdentityDocument(
@@ -145,7 +195,6 @@ export async function uploadIdentityDocument(
     .upload(path, buffer, { contentType: file.type, upsert: true });
 
   if (uploadErr) {
-    // Fallback: store path reference only (bucket may not exist yet)
     console.warn("[verify:upload] storage:", uploadErr.message);
   }
 

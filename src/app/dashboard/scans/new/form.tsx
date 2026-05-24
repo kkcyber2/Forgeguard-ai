@@ -3,11 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useActionState } from "react";
-import { AlertTriangle, Eye, EyeOff, Lock, Radar, ShieldCheck, Zap, Radiation, Activity } from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, Lock, Radar, ShieldCheck, Zap, Radiation, Activity, Copy, CheckCircle2, Bot, Globe, Server, MessageSquare } from "lucide-react";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { createScan, type CreateScanState } from "../actions";
+import { issueScanOwnershipToken, verifyScanOwnership } from "../ownership-actions";
 import { LegalVerificationModal } from "@/components/scans/LegalVerificationModal";
 import type { LegalIntensity } from "../legal-actions";
 
@@ -51,6 +52,40 @@ const PRESET_ENDPOINTS = [
     model: "",
   },
 ] as const;
+
+type SurfaceKind = "llm" | "web" | "code" | "mobile";
+
+const TARGET_TYPES: {
+  value: SurfaceKind;
+  label: string;
+  icon: React.ElementType;
+  modules: string[];
+}[] = [
+  {
+    value: "llm",
+    label: "LLM ENDPOINT",
+    icon: Bot,
+    modules: ["Prompt Hijacker", "Jailbreak Mutator", "System Prompt Leak"],
+  },
+  {
+    value: "web",
+    label: "WEB APPLICATION",
+    icon: Globe,
+    modules: ["Logic Discovery", "XSS Vector Scout", "Session Fixation Probe"],
+  },
+  {
+    value: "code",
+    label: "API GATEWAY",
+    icon: Server,
+    modules: ["BOLA/IDOR Sweep", "Rate-Limit Bypass", "AuthZ Graph Mapper"],
+  },
+  {
+    value: "mobile",
+    label: "CHAT BOT",
+    icon: MessageSquare,
+    modules: ["Intent Drift Harness", "Tool-Call Injection", "Context Poisoning"],
+  },
+];
 
 /* ── Intensity selector config ─────────────────────────────────────── */
 type ScanIntensity = "standard" | LegalIntensity;
@@ -98,6 +133,11 @@ export function NewScanForm() {
   const [intensity,  setIntensity]  = React.useState<ScanIntensity>("standard");
   const [showLegal,  setShowLegal]  = React.useState(false);
   const [authId,     setAuthId]     = React.useState<string | null>(null);
+  const [surfaceKind,setSurfaceKind]= React.useState<SurfaceKind>("llm");
+  const [ownershipToken, setOwnershipToken] = React.useState<string | null>(null);
+  const [ownershipVerified, setOwnershipVerified] = React.useState(false);
+  const [ownershipBusy, setOwnershipBusy] = React.useState(false);
+  const [ownershipMsg, setOwnershipMsg] = React.useState<string | null>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
 
   React.useEffect(() => {
@@ -107,11 +147,52 @@ export function NewScanForm() {
     setTargetModel(hit.model);
   }, [preset]);
 
+  React.useEffect(() => {
+    setOwnershipVerified(false);
+    setOwnershipToken(null);
+    setOwnershipMsg(null);
+  }, [targetUrl, intensity]);
+
+  const selectedTarget = TARGET_TYPES.find((t) => t.value === surfaceKind)!;
+  const needsOwnership = intensity !== "standard";
+
+  async function handleIssueToken() {
+    if (!targetUrl) {
+      setOwnershipMsg("Enter target URL first.");
+      return;
+    }
+    setOwnershipBusy(true);
+    setOwnershipMsg(null);
+    const res = await issueScanOwnershipToken(targetUrl);
+    setOwnershipBusy(false);
+    if (res.error) {
+      setOwnershipMsg(res.error);
+      return;
+    }
+    setOwnershipToken(res.token ?? null);
+    setOwnershipVerified(false);
+    setOwnershipMsg(`Place token in https://${res.host}/auth.txt then verify.`);
+  }
+
+  async function handleVerifyOwnership() {
+    if (!targetUrl || !ownershipToken) return;
+    setOwnershipBusy(true);
+    const res = await verifyScanOwnership(targetUrl, ownershipToken);
+    setOwnershipBusy(false);
+    setOwnershipVerified(res.verified);
+    setOwnershipMsg(res.detail);
+  }
+
   function handleLaunch(e: React.FormEvent) {
     const selected = INTENSITY_OPTIONS.find((o) => o.value === intensity);
     if (selected?.needsLegal && !authId) {
       e.preventDefault();
       setShowLegal(true);
+      return;
+    }
+    if (needsOwnership && !ownershipVerified) {
+      e.preventDefault();
+      setOwnershipMsg("Verify proof of ownership before launching above Standard intensity.");
     }
     // else: let the form submit naturally via formAction
   }
@@ -141,6 +222,10 @@ export function NewScanForm() {
     >
       {/* Hidden fields for intensity + auth */}
       <input type="hidden" name="intensity" value={intensity} />
+      <input type="hidden" name="surface_kind" value={surfaceKind} />
+      {ownershipToken && (
+        <input type="hidden" name="ownership_token" value={ownershipToken} />
+      )}
       {authId && <input type="hidden" name="legal_auth_id" value={authId} />}
 
       <div className="border-b-[0.5px] border-white/[0.06] px-6 py-5">
@@ -154,7 +239,68 @@ export function NewScanForm() {
         </p>
       </div>
 
-      <div className="space-y-5 px-6 py-6">
+      <div className="flex flex-col gap-5 px-6 py-6">
+        {/* Target type */}
+        <div>
+          <Label>Target type</Label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {TARGET_TYPES.map((t) => {
+              const active = surfaceKind === t.value;
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setSurfaceKind(t.value)}
+                  className={cn(
+                    "flex items-start gap-3 rounded-sm border px-3 py-3 text-left transition-colors",
+                    active
+                      ? "border-acid/40 bg-acid-wash"
+                      : "border-white/10 bg-obsidian-800/40 hover:border-white/20",
+                  )}
+                >
+                  <Icon
+                    size={16}
+                    className={active ? "text-acid" : "text-white/35"}
+                    strokeWidth={1.75}
+                  />
+                  <div>
+                    <p
+                      className={cn(
+                        "font-mono text-[10px] font-semibold uppercase tracking-widest",
+                        active ? "text-acid" : "text-white/55",
+                      )}
+                    >
+                      {t.label}
+                    </p>
+                    <p className="mt-1 text-[10px] text-white/35">
+                      {t.modules.slice(0, 2).join(" · ")}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tactical modules */}
+        <div className="rounded-sm border border-white/10 bg-obsidian-900/50 p-4">
+          <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-acid/80">
+            Tactical modules
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {selectedTarget.modules.map((mod) => (
+              <li
+                key={mod}
+                className="flex items-center gap-2 font-mono text-[11px] text-white/70"
+              >
+                <span className="h-1 w-1 rounded-full bg-acid" />
+                {mod}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* Preset picker */}
         <div>
           <Label>Provider</Label>
@@ -260,7 +406,7 @@ export function NewScanForm() {
         {/* ── Intensity selector ──────────────────────────────────── */}
         <div>
           <Label>Scan intensity</Label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {INTENSITY_OPTIONS.map((opt) => {
               const active = intensity === opt.value;
               const OptIcon = opt.Icon;
@@ -306,6 +452,55 @@ export function NewScanForm() {
             })}
           </div>
         </div>
+
+        {needsOwnership && (
+          <div className="rounded-sm border border-amber-400/25 bg-amber-400/5 p-4">
+            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-amber-300">
+              Proof of ownership
+            </p>
+            <p className="mt-2 text-xs text-white/55">
+              Copy your unique token into the target&apos;s{" "}
+              <code className="text-amber-200">auth.txt</code> before High or Nuclear
+              scans can launch.
+            </p>
+            {ownershipToken && (
+              <div className="mt-3 flex flex-col gap-2 rounded-sm border border-white/10 bg-black/40 p-3 sm:flex-row sm:items-center">
+                <code className="flex-1 break-all font-mono text-[10px] text-white/75">
+                  {ownershipToken}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(ownershipToken)}
+                  className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-white/50"
+                >
+                  <Copy size={11} /> Copy
+                </button>
+              </div>
+            )}
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleIssueToken}
+                disabled={ownershipBusy}
+                className="rounded-sm border border-white/15 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/70"
+              >
+                Issue token
+              </button>
+              <button
+                type="button"
+                onClick={handleVerifyOwnership}
+                disabled={ownershipBusy || !ownershipToken}
+                className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-acid/15 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-acid disabled:opacity-40"
+              >
+                {ownershipVerified ? <CheckCircle2 size={12} /> : null}
+                Verify ownership
+              </button>
+            </div>
+            {ownershipMsg && (
+              <p className="mt-2 text-xs text-white/50">{ownershipMsg}</p>
+            )}
+          </div>
+        )}
 
         <div>
           <Label htmlFor="notes">

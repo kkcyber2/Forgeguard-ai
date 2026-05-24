@@ -1,21 +1,41 @@
 "use client";
 
-/**
- * WebcamIdentity — Identity Proofing stub
- * ─────────────────────────────────────────
- * Requests webcam access to capture an identity photo.
- * The photo is NOT transmitted — this is a UI stub demonstrating
- * the Identity Proofing flow for Enterprise missions.
- * Full biometric verification would integrate a KYC provider.
- * Aesthetic: Sovereign OS — Electric Purple accent.
- */
+import { useState, useRef, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Camera,
+  Shield,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
+import { saveWebcamCapture } from "./verification-actions";
 
-import { useState, useRef, useCallback } from "react";
-import { Camera, Shield, AlertCircle, RefreshCw, CheckCircle2 } from "lucide-react";
+type State = "idle" | "requesting" | "live" | "captured" | "error" | "saving";
 
-type State = "idle" | "requesting" | "live" | "captured" | "error";
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+function cameraErrorMessage(err: unknown): string {
+  if (err instanceof DOMException) {
+    if (err.name === "NotAllowedError") {
+      return "Camera access denied. Allow camera permission in browser settings.";
+    }
+    if (err.name === "NotFoundError") {
+      return "No camera found on this device.";
+    }
+    if (err.name === "NotReadableError") {
+      return "Camera is in use by another application.";
+    }
+  }
+  return "Could not access camera. Check permissions and try again.";
+}
 
 export function WebcamIdentity({ verified }: { verified: boolean }) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -23,21 +43,37 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   const [state, setState] = useState<State>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
+  const [saved, setSaved] = useState(verified);
+  const [pending, startTransition] = useTransition();
 
   const startCamera = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErrorMsg("Camera API unavailable. Use HTTPS or a modern browser.");
+      setState("error");
+      return;
+    }
+
     setState("requesting");
+    setErrorMsg(null);
+
     try {
+      const mobile = isMobileDevice();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 480 }, height: { ideal: 320 }, facingMode: "user" },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: mobile ? { ideal: "environment" } : "user",
+        },
+        audio: false,
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
       }
       setState("live");
-    } catch {
-      setErrorMsg("Camera access denied. Please allow camera in browser settings.");
+    } catch (err) {
+      setErrorMsg(cameraErrorMessage(err));
       setState("error");
     }
   }, []);
@@ -65,7 +101,23 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
     setErrorMsg(null);
   }
 
-  if (verified) {
+  function handleSubmit() {
+    if (!capturedUrl) return;
+    setState("saving");
+    startTransition(async () => {
+      const res = await saveWebcamCapture(capturedUrl);
+      if (res.error) {
+        setErrorMsg(res.error);
+        setState("error");
+        return;
+      }
+      setSaved(true);
+      setState("captured");
+      router.refresh();
+    });
+  }
+
+  if (saved || verified) {
     return (
       <div className="flex items-center gap-3">
         <div
@@ -76,7 +128,7 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
         </div>
         <div>
           <p className="text-sm font-medium text-white">Identity Verified</p>
-          <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
+          <p className="text-xs text-white/50">
             Biometric proof on file. Enterprise missions unlocked.
           </p>
         </div>
@@ -86,30 +138,17 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header */}
       <div className="flex items-center gap-2">
         <Camera size={13} style={{ color: "#8B5CF6" }} strokeWidth={1.5} />
         <p className="font-mono text-[11px] uppercase tracking-[0.18em]" style={{ color: "#8B5CF6" }}>
           Identity Proofing
         </p>
-        <span
-          className="ml-auto font-mono text-[9px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-[3px]"
-          style={{
-            background: "rgba(255,200,0,0.08)",
-            border: "0.5px solid rgba(255,200,0,0.25)",
-            color: "rgba(255,200,0,0.7)",
-          }}
-        >
-          Beta
-        </span>
       </div>
 
-      <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
-        Required for SOVEREIGN-rank missions. Captures a one-time identity proof using your webcam.{" "}
-        <span style={{ color: "rgba(139,92,246,0.7)" }}>No data is transmitted during this preview.</span>
+      <p className="text-xs text-white/50">
+        Required for SOVEREIGN-rank missions. On mobile, the rear camera is used for ID capture.
       </p>
 
-      {/* Camera panel */}
       <div
         className="relative overflow-hidden rounded-[4px]"
         style={{
@@ -119,7 +158,6 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
           maxHeight: 260,
         }}
       >
-        {/* Live video */}
         <video
           ref={videoRef}
           autoPlay
@@ -129,7 +167,6 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
           style={{ display: state === "live" ? "block" : "none" }}
         />
 
-        {/* Captured frame */}
         {capturedUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -139,69 +176,35 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
           />
         )}
 
-        {/* Overlay states */}
         {state === "idle" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-full"
-              style={{ background: "rgba(139,92,246,0.1)", border: "0.5px solid rgba(139,92,246,0.25)" }}
-            >
-              <Camera size={20} style={{ color: "#8B5CF6", opacity: 0.7 }} strokeWidth={1.5} />
-            </div>
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>Camera not active</p>
+            <Camera size={20} style={{ color: "#8B5CF6", opacity: 0.7 }} strokeWidth={1.5} />
+            <p className="text-xs text-white/40">Camera not active</p>
           </div>
         )}
         {state === "requesting" && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <p className="font-mono text-[10px] uppercase tracking-[0.15em] animate-pulse" style={{ color: "#8B5CF6" }}>
+            <p className="animate-pulse font-mono text-[10px] uppercase tracking-[0.15em] text-violet-400">
               Requesting camera…
             </p>
           </div>
         )}
         {state === "error" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-            <AlertCircle size={18} style={{ color: "rgba(255,100,100,0.7)" }} strokeWidth={1.5} />
-            <p className="text-xs" style={{ color: "rgba(255,100,100,0.7)" }}>{errorMsg}</p>
+            <AlertCircle size={18} className="text-red-400/80" strokeWidth={1.5} />
+            <p className="text-xs text-red-400/90">{errorMsg}</p>
           </div>
         )}
 
-        {/* Scan overlay on live feed */}
-        {state === "live" && (
-          <>
-            {/* Corner brackets */}
-            {["top-3 left-3", "top-3 right-3", "bottom-3 left-3", "bottom-3 right-3"].map((pos, i) => (
-              <div
-                key={i}
-                className={`absolute ${pos} h-5 w-5`}
-                style={{
-                  borderTop: i < 2 ? "1.5px solid rgba(139,92,246,0.7)" : "none",
-                  borderBottom: i >= 2 ? "1.5px solid rgba(139,92,246,0.7)" : "none",
-                  borderLeft: i % 2 === 0 ? "1.5px solid rgba(139,92,246,0.7)" : "none",
-                  borderRight: i % 2 === 1 ? "1.5px solid rgba(139,92,246,0.7)" : "none",
-                }}
-              />
-            ))}
-            <p
-              className="absolute bottom-2 left-0 right-0 text-center font-mono text-[9px] uppercase tracking-[0.15em] animate-pulse"
-              style={{ color: "rgba(139,92,246,0.6)" }}
-            >
-              Scanning…
-            </p>
-          </>
-        )}
-
-        {/* Hidden canvas for capture */}
         <canvas ref={canvasRef} className="hidden" />
       </div>
 
-      {/* Controls */}
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         {state === "idle" || state === "error" ? (
           <button
             type="button"
             onClick={startCamera}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[3px] py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em]"
-            style={{ background: "#8B5CF6", color: "#fff" }}
+            className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-violet-500 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white"
           >
             <Camera size={12} strokeWidth={2} />
             Start Camera
@@ -211,47 +214,44 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
             <button
               type="button"
               onClick={handleCapture}
-              className="flex flex-1 items-center justify-center gap-2 rounded-[3px] py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em]"
-              style={{ background: "#8B5CF6", color: "#fff" }}
+              className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-violet-500 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white"
             >
               <Shield size={12} strokeWidth={2} />
-              Capture
+              Capture ID
             </button>
             <button
               type="button"
-              onClick={() => { stopCamera(); setState("idle"); }}
-              className="flex items-center gap-1.5 rounded-[3px] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "0.5px solid rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.35)",
+              onClick={() => {
+                stopCamera();
+                setState("idle");
               }}
+              className="rounded-[3px] border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/50"
             >
               Cancel
             </button>
           </>
-        ) : state === "captured" ? (
+        ) : state === "captured" || state === "saving" ? (
           <>
-            <div
-              className="flex flex-1 items-center gap-2 rounded-[3px] px-3 py-2"
-              style={{ background: "rgba(139,92,246,0.08)", border: "0.5px solid rgba(139,92,246,0.2)" }}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={pending || state === "saving"}
+              className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-[#D1FF00]/15 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#D1FF00] disabled:opacity-40"
             >
-              <CheckCircle2 size={12} style={{ color: "#8B5CF6" }} strokeWidth={2} />
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: "#8B5CF6" }}>
-                Frame captured (preview only)
-              </span>
-            </div>
+              {pending || state === "saving" ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={12} />
+              )}
+              Seal Identity Proof
+            </button>
             <button
               type="button"
               onClick={handleReset}
-              className="flex items-center gap-1.5 rounded-[3px] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "0.5px solid rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.35)",
-              }}
+              disabled={pending}
+              className="flex items-center gap-1.5 rounded-[3px] border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/50"
             >
-              <RefreshCw size={11} strokeWidth={1.75} />
+              <RefreshCw size={11} />
               Redo
             </button>
           </>

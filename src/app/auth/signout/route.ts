@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 
+export const runtime = "nodejs";
+
 /**
  * POST /auth/signout — clears the Supabase session cookie and redirects
  * the user to the landing page. Accepts POST only to prevent link-based

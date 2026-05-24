@@ -78,6 +78,8 @@ export interface NavItem {
   badge?: React.ReactNode;
   /** Section label — kept for mobile-nav grouping */
   section?: string;
+  /** When true, item is visible but opens upgrade gate instead of navigating */
+  locked?: boolean;
 }
 
 export interface ShellUser {
@@ -90,6 +92,7 @@ export interface ShellUser {
   identityVerified?: boolean;
   companyTag?: string | null;
   domainVerified?: boolean;
+  trustScore?: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -106,6 +109,7 @@ export function DashboardShell({
   activePath: _activePath,
   viewMode = "hacker",
   identityChosen = true,
+  canSwitchIdentity = false,
   systemDegraded = false,
 }: {
   children: React.ReactNode;
@@ -121,6 +125,7 @@ export function DashboardShell({
   activePath?: string;
   viewMode?: ViewMode;
   identityChosen?: boolean;
+  canSwitchIdentity?: boolean;
   /** Set to true when Railway reports infrastructure degradation. */
   systemDegraded?: boolean;
 }) {
@@ -142,6 +147,7 @@ export function DashboardShell({
         scope={scope}
         viewMode={viewMode}
         identityChosen={identityChosen}
+        canSwitchIdentity={canSwitchIdentity}
         systemDegraded={systemDegraded}
       />
 

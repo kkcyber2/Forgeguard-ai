@@ -4,7 +4,7 @@
  * Hacker Bazaar — Script Upload + AI Customs Agent
  *
  * Flow:
- *   1. Auth guard (access_level ≥ 2)
+ *   1. Auth guard (access_level ≥ 3)
  *   2. Validate payload (name, description, code, price_usd)
  *   3. Call Python customs-audit bridge (or inline Llama-3 via OpenRouter)
  *      → verdict: CLEARED | FLAGGED | REJECTED
@@ -13,7 +13,7 @@
  *   5. Admin manually publishes after review for FLAGGED
  *      CLEARED scripts auto-publish if price == 0 OR author is Hacker rank
  *
- * Auth: Supabase session, access_level ≥ 2.
+ * Auth: Supabase session, access_level ≥ 3.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   const accessLevel = (profile?.access_level as number | undefined) ?? 1;
-  if (accessLevel < 2) {
+  if (accessLevel < 3) {
     return NextResponse.json(
       { ok: false, error: "Hacker rank required to list scripts.", code: "IDENTITY_GATE" },
       { status: 403 },

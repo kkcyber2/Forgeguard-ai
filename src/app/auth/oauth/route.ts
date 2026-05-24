@@ -34,6 +34,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Provider } from "@supabase/supabase-js";
 
+export const runtime = "nodejs";
+
 const ALLOWED_PROVIDERS: Provider[] = ["github", "google", "discord"];
 
 export async function GET(request: NextRequest) {

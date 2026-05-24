@@ -76,7 +76,7 @@ export default async function SettingsPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* ── Left column: forms ─────────────────────────── */}
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <Section id="profile" icon={User2} eyebrow="Identity" title="Profile">
             <ProfileForm
               initial={{
@@ -135,7 +135,7 @@ export default async function SettingsPage() {
             eyebrow="Sovereign pipeline"
             title="Clearance & Verification"
           >
-            <div className="space-y-8">
+            <div className="flex flex-col gap-8">
               <PhoneVerification
                 initialPhone={profile?.phone ?? ""}
                 phoneVerified={phoneVerified}

@@ -140,20 +140,20 @@ export function MissionCard({
         {/* ── Description ─────────────────────────────────── */}
         <p
           className="relative mb-4 text-xs leading-relaxed line-clamp-2"
-          style={{ color: "rgba(255,255,255,0.4)" }}
+          style={{ color: "rgba(255,255,255,0.55)" }}
         >
           {description}
         </p>
 
         {/* ── Stats row ───────────────────────────────────── */}
-        <div className="relative flex items-center gap-5">
+        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
           {/* Budget */}
           <div className="flex items-center gap-1.5">
             <Coins size={13} style={{ color: "#D1FF00", opacity: 0.8 }} strokeWidth={1.5} />
             <span className="font-mono text-xs font-semibold" style={{ color: "#D1FF00" }}>
               {budgetCredits.toLocaleString()}
             </span>
-            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>
+            <span className="text-[10px] text-white/40">
               credits
             </span>
           </div>
@@ -169,7 +169,7 @@ export function MissionCard({
           {/* Time */}
           <div className="flex items-center gap-1 ml-auto">
             <Clock size={11} style={{ color: "rgba(255,255,255,0.2)" }} strokeWidth={1.5} />
-            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
+            <span className="text-[10px] text-white/40">
               {relativeTime}
             </span>
           </div>
@@ -178,8 +178,8 @@ export function MissionCard({
           <ArrowRight
             size={13}
             strokeWidth={1.5}
-            className="transition-transform group-hover:translate-x-0.5"
-            style={{ color: "rgba(255,255,255,0.2)" }}
+            className="hidden transition-transform group-hover:translate-x-0.5 sm:block"
+            style={{ color: "rgba(255,255,255,0.35)" }}
           />
         </div>
 

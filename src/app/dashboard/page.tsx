@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Activity, Lock, Plus, Radar, ShieldCheck, Terminal } from "lucide-react";
@@ -10,6 +11,7 @@ import { RedTeamFeed, type RedTeamLog } from "@/components/dashboard/red-team-fe
 import { OverviewKpis, ScanOpsKpis } from "@/components/dashboard/overview-kpis";
 import { VerificationStatus } from "@/components/dashboard/VerificationStatus";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { DashboardGateModal } from "@/components/dashboard/dashboard-gate-modal";
 import { resolveViewMode, type ViewMode } from "@/lib/access/parallel-sovereignty";
 import { buttonStyles } from "@/components/ui/button";
 import { scansTableToCards } from "@/lib/scans/adapt";
@@ -34,8 +36,8 @@ export const revalidate = 0;
 // ─── Gate banner config ────────────────────────────────────────────────────
 const GATE_COPY: Record<string, { title: string; body: string }> = {
   forge: {
-    title: "Forge access requires Hacker tier",
-    body:  "The Forge workbench is available to Hacker and Developer identity tiers. Upgrade your identity in the Verification Status panel below to unlock adversarial script execution.",
+    title: "Forge access requires Ghost tier (Startup+)",
+    body:  "The Forge workbench unlocks at access_level ≥ 3. Upgrade your plan or complete verification to run adversarial scripts in the Terminal.",
   },
   intel: {
     title: "Intel Hub requires Hacker tier",
@@ -176,6 +178,9 @@ export default async function UserDashboardPage({
 
   return (
     <>
+      <Suspense fallback={null}>
+        <DashboardGateModal />
+      </Suspense>
       <PageHeader
         eyebrow={viewMode === "client" ? "Client Sovereign" : "Hacker Sovereign"}
         title={greeting(profile?.full_name ?? user.email ?? "Operator")}

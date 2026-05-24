@@ -19,7 +19,7 @@ import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 import { ScanLiveLog } from "./live-log";
 import { ScanStatusTracker } from "./scan-status-tracker";
 import { FindingsReport } from "./findings-report";
-import { GenesisTabs } from "./genesis-tabs";
+import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemoryRow } from "./genesis-tabs";
 import { deleteScan } from "../actions";
 import type { ScanReport } from "./findings-report";
 
@@ -65,6 +65,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
     target_model: string;
     target_url: string;
     status: ScanStatus;
+    intensity: "recon" | "standard" | "aggressive" | "greasy";
     progress_pct: number | null;
     finding_count: number | null;
     high_severity_count: number | null;
@@ -76,7 +77,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
   const { data: scan, error: scanErr } = (await supabase
     .from("scans")
     .select(
-      "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, notes, created_at, started_at, completed_at",
+      "id, target_model, target_url, status, intensity, progress_pct, finding_count, high_severity_count, notes, created_at, started_at, completed_at",
     )
     .eq("id", id)
     .maybeSingle()) as {
@@ -117,6 +118,20 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .eq("user_id", user.id)
     .maybeSingle();
   const userPlan = (sub?.plan as "free" | "startup" | "enterprise" | null) ?? "free";
+
+  const { data: rawMemories } = await supabase
+    .from("agent_memories")
+    .select("id, agent_role, thought_process, action_taken, created_at")
+    .eq("scan_id", id)
+    .order("created_at", { ascending: true });
+
+  const agentMemories: AgentMemoryRow[] = (rawMemories ?? []).map((row) => ({
+    id: row.id,
+    agent_role: row.agent_role,
+    thought: row.thought_process ?? "",
+    action_taken: row.action_taken,
+    created_at: row.created_at,
+  }));
 
   // Severity breakdown derived from initial logs (the live child keeps
   // its own running totals after that).
@@ -245,15 +260,15 @@ export default async function ScanDetailPage({ params }: PageProps) {
         userPlan={userPlan}
       />
 
-      {/* Genesis Intelligence Pipeline — RECON MAP, FINANCIAL RISK, AEGIS BUNDLE, SOCIAL SWARM */}
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <GenesisTabs
         scanId={scan.id}
         targetUrl={scan.target_url}
-        discoveryReport={(scanReport?.discovery_report as any) ?? null}
+        scanIntensity={scan.intensity ?? "standard"}
+        discoveryReport={(scanReport?.discovery_report as DiscoveryReport | null) ?? null}
         aleUsd={scanReport?.ale_usd ?? null}
-        socialTemplates={(scanReport?.social_templates as any) ?? null}
+        socialTemplates={(scanReport?.social_templates as SocialTemplate[] | null) ?? null}
         aegisZipB64={scanReport?.aegis_zip_b64 ?? null}
+        agentMemories={agentMemories}
       />
 
       <p className="mt-6 text-[11px] text-foreground-subtle">

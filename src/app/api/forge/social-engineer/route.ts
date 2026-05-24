@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
     .eq("id", user.id)
     .maybeSingle() as { data: { access_level: number | null } | null };
 
-  if (!profile || (profile.access_level ?? 0) < 2) {
+  if (!profile || (profile.access_level ?? 0) < 3) {
     return NextResponse.json(
       { ok: false, error: "Marine Swarm requires Hacker or Developer identity.", code: "IDENTITY_GATE" },
       { status: 403 },

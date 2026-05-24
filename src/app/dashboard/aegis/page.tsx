@@ -168,7 +168,7 @@ function CodePreview({ code, ext }: { code: string; ext: string }) {
       <pre className="max-h-[480px] overflow-auto px-4 py-4 font-mono text-[11px] leading-relaxed text-foreground-muted scrollbar-thin scrollbar-thumb-white/10">
         {lines.map((line, i) => (
           <div key={i} className="flex gap-4">
-            <span className="w-8 shrink-0 select-none text-right text-foreground-subtle/40 tabular-nums">
+            <span className="w-8 shrink-0 select-none text-right text-foreground-muted/70 tabular-nums">
               {i + 1}
             </span>
             <span>{line}</span>
@@ -359,7 +359,7 @@ export default function AegisPage() {
 
           {/* Format selector — grouped by category */}
           <div className="flex flex-col gap-1.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-muted">
               Export format
             </span>
             <div className="flex flex-col gap-4">
@@ -370,12 +370,12 @@ export default function AegisPage() {
                   <div key={cat} className="flex flex-col gap-2">
                     {/* Category header */}
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-400">
+                      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-foreground-muted">
                         {catMeta.label}
                       </span>
                       <div className="flex-1 h-px bg-white/[0.04]" />
                     </div>
-                    <p className="text-[10px] text-zinc-400 -mt-1 mb-1">
+                    <p className="text-[10px] text-foreground-muted -mt-1 mb-1">
                       {catMeta.description}
                     </p>
                     {catFmts.map((fmt) => {
@@ -396,7 +396,7 @@ export default function AegisPage() {
                             "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-xs border",
                             active ? "border-acid/30 bg-acid/[0.10]" : "border-white/[0.08] bg-obsidian-700/40",
                           )}>
-                            <Icon size={11} strokeWidth={1.5} className={active ? "text-acid" : "text-zinc-400"} />
+                            <Icon size={11} strokeWidth={1.5} className={active ? "text-acid" : "text-foreground-muted"} />
                           </div>
                           <div>
                             <p className={cn(
@@ -405,10 +405,10 @@ export default function AegisPage() {
                             )}>
                               {fmt.label}
                             </p>
-                            <p className="mt-1 font-mono text-[10px] text-zinc-400">
+                            <p className="mt-1 font-mono text-[10px] text-foreground-muted">
                               {fmt.sublabel}
                             </p>
-                            <p className="mt-1.5 text-[11px] text-zinc-400 leading-snug">
+                            <p className="mt-1.5 text-[11px] text-foreground-muted leading-snug">
                               {fmt.description}
                             </p>
                           </div>

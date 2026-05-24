@@ -27,7 +27,7 @@ export async function setUserIdentity(userType: UserType): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activeViewMode = userType === "client" ? "client" : "hacker";
 
-  await (admin as any)
+  await admin
     .from("profiles")
     .update({
       user_type:         userType,

@@ -1,9 +1,10 @@
 "use client";
 
-import { Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { rankBadgeClass } from "@/lib/access/ranks";
 import { VerifiedCheckmark, CompanyTagBadge } from "@/components/dashboard/verified-badge";
+import { WalletCredits } from "@/components/dashboard/wallet-credits";
+import type { ViewMode } from "@/lib/access/parallel-sovereignty";
 
 export interface IdentityBadgeProps {
   hackerRank: string | null;
@@ -12,6 +13,8 @@ export interface IdentityBadgeProps {
   identityVerified?: boolean;
   companyTag?: string | null;
   domainVerified?: boolean;
+  viewMode?: ViewMode;
+  trustScore?: number;
 }
 
 export function IdentityBadge({
@@ -21,45 +24,39 @@ export function IdentityBadge({
   identityVerified = false,
   companyTag = null,
   domainVerified = false,
+  viewMode = "hacker",
+  trustScore = 0,
 }: IdentityBadgeProps) {
   const rankLabel = (hackerRank ?? "RECRUIT").toUpperCase();
+  const isClient = viewMode === "client";
 
   return (
     <div className="hidden items-center gap-2 sm:flex">
       {identityVerified && <VerifiedCheckmark />}
       {domainVerified && companyTag && <CompanyTagBadge tag={companyTag} />}
-      <span
-        className={cn(
-          "rounded-[3px] border-[0.5px] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]",
-          rankBadgeClass(hackerRank),
-        )}
-        title="Operator rank"
-      >
-        {rankLabel}
-      </span>
-      <div
-        className={cn(
-          "flex items-center gap-1.5 rounded-[3px] border-[0.5px] px-2 py-0.5",
-          walletFrozen
-            ? "border-red-400/25 bg-red-500/10"
-            : "border-[#D1FF00]/25 bg-[#D1FF00]/[0.06]",
-        )}
-        title={walletFrozen ? "Wallet frozen" : "Wallet balance"}
-      >
-        <Coins
-          size={10}
-          strokeWidth={1.5}
-          className={walletFrozen ? "text-red-400/70" : "text-[#D1FF00]"}
-        />
+      {isClient ? (
+        <span
+          className="rounded-[3px] border-[0.5px] border-violet-400/35 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-violet-300"
+          title="Organizational trust score"
+        >
+          Trust {trustScore}
+        </span>
+      ) : (
         <span
           className={cn(
-            "font-mono text-[10px] font-semibold tabular-nums",
-            walletFrozen ? "text-red-400/80" : "text-[#D1FF00]",
+            "rounded-[3px] border-[0.5px] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em]",
+            rankBadgeClass(hackerRank),
           )}
+          title="Operator rank"
         >
-          ${walletBalance.toFixed(2)}
+          {rankLabel}
         </span>
-      </div>
+      )}
+      {walletFrozen ? (
+        <WalletCredits initialBalance={walletBalance} className="border-red-400/25 bg-red-500/10" />
+      ) : (
+        <WalletCredits initialBalance={walletBalance} className="px-2 py-0.5" />
+      )}
     </div>
   );
 }

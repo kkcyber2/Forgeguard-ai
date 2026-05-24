@@ -13,6 +13,7 @@ export function ActivePath({
   scope,
   viewMode,
   identityChosen,
+  canSwitchIdentity,
   children,
 }: {
   nav: NavItem[];
@@ -22,6 +23,7 @@ export function ActivePath({
   scope: "user" | "admin";
   viewMode?: ViewMode;
   identityChosen?: boolean;
+  canSwitchIdentity?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
@@ -35,6 +37,7 @@ export function ActivePath({
       activePath={pathname}
       viewMode={viewMode ?? "hacker"}
       identityChosen={identityChosen ?? true}
+      canSwitchIdentity={canSwitchIdentity ?? false}
     >
       {children}
     </DashboardShell>

@@ -7,6 +7,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { sealCredential } from "@/lib/crypto/credentials";
 import { headers } from "next/headers";
+import { verifyScanOwnership } from "./ownership-actions";
 
 /**
  * Scan Server Actions.
@@ -27,6 +28,8 @@ export interface CreateScanState {
   >;
 }
 
+const SURFACE_KINDS = ["llm", "web", "code", "mobile"] as const;
+
 const CreateScanSchema = z.object({
   target_model: z
     .string()
@@ -40,6 +43,7 @@ const CreateScanSchema = z.object({
     .min(8, "API key looks too short")
     .max(2048, "API key too long"),
   notes: z.string().max(2000).optional().nullable(),
+  surface_kind: z.enum(SURFACE_KINDS).default("llm"),
 });
 
 function flattenZod(e: z.ZodError): Record<string, string> {
@@ -60,6 +64,7 @@ export async function createScan(
     target_url: formData.get("target_url"),
     api_key: formData.get("api_key"),
     notes: formData.get("notes") || null,
+    surface_kind: formData.get("surface_kind") || "llm",
   });
   if (!parsed.success) {
     return { ok: false, fieldErrors: flattenZod(parsed.error) };
@@ -70,6 +75,48 @@ export async function createScan(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
+
+  const rawIntensity = String(formData.get("intensity") ?? "standard");
+  const intensityMap: Record<string, "recon" | "standard" | "aggressive" | "greasy"> = {
+    recon: "recon",
+    standard: "standard",
+    high: "aggressive",
+    aggressive: "aggressive",
+    nuclear: "greasy",
+    greasy: "greasy",
+  };
+  const intensity = intensityMap[rawIntensity] ?? "standard";
+
+  const legalAuthId = String(formData.get("legal_auth_id") ?? "").trim();
+  if (intensity === "aggressive" || intensity === "greasy") {
+    if (!legalAuthId) {
+      return { ok: false, error: "Legal authorization required for High/Nuclear scans." };
+    }
+    const admin = createAdminSupabase();
+    const { data: legalRow } = await admin
+      .from("legal_authorizations")
+      .select("id, user_id, intensity, consented")
+      .eq("id", legalAuthId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!legalRow?.consented) {
+      return { ok: false, error: "Invalid or expired legal authorization." };
+    }
+  }
+
+  const ownershipToken = String(formData.get("ownership_token") ?? "").trim();
+  if (intensity !== "standard" && intensity !== "recon") {
+    if (!ownershipToken) {
+      return {
+        ok: false,
+        error: "Proof of ownership token required for scans above Standard intensity.",
+      };
+    }
+    const ownership = await verifyScanOwnership(parsed.data.target_url, ownershipToken);
+    if (!ownership.verified) {
+      return { ok: false, error: ownership.detail };
+    }
+  }
 
   let sealed: string;
   try {
@@ -97,6 +144,8 @@ export async function createScan(
       target_credential_encrypted: sealed,
       status: "queued",
       progress_pct: 0,
+      intensity,
+      surface_kind: parsed.data.surface_kind,
       notes: parsed.data.notes ?? null,
     })
     .select("id")
@@ -108,6 +157,15 @@ export async function createScan(
   if (insErr || !scan) {
     console.error("[scans] insert failed:", insErr?.message);
     return { ok: false, error: "Could not create scan. Try again." };
+  }
+
+  if (legalAuthId) {
+    const admin = createAdminSupabase();
+    await admin
+      .from("legal_authorizations")
+      .update({ scan_id: scan.id })
+      .eq("id", legalAuthId)
+      .eq("user_id", user.id);
   }
 
   // Kick the runner. We MUST await this — Vercel Server Actions terminate

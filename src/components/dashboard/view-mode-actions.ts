@@ -25,7 +25,7 @@ export async function switchViewMode(
     .from("profiles")
     .select("user_type")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!profile?.user_type) {
     return { error: "Complete identity selection first." };

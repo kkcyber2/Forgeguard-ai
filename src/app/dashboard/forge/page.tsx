@@ -421,9 +421,19 @@ export default function ForgePage() {
       });
       if (res.ok) {
         setStdinInput("");
-        setWaitingForInput(false);
         setEvents(prev => [...prev, { type: "stdin", line: `> ${text}` }]);
+      } else {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setEvents(prev => [
+          ...prev,
+          { type: "error", message: body.error ?? `Stdin rejected (${res.status})` },
+        ]);
       }
+    } catch (err) {
+      setEvents(prev => [
+        ...prev,
+        { type: "error", message: err instanceof Error ? err.message : "Stdin send failed" },
+      ]);
     } finally {
       setStdinSending(false);
     }

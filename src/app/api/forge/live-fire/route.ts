@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (((profile?.access_level as number | undefined) ?? 1) < 2) {
+  if (((profile?.access_level as number | undefined) ?? 1) < 3) {
     return NextResponse.json(
       { ok: false, error: "Hacker rank required.", code: "IDENTITY_GATE" },
       { status: 403 },

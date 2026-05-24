@@ -9,6 +9,7 @@
  */
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import SignatureCanvas from "react-signature-canvas";
 import { PenLine, RotateCcw, Check, Loader2, ShieldCheck } from "lucide-react";
 import { saveSignatureSeal } from "./verification-actions";
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function SignaturePad({ existingSignature }: Props) {
+  const router = useRouter();
   const canvasRef = useRef<SignatureCanvas>(null);
   const [isEmpty, setIsEmpty] = useState(true);
   const [saved, setSaved] = useState(!!existingSignature);
@@ -49,6 +51,7 @@ export function SignaturePad({ existingSignature }: Props) {
       else {
         setSaved(true);
         setCustodyHash(res.custodyHash ?? null);
+        router.refresh();
       }
     });
   }

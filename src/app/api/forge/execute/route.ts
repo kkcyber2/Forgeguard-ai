@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     .eq("id", user.id)
     .maybeSingle()) as { data: ProfileRow | null };
 
-  if (!profile || profile.access_level === null || profile.access_level < 2) {
+  if (!profile || profile.access_level === null || profile.access_level < 3) {
     return NextResponse.json(
       {
         ok: false,

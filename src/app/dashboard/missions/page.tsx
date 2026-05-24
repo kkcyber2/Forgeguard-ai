@@ -45,7 +45,7 @@ function StatusChip({ status }: { status: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-[2px] border border-white/10 bg-white/[0.02] px-1.5 py-0.5">
       <span className="h-1 w-1 rounded-full bg-white/30" />
-      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/30">Closed</span>
+      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/55">Closed</span>
     </span>
   );
 }
@@ -58,7 +58,7 @@ function RankChip({ rank }: { rank: string | null }) {
     SENTINEL: { label: "SENTINEL", color: "text-sky-400 border-sky-400/20 bg-sky-400/5"     },
     TRAITOR:  { label: "TRAITOR",  color: "text-red-400 border-red-400/20 bg-red-400/5"       },
   };
-  const style = map[rank ?? ""] ?? { label: rank ?? "ANY", color: "text-white/40 border-white/10 bg-white/[0.02]" };
+  const style = map[rank ?? ""] ?? { label: rank ?? "ANY", color: "text-white/55 border-white/15 bg-white/[0.03]" };
   return (
     <span className={`inline-flex items-center rounded-[2px] border px-1.5 py-0.5 font-mono text-[9px] tracking-[0.18em] ${style.color}`}>
       {style.label}
@@ -109,7 +109,7 @@ function MissionRow({
             <Shield size={9} className="flex-shrink-0 text-[#D1FF00]" />
           )}
           {isOwner && (
-            <span className="flex-shrink-0 font-mono text-[9px] tracking-[0.15em] text-white/40">
+            <span className="flex-shrink-0 font-mono text-[9px] tracking-[0.15em] text-white/55">
               MINE
             </span>
           )}
@@ -117,7 +117,7 @@ function MissionRow({
 
         {/* Description — single line */}
         {m.description && (
-          <p className="mt-0.5 truncate font-mono text-[10px] text-white/45">
+          <p className="mt-0.5 truncate font-mono text-[10px] text-white/60">
             {m.description}
           </p>
         )}
@@ -127,11 +127,11 @@ function MissionRow({
           <StatusChip status={m.status} />
           <RankChip rank={m.required_rank} />
           {m.company_tag && (
-            <span className="font-mono text-[9px] tracking-wider text-white/25">
+            <span className="font-mono text-[9px] tracking-wider text-white/55">
               {m.company_tag}
             </span>
           )}
-          <span className="flex items-center gap-1 font-mono text-[9px] text-white/40">
+          <span className="flex items-center gap-1 font-mono text-[9px] text-white/55">
             <Clock size={8} />
             {age === 0 ? "Today" : `${age}d ago`}
           </span>
@@ -145,12 +145,12 @@ function MissionRow({
             <p className="font-mono text-[13px] font-semibold tabular-nums text-[#D1FF00]">
               {Number(m.budget_credits).toLocaleString()}
             </p>
-            <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-white/45">
+            <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-white/60">
               Credits
             </p>
           </div>
         )}
-        <ChevronRight size={12} className="text-white/40 transition-colors group-hover:text-white/50" />
+        <ChevronRight size={12} className="text-white/55 transition-colors group-hover:text-white/50" />
       </div>
     </Link>
   );
@@ -162,9 +162,8 @@ export default async function MissionsPage() {
   if (!user) redirect("/auth/login?next=/dashboard/missions");
 
   const profile = await getCurrentProfile();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accessLevel = ((profile as any)?.access_level as number | null) ?? 1;
-  const isClient = accessLevel === 1;
+  const userType = profile?.user_type ?? "hacker";
+  const isClient = userType === "client";
 
   const supabase = await createServerSupabase();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -216,7 +215,7 @@ export default async function MissionsPage() {
       {/* ── Header bar ── */}
       <div className="mb-6 flex items-end justify-between">
         <div>
-          <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-white/25">
+          <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-white/55">
             Mission Vault
           </p>
           <h1 className="mt-1 font-display text-2xl font-semibold tracking-[-0.02em] text-white">
@@ -251,7 +250,7 @@ export default async function MissionsPage() {
               <p className={`font-mono text-sm font-semibold tabular-nums ${color}`}>
                 {value}
               </p>
-              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/45">
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/60">
                 {label}
               </p>
             </div>
@@ -273,8 +272,8 @@ export default async function MissionsPage() {
 
         {missions.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
-            <Crosshair size={28} strokeWidth={1} className="text-white/30" />
-            <p className="font-mono text-[11px] uppercase tracking-widest text-white/40">
+            <Crosshair size={28} strokeWidth={1} className="text-white/55" />
+            <p className="font-mono text-[11px] uppercase tracking-widest text-white/55">
               {isClient ? "No missions posted" : "No open contracts"}
             </p>
             {isClient && (
@@ -283,7 +282,7 @@ export default async function MissionsPage() {
                 className={buttonStyles({
                   size: "sm",
                   className:
-                    "mt-2 border-[0.5px] border-white/10 bg-transparent font-mono text-[10px] uppercase tracking-widest text-white/40 hover:text-white/70",
+                    "mt-2 border-[0.5px] border-white/10 bg-transparent font-mono text-[10px] uppercase tracking-widest text-white/55 hover:text-white/70",
                 })}
               >
                 Post your first mission

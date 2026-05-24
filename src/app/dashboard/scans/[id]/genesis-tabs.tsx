@@ -12,6 +12,7 @@ import {
   Circle,
   AlertTriangle,
   ExternalLink,
+  Brain,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -40,39 +41,74 @@ export interface SocialTemplate {
   watermark: string;
 }
 
+export interface AgentMemoryRow {
+  id: string;
+  agent_role: string | null;
+  thought: string;
+  action_taken: string | null;
+  created_at: string | null;
+}
+
 export interface GenesisTabs {
   scanId: string;
   targetUrl: string;
+  scanIntensity?: "recon" | "standard" | "aggressive" | "greasy";
   discoveryReport: DiscoveryReport | null;
   aleUsd: number | null;
   socialTemplates: SocialTemplate[] | null;
   aegisZipB64: string | null;
+  agentMemories?: AgentMemoryRow[] | null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /* Tab identifiers                                                             */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-type TabKey = "recon" | "finance" | "aegis" | "social";
+type TabKey = "recon" | "finance" | "aegis" | "social" | "memories";
 
-const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+const ALL_TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "recon",   label: "RECON MAP",     icon: GitBranch  },
   { key: "finance", label: "FINANCIAL RISK", icon: DollarSign },
   { key: "aegis",   label: "AEGIS BUNDLE",  icon: Shield     },
   { key: "social",  label: "SOCIAL SWARM",  icon: Users      },
+  { key: "memories", label: "AGENT_MEMORIES", icon: Brain   },
 ];
 
-/* ─────────────────────────────────────────────────────────────────────────── */
-/* Root component                                                              */
-/* ─────────────────────────────────────────────────────────────────────────── */
+function tabsForIntensity(intensity: GenesisTabs["scanIntensity"]): TabKey[] {
+  const level = intensity ?? "standard";
+  const keys: TabKey[] = ["recon", "finance"];
+  if (level === "aggressive" || level === "greasy") keys.push("aegis");
+  if (level === "greasy") {
+    keys.push("social", "memories");
+  }
+  return keys;
+}
+
+function formatAleDisplay(usd: number): string {
+  if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;
+  if (usd >= 1_000) return `$${(usd / 1_000).toFixed(1)}k`;
+  return `$${usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
 
 export function GenesisTabs({
-  scanId, targetUrl, discoveryReport, aleUsd, socialTemplates, aegisZipB64,
+  scanId, targetUrl, scanIntensity = "standard", discoveryReport, aleUsd, socialTemplates, aegisZipB64, agentMemories,
 }: GenesisTabs) {
-  const [active, setActive] = React.useState<TabKey>("recon");
+  const visibleKeys = tabsForIntensity(scanIntensity);
+  const TABS = ALL_TABS.filter((t) => visibleKeys.includes(t.key));
+  const [active, setActive] = React.useState<TabKey>(visibleKeys[0] ?? "recon");
 
-  // Only render if at least one Genesis data field is present
-  const hasData = discoveryReport || aleUsd || socialTemplates || aegisZipB64;
+  React.useEffect(() => {
+    if (!visibleKeys.includes(active)) {
+      setActive(visibleKeys[0] ?? "recon");
+    }
+  }, [active, visibleKeys]);
+
+  const hasData =
+    discoveryReport != null ||
+    aleUsd != null ||
+    (socialTemplates != null && socialTemplates.length > 0) ||
+    aegisZipB64 != null ||
+    (agentMemories != null && agentMemories.length > 0);
   if (!hasData) return null;
 
   return (
@@ -125,6 +161,7 @@ export function GenesisTabs({
           {active === "finance" && <FinancialRisk aleUsd={aleUsd} />}
           {active === "aegis"   && <AegisBundle scanId={scanId} zipB64={aegisZipB64} />}
           {active === "social"  && <SocialSwarm templates={socialTemplates} />}
+          {active === "memories" && <AgentMemoriesPanel memories={agentMemories} />}
         </motion.div>
       </AnimatePresence>
     </section>
@@ -149,8 +186,9 @@ function ReconMap({ report, targetUrl }: { report: DiscoveryReport | null; targe
   }
 
   const domain = report.base_url || targetUrl;
-  const endpoints = report.api_endpoints.slice(0, 40);
-  const vectors   = report.input_vectors.slice(0, 20);
+  const endpoints = (report.api_endpoints ?? []).slice(0, 40);
+  const vectors   = (report.input_vectors ?? []).slice(0, 20);
+  const crawlErrors = report.crawl_errors ?? [];
 
   return (
     <div className="space-y-5">
@@ -158,9 +196,9 @@ function ReconMap({ report, targetUrl }: { report: DiscoveryReport | null; targe
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: "Pages crawled",  value: report.pages_crawled },
-          { label: "API endpoints",  value: report.api_endpoints.length },
-          { label: "Input vectors",  value: report.input_vectors.length },
-          { label: "Crawl errors",   value: report.crawl_errors.length },
+          { label: "API endpoints",  value: (report.api_endpoints ?? []).length },
+          { label: "Input vectors",  value: (report.input_vectors ?? []).length },
+          { label: "Crawl errors",   value: crawlErrors.length },
         ].map((s) => (
           <div
             key={s.label}
@@ -280,7 +318,7 @@ function FinancialRisk({ aleUsd }: { aleUsd: number | null }) {
     return <EmptyState label="Financial risk quantification not yet available." icon={DollarSign} />;
   }
 
-  const aleM      = aleUsd / 1_000_000;
+  const aleDisplay = formatAleDisplay(aleUsd);
   const danger    = aleUsd > 500_000;
   const risk_tier =
     aleUsd >= 4_500_000 ? "CATASTROPHIC"
@@ -306,7 +344,7 @@ function FinancialRisk({ aleUsd }: { aleUsd: number | null }) {
         <ArcGauge value={aleUsd} max={4_500_000} danger={danger} />
         <p className={`font-mono text-2xl font-bold tabular-nums ${danger ? "text-[#ef4444]" : "text-acid"}`}
            style={{ textShadow: danger ? "0 0 20px rgba(239,68,68,0.5)" : "0 0 20px rgba(209,255,0,0.4)" }}>
-          ${aleM.toFixed(2)}M
+          ${aleDisplay}
         </p>
         <p className="font-mono text-[10px] text-foreground-muted">Projected Annual Loss</p>
       </div>
@@ -575,6 +613,61 @@ function SocialSwarm({ templates }: { templates: SocialTemplate[] | null }) {
         FOR AUTHORISED SECURITY TRAINING ONLY. Templates are forensically watermarked.
         Do not distribute outside your organisation.
       </p>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* AGENT_MEMORIES — Diagnostic Loop (Nuclear scans)                            */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function AgentMemoriesPanel({
+  memories,
+}: {
+  memories: AgentMemoryRow[] | null | undefined;
+}) {
+  if (!memories || memories.length === 0) {
+    return (
+      <EmptyState
+        label="Self-evolution trace not yet available. Nuclear scans stream agent reasoning here."
+        icon={Brain}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="font-mono text-[10px] leading-relaxed text-white/55">
+        Diagnostic Loop — the AI explains how it adapted payloads when target
+        defenses resisted initial probes.
+      </p>
+      <ol className="flex flex-col gap-3">
+        {memories.map((m, idx) => (
+          <li
+            key={m.id}
+            className="rounded-[3px] border border-violet-400/20 bg-violet-400/[0.04] p-4"
+          >
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-violet-300">
+                Step {idx + 1}
+              </span>
+              {m.agent_role && (
+                <span className="font-mono text-[9px] uppercase tracking-widest text-white/40">
+                  {m.agent_role}
+                </span>
+              )}
+            </div>
+            <p className="font-mono text-[11px] leading-relaxed text-white/75">
+              {m.thought}
+            </p>
+            {m.action_taken && (
+              <p className="mt-2 font-mono text-[10px] text-acid/80">
+                → {m.action_taken}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

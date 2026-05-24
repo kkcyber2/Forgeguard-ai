@@ -10,6 +10,7 @@ import {
   type ViewMode,
 } from "@/lib/access/parallel-sovereignty";
 import { resolveAccessRank, type UserType } from "@/lib/access/ranks";
+import { computeTrustScore } from "@/lib/access/trust-score";
 import {
   getSessionUser,
   getCurrentProfile,
@@ -48,6 +49,7 @@ export default async function DashboardLayout({
   const accessLevel = profile.access_level ?? 1;
   const rank = resolveAccessRank(accessLevel, profile.role ?? null);
   const userType = (profile.user_type ?? "hacker") as UserType;
+  const canSwitchIdentity = userType === "developer";
 
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "/dashboard";
@@ -83,6 +85,14 @@ export default async function DashboardLayout({
     identityVerified: profile.identity_verified ?? false,
     companyTag: profile.company_tag ?? null,
     domainVerified: profile.domain_verified ?? false,
+    trustScore: computeTrustScore({
+      identityVerified: profile.identity_verified ?? false,
+      domainVerified: profile.domain_verified ?? false,
+      phoneVerified: profile.phone_verified ?? false,
+      auditScore: profile.identity_audit_score
+        ? Number(profile.identity_audit_score)
+        : null,
+    }),
   };
 
   return (
@@ -94,6 +104,7 @@ export default async function DashboardLayout({
       scope="user"
       viewMode={viewMode}
       identityChosen={Boolean(profile.user_type)}
+      canSwitchIdentity={canSwitchIdentity}
     >
       {children}
     </ActivePath>

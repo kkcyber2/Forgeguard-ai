@@ -73,9 +73,18 @@ export function buildSovereignNav(
           { href: "/dashboard/bazaar", label: "Bazaar", icon: "store", section: "Operations" },
         ];
 
-  const filteredPrimary = primary.filter((item) =>
-    isPathAllowed(item.href, rank, userType),
-  );
+  const filteredPrimary = primary
+    .map((item) => ({
+      ...item,
+      locked:
+        viewMode === "hacker" &&
+        item.href === "/dashboard/forge" &&
+        rank < 3,
+    }))
+    .filter((item) => {
+      if (item.locked) return true;
+      return isPathAllowed(item.href, rank, userType);
+    });
 
   const secondary = SECONDARY_NAV.filter((item) => {
     if (rank < item.minRank) return false;
@@ -134,6 +143,9 @@ export function isPathAllowedForView(
   return isPathAllowed(pathname, rank, userType);
 }
 
-export function redirectForViewBlocked(pathname: string, _viewMode: ViewMode): string {
+export function redirectForViewBlocked(pathname: string, viewMode: ViewMode): string {
+  if (viewMode === "client") {
+    return pathname.startsWith("/dashboard/forge") ? "/dashboard/scans" : "/dashboard";
+  }
   return redirectForBlockedPath(pathname);
 }

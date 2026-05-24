@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 
+export const runtime = "nodejs";
+
 /**
  * OAuth / magic-link callback.
  * Exchanges the short-lived `code` param for a session cookie, then

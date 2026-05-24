@@ -43,6 +43,21 @@ export async function GET() {
     console.warn(
       "[api/health/engine] No auth token: set INTERNAL_SCAN_TOKEN or AGATHON_INTERNAL_SECRET on Vercel",
     );
+    return NextResponse.json({
+      ok: true,
+      status: "unconfigured",
+      reason: "Missing INTERNAL_SCAN_TOKEN",
+      latencyMs: 0,
+    });
+  }
+
+  if (!authHeader) {
+    return NextResponse.json({
+      ok: true,
+      status: "unconfigured",
+      reason: "Auth header unavailable",
+      latencyMs: 0,
+    });
   }
 
   const t0 = Date.now();
@@ -52,7 +67,7 @@ export async function GET() {
     const resp = await fetch(healthUrl, {
       method: "GET",
       headers: {
-        ...(authHeader ?? {}),
+        ...authHeader,
         "Cache-Control": "no-store",
       },
       signal: AbortSignal.timeout(5_000),

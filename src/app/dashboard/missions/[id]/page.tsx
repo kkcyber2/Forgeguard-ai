@@ -29,9 +29,8 @@ export default async function MissionDetailPage({ params }: Props) {
   if (!user) redirect(`/auth/login?next=/dashboard/missions/${id}`);
 
   const profile = await getCurrentProfile();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accessLevel = ((profile as any)?.access_level as number | null) ?? 1;
-  const isClient = accessLevel === 1;
+  const userType = profile?.user_type ?? "hacker";
+  const isClient = userType === "client";
 
   const supabase = await createServerSupabase();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

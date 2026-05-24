@@ -35,6 +35,7 @@ import { IdentityBadge } from "@/components/dashboard/identity-badge";
 import { IdentitySwitcher } from "@/components/dashboard/identity-switcher";
 import { WalletCredits } from "@/components/dashboard/wallet-credits";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
+import { UpgradeRequiredModal } from "@/components/dashboard/upgrade-required-modal";
 import { NAV_ICONS, type NavItem, type ShellUser } from "@/components/dashboard/shell";
 import {
   VIEW_MODE_ACCENTS,
@@ -51,11 +52,16 @@ const ACCOUNT_HREFS = new Set([
   "/dashboard/settings",
 ]);
 
-const QUICK_ACTIONS = [
-  { label: "Launch Scan",    icon: Crosshair,  href: "/dashboard/scans/new" },
-  { label: "Top Up Credits", icon: CreditCard, href: "/dashboard/billing" },
-  { label: "Post Mission",   icon: Swords,     href: "/dashboard/missions/new" },
-] as const;
+const QUICK_ACTIONS: {
+  label: string;
+  icon: typeof Crosshair;
+  href: string;
+  viewModes: ViewMode[];
+}[] = [
+  { label: "Launch Scan",    icon: Crosshair,  href: "/dashboard/scans/new", viewModes: ["client", "hacker"] },
+  { label: "Top Up Credits", icon: CreditCard, href: "/dashboard/billing",   viewModes: ["client", "hacker"] },
+  { label: "Post Mission",   icon: Swords,     href: "/dashboard/missions/new", viewModes: ["hacker"] },
+];
 
 /* -------------------------------------------------------------------------- */
 /* Theme hook                                                                  */
@@ -91,9 +97,11 @@ function useTheme() {
 function QuickActionMenu({
   scope,
   accentHex,
+  viewMode,
 }: {
   scope: "user" | "admin";
   accentHex: string;
+  viewMode: ViewMode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -157,7 +165,7 @@ function QuickActionMenu({
               <p className="px-2.5 py-1.5 font-mono text-[8px] uppercase tracking-[0.25em] text-white/20">
                 Quick Actions
               </p>
-              {QUICK_ACTIONS.map((action) => {
+              {QUICK_ACTIONS.filter((a) => a.viewModes.includes(viewMode)).map((action) => {
                 const Icon = action.icon;
                 return (
                   <button
@@ -421,6 +429,7 @@ export function TopBar({
   scope,
   viewMode = "hacker",
   identityChosen = true,
+  canSwitchIdentity = false,
   systemDegraded = false,
 }: {
   nav: NavItem[];
@@ -430,10 +439,13 @@ export function TopBar({
   scope: "user" | "admin";
   viewMode?: ViewMode;
   identityChosen?: boolean;
+  canSwitchIdentity?: boolean;
   systemDegraded?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
   const { theme, toggle: toggleTheme } = useTheme();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [lockedFeature, setLockedFeature] = useState("The Forge");
 
   const resolvedPrimary = primaryNav ?? nav;
   const resolvedSecondary = secondaryNav ?? [];
@@ -447,6 +459,12 @@ export function TopBar({
 
   return (
     <>
+      {upgradeOpen && (
+        <UpgradeRequiredModal
+          feature={lockedFeature}
+          onClose={() => setUpgradeOpen(false)}
+        />
+      )}
       {/* ── System Degraded Banner ─────────────────────────────────────────── */}
       {systemDegraded && (
         <div className="fixed inset-x-0 top-0 z-50 flex h-7 items-center justify-center gap-2 border-b-[0.5px] border-orange-400/20 bg-[#1a0a00]/90 backdrop-blur-sm">
@@ -475,6 +493,7 @@ export function TopBar({
               activePath={pathname}
               viewMode={viewMode}
               identityChosen={identityChosen}
+              canSwitchIdentity={canSwitchIdentity}
             />
           </div>
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
@@ -494,6 +513,26 @@ export function TopBar({
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const Icon = NAV_ICONS[item.icon];
+
+            if (item.locked) {
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => {
+                    setLockedFeature(item.label);
+                    setUpgradeOpen(true);
+                  }}
+                  className="relative flex h-full items-center gap-1.5 px-4 font-mono text-[10px] uppercase tracking-widest whitespace-nowrap text-white/25 transition-colors hover:text-white/45"
+                >
+                  <Icon size={11} strokeWidth={1.5} className="flex-shrink-0 opacity-50" />
+                  <span>{item.label}</span>
+                  <span className="rounded-[2px] border border-violet-400/30 px-1 py-0.5 text-[8px] text-violet-300">
+                    LOCK
+                  </span>
+                </button>
+              );
+            }
 
             return (
               <Link
@@ -535,11 +574,11 @@ export function TopBar({
           {scope === "user" && (
             <IdentitySwitcher
               activeMode={viewMode}
-              canSwitch={identityChosen}
+              canSwitch={canSwitchIdentity}
             />
           )}
 
-          <QuickActionMenu scope={scope} accentHex={accentHex} />
+          <QuickActionMenu scope={scope} accentHex={accentHex} viewMode={viewMode} />
 
           {/* Theme toggle */}
           <button
@@ -562,11 +601,13 @@ export function TopBar({
             identityVerified={user.identityVerified}
             companyTag={user.companyTag}
             domainVerified={user.domainVerified}
+            viewMode={viewMode}
+            trustScore={user.trustScore ?? 0}
           />
 
           {/* Credits wallet — mobile fallback */}
           <div className="sm:hidden">
-            <WalletCredits />
+            <WalletCredits initialBalance={user.walletBalance ?? 0} />
           </div>
 
           <div className="mx-0.5 hidden h-5 w-px bg-white/[0.07] sm:block" />

@@ -16,6 +16,7 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { purchaseScript } from "@/components/bazaar/actions";
+import { notifyWalletRefresh } from "@/lib/wallet-events";
 import {
   ShoppingCart, Upload, Search, Filter, Zap,
   Shield, CheckCircle, AlertTriangle, XCircle,
@@ -713,7 +714,9 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function BazaarPage() {
-  const [scripts, setScripts]         = React.useState<Script[]>(DEMO_SCRIPTS);
+  const [scripts, setScripts]         = React.useState<Script[]>([]);
+  const [loadError, setLoadError]       = React.useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = React.useState<string | null>(null);
   const [loading, setLoading]         = React.useState(true);
   const [search, setSearch]           = React.useState("");
   const [filterLang, setFilterLang]   = React.useState("all");
@@ -733,11 +736,14 @@ export default function BazaarPage() {
         if (filterFree)           params.set("free",  "true");
         const res  = await fetch(`/api/bazaar/list?${params.toString()}`);
         const data = await res.json() as { ok: boolean; scripts?: Script[] };
-        if (data.ok && data.scripts?.length) {
-          setScripts(data.scripts);
+        if (data.ok) {
+          setScripts(data.scripts ?? []);
+          setLoadError(null);
+        } else {
+          setLoadError("Could not load marketplace scripts.");
         }
       } catch {
-        // keep demo data on network failure
+        setLoadError("Network error loading Bazaar.");
       } finally {
         setLoading(false);
       }
@@ -747,21 +753,27 @@ export default function BazaarPage() {
 
   const handlePurchase = async (scriptId: string) => {
     setPurchasing(scriptId);
+    setPurchaseError(null);
     try {
       const data = await purchaseScript(scriptId);
       if (data.ok) {
-        // Mark as purchased in local state
         const script = scripts.find((s) => s.id === scriptId);
         setScripts((prev) =>
           prev.map((s) => s.id === scriptId ? { ...s, is_purchased: true } : s)
         );
-        // Open code viewer with acquired code
+        if (typeof data.new_balance === "number") {
+          notifyWalletRefresh(data.new_balance);
+        } else {
+          notifyWalletRefresh();
+        }
         if (data.code && script) {
           setAcquiredCode({ scriptName: script.name, code: data.code, language: script.language });
         }
+      } else {
+        setPurchaseError(data.error ?? "Purchase failed.");
       }
     } catch {
-      // silent — button resets
+      setPurchaseError("Purchase failed. Try again.");
     } finally {
       setPurchasing(null);
     }
@@ -846,6 +858,12 @@ export default function BazaarPage() {
               Upload Script
             </button>
           </div>
+
+          {(loadError || purchaseError) && (
+            <div className="mt-4 rounded-[3px] border border-red-400/30 bg-red-500/10 px-3 py-2 font-mono text-[11px] text-red-300">
+              {purchaseError ?? loadError}
+            </div>
+          )}
 
           {/* Stats bar */}
           <div className="mt-4 flex items-center gap-6">

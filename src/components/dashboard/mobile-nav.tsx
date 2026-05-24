@@ -20,6 +20,7 @@ export function MobileNav({
   activePath,
   viewMode = "hacker",
   identityChosen = true,
+  canSwitchIdentity = false,
 }: {
   nav: NavItem[];
   user: ShellUser;
@@ -27,6 +28,7 @@ export function MobileNav({
   activePath: string;
   viewMode?: ViewMode;
   identityChosen?: boolean;
+  canSwitchIdentity?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -89,7 +91,7 @@ export function MobileNav({
 
         {scope === "user" && (
           <div className="border-b-[0.5px] border-white/[0.06] px-5 py-3">
-            <IdentitySwitcher activeMode={viewMode} canSwitch={identityChosen} compact />
+            <IdentitySwitcher activeMode={viewMode} canSwitch={canSwitchIdentity} compact />
           </div>
         )}
 

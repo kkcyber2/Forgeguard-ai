@@ -73,7 +73,7 @@ export default async function PrivacyPage() {
               <Bullet>IP address (for rate limiting and abuse prevention)</Bullet>
               <Bullet>Browser type and operating system (for compatibility)</Bullet>
               <Bullet>Session tokens (stored in Supabase, never in localStorage)</Bullet>
-              <Bullet>Click tracking on outreach links (for War Machine outreach campaigns — anonymized)</Bullet>
+              <Bullet>Click tracking on outreach links (anonymized, managed by separate Shadow Agency tooling)</Bullet>
             </ul>
           </Section>
 

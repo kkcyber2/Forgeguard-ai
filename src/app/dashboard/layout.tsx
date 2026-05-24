@@ -29,7 +29,12 @@ export default async function DashboardLayout({
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard");
 
-  const profile = await getCurrentProfile();
+  // Profile row can lag the auth.users insert trigger on fresh signups.
+  let profile = await getCurrentProfile();
+  if (!profile) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    profile = await getCurrentProfile();
+  }
 
   if (!profile?.user_type) {
     redirect("/auth/signup/identity");

@@ -1,13 +1,30 @@
 import * as React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { GridBackground } from "@/components/ui/grid-background";
-import { getSessionUser } from "@/lib/supabase/server";
+import { getSessionUser, getCurrentProfile } from "@/lib/supabase/server";
 
 export default async function AuthLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "";
+
+  // Identity selection must remain reachable for authenticated users
+  // without user_type — dashboard layout sends them here.
+  if (pathname === "/auth/signup/identity") {
+    const user = await getSessionUser();
+    if (user) {
+      const profile = await getCurrentProfile();
+      if (profile?.user_type) {
+        redirect("/dashboard");
+      }
+    }
+    return <>{children}</>;
+  }
+
   // If we're already signed in, bounce to the dashboard.
   const user = await getSessionUser();
   if (user) redirect("/dashboard");

@@ -63,7 +63,7 @@ export async function login(
       .from("profiles")
       .select("user_type")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
     if (!profile?.user_type) {
       revalidatePath("/", "layout");
       redirect("/auth/signup/identity");

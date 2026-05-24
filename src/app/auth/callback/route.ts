@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     .from("profiles")
     .select("user_type, access_level")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (!profile?.user_type) {
     return NextResponse.redirect(`${origin}/auth/signup/identity`);

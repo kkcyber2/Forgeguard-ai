@@ -8,6 +8,8 @@ import { streamText } from 'ai';
 import { z } from 'zod';
 import type { SanitizedMessage } from '@/types/security';
 
+export const runtime = "nodejs";
+
 const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
 
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes

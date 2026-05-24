@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
+export const runtime = "nodejs";
+
 /**
  * POST /api/verify-domain
  * Generate a domain verification token and store it on the profile.

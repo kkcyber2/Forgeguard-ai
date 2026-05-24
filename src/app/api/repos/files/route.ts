@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
+export const runtime = "nodejs";
+
 const BUCKET = "hacker-repos";
 
 // ── GET ──────────────────────────────────────────────────────────────────────

@@ -3,6 +3,8 @@ import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 
+export const runtime = "nodejs";
+
 const contactFormSchema = z.object({
   name: z.string().min(2).max(100),
   email: z.string().email().max(254),

@@ -5,6 +5,8 @@ import { z } from 'zod';
 import type { Database } from '@/types/supabase';
 import { sanitizeUserInput } from '@/lib/utils';
 
+export const runtime = "nodejs";
+
 const submissionSchema = z.object({
   github_url: z.string().url().optional(),
   service_type: z.enum([

@@ -85,28 +85,37 @@ export default async function DashboardLayout({
   }
 
   const supabase = await createServerSupabase();
-  const [{ data: wallet }, { data: subscription }] = await Promise.all([
-    supabase
-      .from("user_wallets")
-      .select("balance_usd, is_frozen")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("subscriptions")
-      .select("plan, status")
-      .eq("user_id", user.id)
-      .in("status", ["active", "trialing", "past_due"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  let walletBalance = 0;
+  let walletFrozen = false;
+  let subscriptionPlan: string | null = null;
 
-  const subscriptionPlan =
-    subscription?.status === "active" ||
-    subscription?.status === "trialing" ||
-    subscription?.status === "past_due"
-      ? subscription.plan
-      : null;
+  try {
+    const [{ data: wallet }, { data: subscription }] = await Promise.all([
+      supabase
+        .from("user_wallets")
+        .select("balance_usd, is_frozen")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("subscriptions")
+        .select("plan, status")
+        .eq("user_id", user.id)
+        .in("status", ["active", "trialing", "past_due"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    walletBalance = Number(wallet?.balance_usd ?? 0);
+    walletFrozen = wallet?.is_frozen ?? false;
+    subscriptionPlan =
+      subscription?.status === "active" ||
+      subscription?.status === "trialing" ||
+      subscription?.status === "past_due"
+        ? subscription.plan
+        : null;
+  } catch (err) {
+    console.error("[dashboard/layout] wallet/subscription:", err);
+  }
 
   const subscriptionTier = normalizeSubscriptionTier(
     profile.subscription_tier,
@@ -137,8 +146,8 @@ export default async function DashboardLayout({
       null,
     role: profile.role ?? "user",
     hackerRank: profile.hacker_rank ?? null,
-    walletBalance: Number(wallet?.balance_usd ?? 0),
-    walletFrozen: wallet?.is_frozen ?? false,
+    walletBalance,
+    walletFrozen,
     identityVerified: profile.identity_verified ?? false,
     companyTag: profile.company_tag ?? null,
     domainVerified: profile.domain_verified ?? false,

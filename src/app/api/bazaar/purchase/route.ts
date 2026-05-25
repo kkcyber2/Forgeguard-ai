@@ -86,7 +86,8 @@ export async function POST(req: NextRequest) {
       amount_usd: 0,
     });
 
-    await supabase.rpc("increment_purchase", { p_script_id: script_id, p_revenue: 0 });
+    const adminFree = createAdminSupabase();
+    await adminFree.rpc("increment_purchase", { p_script_id: script_id, p_revenue: 0 });
 
     return NextResponse.json({ ok: true, code: script.code });
   }
@@ -112,24 +113,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Debit buyer atomically via RPC (supports negative p_amount)
-  const { error: debitErr } = await supabase.rpc("increment_wallet", {
+  // Debit buyer atomically via service-role RPC (never expose to anon client)
+  const admin = createAdminSupabase();
+  const { error: debitErr } = await admin.rpc("increment_wallet", {
     p_user_id: user.id,
-    p_amount:  -priceUsd,
+    p_amount: -priceUsd,
   });
 
   if (debitErr) {
     return NextResponse.json({ ok: false, error: "Payment processing failed" }, { status: 500 });
   }
 
-  // Credit author at 90% — platform retains 10% fee
-  const platformFee  = Math.round(priceUsd * 0.10 * 100) / 100;
+  const platformFee = Math.round(priceUsd * 0.10 * 100) / 100;
   const authorPayout = Math.round((priceUsd - platformFee) * 100) / 100;
 
-  await supabase.from("user_wallets").upsert({ user_id: script.author_id }, { onConflict: "user_id" });
-  await supabase.rpc("increment_wallet", {
+  await admin.from("user_wallets").upsert({ user_id: script.author_id }, { onConflict: "user_id" });
+  await admin.rpc("increment_wallet", {
     p_user_id: script.author_id,
-    p_amount:  authorPayout,
+    p_amount: authorPayout,
   });
 
   // Escrow record (already released — instant commerce)
@@ -161,8 +162,8 @@ export async function POST(req: NextRequest) {
     amount_usd: priceUsd,
   });
 
-  // Update script stats atomically via RPC (concurrent-safe)
-  await supabase.rpc("increment_purchase", { p_script_id: script_id, p_revenue: priceUsd });
+  // Update script stats atomically via RPC (concurrent-safe, service role only)
+  await admin.rpc("increment_purchase", { p_script_id: script_id, p_revenue: priceUsd });
 
   return NextResponse.json({
     ok:           true,

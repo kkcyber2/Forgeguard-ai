@@ -21,6 +21,7 @@ import { ScanStatusTracker } from "./scan-status-tracker";
 import { FindingsReport } from "./findings-report";
 import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemoryRow } from "./genesis-tabs";
 import { deleteScan } from "../actions";
+import { SCAN_REPORT_SELECT } from "@/lib/scans/queries";
 import type { ScanReport } from "./findings-report";
 
 /**
@@ -105,9 +106,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
   // Includes Genesis Intelligence Pipeline columns (Elite 8).
   const { data: scanReport } = (await supabase
     .from("scan_reports")
-    .select(
-      "executive_summary_md, audit_report_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, attacks_run, wall_seconds, generation_cost_usd, discovery_report, ale_usd, social_templates, aegis_zip_b64",
-    )
+    .select(SCAN_REPORT_SELECT)
     .eq("scan_id", id)
     .maybeSingle()) as { data: ScanReport | null };
 

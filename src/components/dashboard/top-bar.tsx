@@ -45,6 +45,7 @@ import {
 } from "@/lib/access/parallel-sovereignty";
 import { useSovereignStore, useSovereignAccent } from "@/stores/use-sovereign-store";
 import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
+import { useLiveWallet } from "@/hooks/use-live-wallet";
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                   */
@@ -469,6 +470,7 @@ export function TopBar({
     (item) => !ACCOUNT_HREFS.has(item.href),
   );
   const accountNav = nav.filter((item) => ACCOUNT_HREFS.has(item.href));
+  const liveWallet = useLiveWallet(user.walletBalance ?? 0);
 
   return (
     <>
@@ -616,6 +618,7 @@ export function TopBar({
           <IdentityBadge
             hackerRank={user.hackerRank ?? null}
             walletBalance={user.walletBalance ?? 0}
+            wallet={liveWallet}
             walletFrozen={user.walletFrozen}
             identityVerified={user.identityVerified}
             companyTag={user.companyTag}
@@ -626,7 +629,7 @@ export function TopBar({
 
           {/* Credits wallet — mobile fallback */}
           <div className="sm:hidden">
-            <WalletCredits initialBalance={user.walletBalance ?? 0} />
+            <WalletCredits initialBalance={user.walletBalance ?? 0} wallet={liveWallet} />
           </div>
 
           <div className="mx-0.5 hidden h-5 w-px bg-white/[0.07] sm:block" />

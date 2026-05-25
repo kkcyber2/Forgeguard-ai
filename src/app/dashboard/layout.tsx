@@ -15,7 +15,7 @@ import {
 } from "@/lib/access/parallel-sovereignty";
 import { canEnableGhostMode, normalizeSubscriptionTier } from "@/lib/access/ghost-mode";
 import { resolveAccessRank, type UserType } from "@/lib/access/ranks";
-import { computeTrustScore } from "@/lib/access/trust-score";
+import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
 import {
   getSessionUser,
   getCurrentProfile,
@@ -125,20 +125,13 @@ export default async function DashboardLayout({
       (user.user_metadata?.full_name as string | undefined) ??
       null,
     role: profile.role ?? "user",
-    hackerRank: profile.hacker_rank ?? "RECRUIT",
+    hackerRank: profile.hacker_rank ?? null,
     walletBalance: Number(wallet?.balance_usd ?? 0),
     walletFrozen: wallet?.is_frozen ?? false,
     identityVerified: profile.identity_verified ?? false,
     companyTag: profile.company_tag ?? null,
     domainVerified: profile.domain_verified ?? false,
-    trustScore: computeTrustScore({
-      identityVerified: profile.identity_verified ?? false,
-      domainVerified: profile.domain_verified ?? false,
-      phoneVerified: profile.phone_verified ?? false,
-      auditScore: profile.identity_audit_score
-        ? Number(profile.identity_audit_score)
-        : null,
-    }),
+    trustScore: resolveTrustLevelFromHackerRank(profile.hacker_rank),
   };
 
   return (

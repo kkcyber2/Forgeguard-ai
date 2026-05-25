@@ -18,6 +18,7 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
   });
 
   const supabase = React.useMemo(() => createClient(), []);
+  const channelRef = React.useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const fetchWallet = React.useCallback(async () => {
     const {
@@ -49,7 +50,6 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
 
   React.useEffect(() => {
     let cancelled = false;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const onRefresh = (e: Event) => {
       const detail = (e as CustomEvent<{ balance?: number }>).detail;
@@ -67,7 +67,7 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
       const uid = await fetchWallet();
       if (cancelled || !uid) return;
 
-      channel = supabase
+      const channel = supabase
         .channel(`wallet:${uid}`)
         .on(
           "postgres_changes",
@@ -82,16 +82,23 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
           },
         )
         .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            console.log("[wallet:realtime] Sovereign Realtime Active");
+          }
           if (status === "CHANNEL_ERROR") {
             console.error("[wallet:realtime] channel error for user", uid);
           }
         });
+
+      channelRef.current = channel;
     })();
 
     return () => {
       cancelled = true;
       window.removeEventListener(WALLET_REFRESH_EVENT, onRefresh);
       clearInterval(interval);
+      const channel = channelRef.current;
+      channelRef.current = null;
       if (channel) {
         void supabase.removeChannel(channel);
       }

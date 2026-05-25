@@ -4,11 +4,13 @@ import { cn } from "@/lib/utils";
 import { rankBadgeClass } from "@/lib/access/ranks";
 import { VerifiedCheckmark, CompanyTagBadge } from "@/components/dashboard/verified-badge";
 import { WalletCredits } from "@/components/dashboard/wallet-credits";
+import type { LiveWalletState } from "@/hooks/use-live-wallet";
 import type { ViewMode } from "@/lib/access/parallel-sovereignty";
 
 export interface IdentityBadgeProps {
   hackerRank: string | null;
   walletBalance: number;
+  wallet?: LiveWalletState;
   walletFrozen?: boolean;
   identityVerified?: boolean;
   companyTag?: string | null;
@@ -20,6 +22,7 @@ export interface IdentityBadgeProps {
 export function IdentityBadge({
   hackerRank,
   walletBalance,
+  wallet,
   walletFrozen = false,
   identityVerified = false,
   companyTag = null,
@@ -37,7 +40,7 @@ export function IdentityBadge({
       {isClient ? (
         <span
           className="rounded-[3px] border-[0.5px] border-violet-400/35 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-violet-300"
-          title="Organizational trust score"
+          title="Trust tier from operator rank (0 if unranked)"
         >
           Trust {trustScore}
         </span>
@@ -53,9 +56,13 @@ export function IdentityBadge({
         </span>
       )}
       {walletFrozen ? (
-        <WalletCredits initialBalance={walletBalance} className="border-red-400/25 bg-red-500/10" />
+        <WalletCredits
+          initialBalance={walletBalance}
+          wallet={wallet}
+          className="border-red-400/25 bg-red-500/10"
+        />
       ) : (
-        <WalletCredits initialBalance={walletBalance} className="px-2 py-0.5" />
+        <WalletCredits initialBalance={walletBalance} wallet={wallet} className="px-2 py-0.5" />
       )}
     </div>
   );

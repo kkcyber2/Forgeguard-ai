@@ -3,19 +3,22 @@
 import * as React from "react";
 import { Coins, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useLiveWallet } from "@/hooks/use-live-wallet";
+import { useLiveWallet, type LiveWalletState } from "@/hooks/use-live-wallet";
 
 interface WalletCreditsProps {
   initialBalance?: number;
   className?: string;
+  /** When provided, skips an internal Realtime subscription (TopBar owns one shared hook). */
+  wallet?: LiveWalletState;
 }
 
-export function WalletCredits({
-  initialBalance = 0,
+function WalletCreditsInner({
+  wallet,
   className,
-}: WalletCreditsProps) {
-  const wallet = useLiveWallet(initialBalance);
-
+}: {
+  wallet: LiveWalletState;
+  className?: string;
+}) {
   if (wallet.loading) {
     return (
       <div className={cn("flex items-center gap-1.5 px-3 py-1", className)}>
@@ -52,5 +55,30 @@ export function WalletCredits({
         ${wallet.balance_usd.toFixed(2)}
       </span>
     </div>
+  );
+}
+
+function WalletCreditsConnected({
+  initialBalance = 0,
+  className,
+}: {
+  initialBalance: number;
+  className?: string;
+}) {
+  const wallet = useLiveWallet(initialBalance);
+  return <WalletCreditsInner wallet={wallet} className={className} />;
+}
+
+export function WalletCredits({
+  initialBalance = 0,
+  className,
+  wallet,
+}: WalletCreditsProps) {
+  if (wallet) {
+    return <WalletCreditsInner wallet={wallet} className={className} />;
+  }
+
+  return (
+    <WalletCreditsConnected initialBalance={initialBalance} className={className} />
   );
 }

@@ -48,6 +48,7 @@ This adds:
 | ID document OCR path | `verification-docs` storage bucket + RLS |
 | Ghost Protocol | `profiles.is_ghost_active`, `profiles.subscription_tier` |
 | Stronghold OTP + wallet realtime | `verification_otps.code_hash`, `user_wallets` in Realtime publication |
+| Section 12 legacy repair | `phone_number`→`phone`, `consumed`, `otp_logs` columns, `REPLICA IDENTITY FULL` on wallets |
 
 **Verify:**
 ```sql
@@ -61,6 +62,11 @@ SELECT column_name FROM information_schema.columns
  WHERE table_name = 'verification_otps' AND column_name = 'code_hash';
 SELECT tablename FROM pg_publication_tables
  WHERE pubname = 'supabase_realtime' AND tablename = 'user_wallets';
+SELECT column_name FROM information_schema.columns
+ WHERE table_name = 'verification_otps'
+   AND column_name IN ('phone', 'code_hash', 'consumed');
+SELECT relreplident FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname = 'public' AND c.relname = 'user_wallets';
 ```
 
 ---

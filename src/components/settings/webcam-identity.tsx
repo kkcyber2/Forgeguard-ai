@@ -201,7 +201,14 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      className="flex flex-col gap-4"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
+          e.preventDefault();
+        }
+      }}
+    >
       <div className="flex items-center gap-2">
         <Camera size={13} style={{ color: "#8B5CF6" }} strokeWidth={1.5} />
         <p className="font-mono text-[11px] uppercase tracking-[0.18em]" style={{ color: "#8B5CF6" }}>

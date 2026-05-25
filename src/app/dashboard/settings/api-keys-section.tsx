@@ -128,6 +128,7 @@ export function ApiKeysSection({ initialKeys }: ApiKeysSectionProps) {
             placeholder="e.g. GitHub Actions / Deploy pipeline"
             required
             maxLength={80}
+            autoComplete="off"
             className="w-full rounded-sm border-hairline border-white/[0.08] bg-surface px-3 py-2 font-mono text-xs text-foreground placeholder:text-foreground-subtle focus:border-acid/40 focus:outline-none focus:ring-1 focus:ring-acid/20"
           />
           {createState.fieldErrors?.name && (

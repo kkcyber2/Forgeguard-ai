@@ -158,7 +158,15 @@ export function IdentityAuditor({
   }
 
   return (
-    <div id="clearance-audit" className="relative flex flex-col gap-4 scroll-mt-24">
+    <div
+      id="clearance-audit"
+      className="relative flex flex-col gap-4 scroll-mt-24"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !(e.target instanceof HTMLTextAreaElement)) {
+          e.preventDefault();
+        }
+      }}
+    >
       {isGhostMode && (
         <div
           className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[4px]"
@@ -273,6 +281,7 @@ export function IdentityAuditor({
           ref={inputRef}
           type="file"
           accept=".pdf,.png,.jpg,.jpeg,.webp"
+          autoComplete="off"
           className="sr-only"
         />
       </label>

@@ -46,7 +46,11 @@ export function PhoneVerification({
   }
 
   return (
-    <div id="clearance-phone" className="space-y-3 scroll-mt-24">
+    <form
+      className="space-y-3 scroll-mt-24"
+      id="clearance-phone"
+      onSubmit={(e) => e.preventDefault()}
+    >
       <div className="flex items-center gap-2">
         <Phone size={12} className="text-[#D1FF00]/80" />
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
@@ -65,8 +69,13 @@ export function PhoneVerification({
           type="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
           disabled={verified}
           placeholder="+1 555 0100"
+          autoComplete="tel"
+          name="verification-phone"
           className="flex-1 rounded-[3px] border-[0.5px] border-white/10 bg-black/40 px-3 py-2 font-mono text-[12px] text-white placeholder:text-zinc-600 focus:border-[#D1FF00]/40 focus:outline-none"
         />
         {!verified && (
@@ -90,7 +99,15 @@ export function PhoneVerification({
             maxLength={6}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (code.length >= 6 && !pending) handleVerify();
+              }
+            }}
             placeholder="6-digit code"
+            autoComplete="off"
+            name="verification-otp"
             className="w-full sm:w-36 rounded-[3px] border-[0.5px] border-white/10 bg-black/40 px-3 py-2 font-mono text-[12px] text-white tracking-[0.3em]"
           />
           <button
@@ -124,6 +141,6 @@ export function PhoneVerification({
           OTP storage.
         </p>
       )}
-    </div>
+    </form>
   );
 }

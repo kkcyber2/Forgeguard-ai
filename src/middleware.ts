@@ -210,11 +210,11 @@ const VERIFICATION_CAMERA_PATHS = [
 ];
 
 function permissionsPolicy(pathname: string): string {
-  const allowsCamera = VERIFICATION_CAMERA_PATHS.some(
+  const allowsHardware = VERIFICATION_CAMERA_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
-  if (allowsCamera) {
-    return "camera=(self), microphone=(self), geolocation=()";
+  if (allowsHardware) {
+    return "camera=*, microphone=*, geolocation=*";
   }
   return "camera=(), microphone=(), geolocation=()";
 }

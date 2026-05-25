@@ -43,6 +43,31 @@ const nextConfig = {
     });
     return config;
   },
+
+  async headers() {
+    const hardwarePolicy =
+      "camera=*, microphone=*, geolocation=*";
+    return [
+      {
+        source: "/dashboard/settings",
+        headers: [
+          { key: "Permissions-Policy", value: hardwarePolicy },
+        ],
+      },
+      {
+        source: "/dashboard/settings/:path*",
+        headers: [
+          { key: "Permissions-Policy", value: hardwarePolicy },
+        ],
+      },
+      {
+        source: "/auth/signup/identity",
+        headers: [
+          { key: "Permissions-Policy", value: hardwarePolicy },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

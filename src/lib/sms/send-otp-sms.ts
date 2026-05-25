@@ -10,6 +10,13 @@ export async function sendOtpSms(
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_PHONE_NUMBER;
 
+  if (!process.env.TWILIO_ACCOUNT_SID?.trim()) {
+    console.error(
+      "[sms:twilio] TWILIO_ACCOUNT_SID is not set — cannot send SMS. " +
+        "Configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER.",
+    );
+  }
+
   if (accountSid && authToken && from) {
     const body = new URLSearchParams({
       To: phone.startsWith("+") ? phone : `+${phone}`,

@@ -59,6 +59,17 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
   const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
+  if (!process.env.TWILIO_ACCOUNT_SID?.trim()) {
+    console.error(
+      "[verify:otp] TWILIO_ACCOUNT_SID is missing — SMS cannot be sent. " +
+        "Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER on Vercel.",
+    );
+  } else if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    console.error(
+      "[verify:otp] SUPABASE_SERVICE_ROLE_KEY is missing — OTP insert will fail RLS.",
+    );
+  }
+
   await writeOtpLog(admin, {
     user_id: user.id,
     phone: normalized,
@@ -85,6 +96,11 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
       error: `Could not queue OTP: ${insertErr.message}`,
     };
   }
+
+  console.log(
+    "[verify:otp] OTP queued via service_role into verification_otps for user",
+    user.id.slice(0, 8),
+  );
 
   const sms = await sendOtpSms(normalized, code);
   if (!sms.ok) {

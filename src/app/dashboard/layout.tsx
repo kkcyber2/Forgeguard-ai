@@ -15,6 +15,9 @@ import { isSovereignOperator } from "@/lib/access/sovereign-operator";
  * Page content always renders; shell telemetry failures show a banner only.
  */
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function DashboardLayout({
   children,
 }: {

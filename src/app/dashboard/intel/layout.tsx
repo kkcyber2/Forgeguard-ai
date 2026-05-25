@@ -1,5 +1,8 @@
 import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function IntelLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_300px]">

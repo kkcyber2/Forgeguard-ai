@@ -1,8 +1,10 @@
+import { connection } from "next/server";
 import { HackerProfile } from "@/components/dashboard/hacker-profile";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
   try {
+    await connection();
     const supabase = await createServerSupabase();
     const { data: rows, error } = await supabase
       .from("profiles")

@@ -1,20 +1,17 @@
 /**
- * Sovereign operator allowlist — only this email may access /admin and sovereign features.
- * Override via SOVEREIGN_OPERATOR_EMAIL env var on Vercel.
+ * Sovereign operator allowlist — ONLY ksk805763@gmail.com may access /admin
+ * and sovereign features. Hard-locked; not overridable via env.
  */
 
-const DEFAULT_SOVEREIGN_EMAIL = "ksk805763@gmail.com";
+export const SOVEREIGN_OPERATOR_EMAIL = "ksk805763@gmail.com" as const;
 
 export function getSovereignOperatorEmail(): string {
-  return (
-    process.env.SOVEREIGN_OPERATOR_EMAIL?.trim().toLowerCase() ||
-    DEFAULT_SOVEREIGN_EMAIL
-  );
+  return SOVEREIGN_OPERATOR_EMAIL;
 }
 
 export function isSovereignOperator(
   email: string | null | undefined,
 ): boolean {
   if (!email) return false;
-  return email.trim().toLowerCase() === getSovereignOperatorEmail();
+  return email.trim().toLowerCase() === SOVEREIGN_OPERATOR_EMAIL;
 }

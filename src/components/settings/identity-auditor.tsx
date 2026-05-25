@@ -1,15 +1,20 @@
 "use client";
 
-import { useRef, useState, useTransition, useCallback } from "react";
+import { useRef, useState, useTransition, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, FileSearch, Loader2, Upload } from "lucide-react";
 import { uploadIdentityDocument } from "./verification-actions";
+import { SCHEMA_SYNC_MSG } from "@/lib/verify/messages";
 import { useSovereignStore } from "@/stores/use-sovereign-store";
 import {
   cameraErrorMessage,
   CameraPermissionOverlay,
   CAMERA_PERMISSION_DENIED_MESSAGE,
 } from "./camera-permission-overlay";
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
 
 export function IdentityAuditor({
   documentPath,
@@ -25,10 +30,13 @@ export function IdentityAuditor({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const startingRef = useRef(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [captureMode, setCaptureMode] = useState<"upload" | "webcam">("upload");
-  const [camState, setCamState] = useState<"idle" | "live" | "error">("idle");
+  const [camState, setCamState] = useState<"idle" | "live" | "error" | "requesting">("idle");
   const [camError, setCamError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
   const [auditResult, setAuditResult] = useState<{
     score: number;
     passed: boolean;
@@ -41,15 +49,37 @@ export function IdentityAuditor({
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, [stopCamera]);
+
+  function showSyncToast(message: string) {
+    setSyncToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setSyncToast(null), 8000);
+  }
+
   const startWebcam = useCallback(async () => {
+    if (videoRef.current?.srcObject || streamRef.current) return;
+    if (startingRef.current) return;
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setCamError("Camera unavailable in this browser.");
       setCamState("error");
       return;
     }
     setCamError(null);
+    setCamState("requesting");
+    startingRef.current = true;
+
     try {
       const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -67,9 +97,19 @@ export function IdentityAuditor({
       }
       setCamState("live");
     } catch (err) {
+      if (
+        isAbortError(err) &&
+        (videoRef.current?.srcObject || streamRef.current)
+      ) {
+        console.warn("[verify:auditor] getUserMedia aborted — stream already active");
+        setCamState("live");
+        return;
+      }
       console.error("[verify:auditor] getUserMedia failed:", err);
       setCamError(cameraErrorMessage(err));
       setCamState("error");
+    } finally {
+      startingRef.current = false;
     }
   }, []);
 
@@ -120,6 +160,9 @@ export function IdentityAuditor({
 
       const up = await uploadIdentityDocument(formData);
       if (up.error) {
+        if (up.schemaSync) {
+          showSyncToast(SCHEMA_SYNC_MSG);
+        }
         setError(up.error);
         return;
       }
@@ -158,9 +201,10 @@ export function IdentityAuditor({
   }
 
   return (
-    <div
+    <form
       id="clearance-audit"
       className="relative flex flex-col gap-4 scroll-mt-24"
+      onSubmit={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key === "Enter" && !(e.target instanceof HTMLTextAreaElement)) {
           e.preventDefault();
@@ -198,6 +242,12 @@ export function IdentityAuditor({
         Upload government ID or capture via webcam. DeepSeek-R1 extracts your legal
         name and cross-checks profile data.
       </p>
+
+      {syncToast && (
+        <div className="rounded-[3px] border border-amber-400/40 bg-amber-400/10 px-3 py-2 font-mono text-[10px] text-amber-200">
+          {syncToast}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {(["upload", "webcam"] as const).map((mode) => (
@@ -251,8 +301,9 @@ export function IdentityAuditor({
             {camState !== "live" ? (
               <button
                 type="button"
-                onClick={startWebcam}
-                className="flex-1 rounded-[3px] bg-violet-500/90 py-2 font-mono text-[10px] uppercase tracking-widest text-white"
+                onClick={() => void startWebcam()}
+                disabled={camState === "requesting" || pending}
+                className="flex-1 rounded-[3px] bg-violet-500/90 py-2 font-mono text-[10px] uppercase tracking-widest text-white disabled:opacity-40"
               >
                 Start camera
               </button>
@@ -260,7 +311,8 @@ export function IdentityAuditor({
               <button
                 type="button"
                 onClick={() => captureWebcamFrame()}
-                className="flex-1 rounded-[3px] bg-[#D1FF00]/15 py-2 font-mono text-[10px] uppercase tracking-widest text-[#D1FF00]"
+                disabled={pending}
+                className="flex-1 rounded-[3px] bg-[#D1FF00]/15 py-2 font-mono text-[10px] uppercase tracking-widest text-[#D1FF00] disabled:opacity-40"
               >
                 Capture frame
               </button>
@@ -296,7 +348,7 @@ export function IdentityAuditor({
       <button
         type="button"
         onClick={handleUploadAndAudit}
-        disabled={pending}
+        disabled={pending || camState === "requesting"}
         className="flex w-full items-center justify-center gap-2 rounded-[3px] border-[0.5px] border-[#D1FF00]/35 bg-[#D1FF00]/10 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#D1FF00] disabled:opacity-40"
       >
         {pending ? <Loader2 size={12} className="animate-spin" /> : <FileSearch size={12} />}
@@ -328,6 +380,6 @@ export function IdentityAuditor({
       )}
 
       {error && <p className="font-mono text-[10px] text-red-400/90">{error}</p>}
-    </div>
+    </form>
   );
 }

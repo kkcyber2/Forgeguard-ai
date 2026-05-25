@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { saveWebcamCapture } from "./verification-actions";
+import { SCHEMA_SYNC_MSG } from "@/lib/verify/messages";
 import { useSovereignStore } from "@/stores/use-sovereign-store";
 import { GhostPublicIdentity } from "@/components/dashboard/ghost-public-identity";
 import {
@@ -33,15 +34,22 @@ function isValidCapture(dataUrl: string | null): boolean {
   return Boolean(base64 && base64.length > 100);
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
 export function WebcamIdentity({ verified }: { verified: boolean }) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const startingRef = useRef(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [state, setState] = useState<State>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [saved, setSaved] = useState(verified);
   const [pending, startTransition] = useTransition();
@@ -58,10 +66,20 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   useEffect(() => {
     return () => {
       stopCamera();
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, [stopCamera]);
 
+  function showSyncToast(message: string) {
+    setSyncToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setSyncToast(null), 8000);
+  }
+
   const startCamera = useCallback(async () => {
+    if (videoRef.current?.srcObject || streamRef.current) return;
+    if (startingRef.current) return;
+
     if (typeof window !== "undefined" && !window.isSecureContext) {
       setErrorMsg("Camera requires HTTPS. Use a secure URL (not plain HTTP).");
       setState("error");
@@ -78,6 +96,7 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
     setState("requesting");
     setErrorMsg(null);
     setPermissionDenied(false);
+    startingRef.current = true;
 
     try {
       const mobile = isMobileDevice();
@@ -112,11 +131,21 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
 
       setState("live");
     } catch (err) {
+      if (
+        isAbortError(err) &&
+        (videoRef.current?.srcObject || streamRef.current)
+      ) {
+        console.warn("[verify:webcam] getUserMedia aborted — stream already active");
+        setState("live");
+        return;
+      }
       console.error("[verify:webcam] getUserMedia failed:", err);
       stopCamera();
       setErrorMsg(cameraErrorMessage(err));
       setPermissionDenied(isCameraPermissionDenied(err));
       setState("error");
+    } finally {
+      startingRef.current = false;
     }
   }, [stopCamera]);
 
@@ -189,6 +218,9 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
       const res = await saveWebcamCapture(capturedUrl);
       if (res.error) {
         console.error("[verify:webcam] save failed:", res.error);
+        if (res.schemaSync) {
+          showSyncToast(SCHEMA_SYNC_MSG);
+        }
         setErrorMsg(res.error);
         setState("error");
         return;
@@ -229,8 +261,9 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   }
 
   return (
-    <div
+    <form
       className="flex flex-col gap-4"
+      onSubmit={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
           e.preventDefault();
@@ -247,6 +280,12 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
       <p className="text-xs text-white/50">
         Required for SOVEREIGN-rank missions. Tap Start Camera — permission is requested only on button press.
       </p>
+
+      {syncToast && (
+        <div className="rounded-[3px] border border-amber-400/40 bg-amber-400/10 px-3 py-2 font-mono text-[10px] text-amber-200">
+          {syncToast}
+        </div>
+      )}
 
       <div
         className="relative overflow-hidden rounded-[4px]"
@@ -369,6 +408,6 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
           </>
         ) : null}
       </div>
-    </div>
+    </form>
   );
 }

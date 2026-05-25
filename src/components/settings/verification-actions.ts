@@ -7,8 +7,56 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { buildCustodyHash } from "@/lib/verify/custody-hash";
 import { sendOtpSms } from "@/lib/sms/send-otp-sms";
+import type { Database } from "@/types/supabase";
+
+type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
 const OTP_TTL_MS = 10 * 60 * 1000;
+
+const SCHEMA_SYNC_MSG = "System Syncing - Please Refresh (Ctrl+R)";
+
+function isSchemaColumnError(msg: string): boolean {
+  return /column.*not found|PGRST204|42703|schema cache/i.test(msg);
+}
+
+async function adminUpdateProfile(
+  userId: string,
+  full: ProfileUpdate,
+  minimal: ProfileUpdate,
+): Promise<{ error?: string; schemaSync?: boolean }> {
+  try {
+    const admin = createAdminSupabase();
+    const { error: fullErr } = await admin
+      .from("profiles")
+      .update(full)
+      .eq("id", userId);
+
+    if (!fullErr) return {};
+
+    console.warn("[verify:profile] full update:", fullErr.message);
+
+    if (isSchemaColumnError(fullErr.message)) {
+      const { error: minErr } = await admin
+        .from("profiles")
+        .update(minimal)
+        .eq("id", userId);
+
+      if (!minErr) return {};
+
+      console.error("[verify:profile] minimal update:", minErr.message);
+      if (isSchemaColumnError(minErr.message)) {
+        return { schemaSync: true, error: SCHEMA_SYNC_MSG };
+      }
+      return { error: minErr.message };
+    }
+
+    return { error: fullErr.message };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    console.error("[verify:profile] adminUpdateProfile:", msg);
+    return { error: "Server misconfigured. SUPABASE_SERVICE_ROLE_KEY required." };
+  }
+}
 
 function hashOtp(code: string): string {
   return createHash("sha256").update(code).digest("hex");
@@ -254,7 +302,7 @@ function isValidCaptureDataUrl(dataUrl: string): boolean {
 
 export async function saveWebcamCapture(
   dataUrl: string,
-): Promise<{ error?: string; verified?: boolean }> {
+): Promise<{ error?: string; verified?: boolean; schemaSync?: boolean }> {
   const user = await getSessionUser();
   if (!user) return { error: "Not authenticated." };
   if (!isValidCaptureDataUrl(dataUrl)) {
@@ -264,7 +312,15 @@ export async function saveWebcamCapture(
   const path = `${user.id}/webcam-${Date.now()}.jpg`;
   const base64 = dataUrl.split(",")[1]!;
   const buffer = Buffer.from(base64, "base64");
-  const admin = createAdminSupabase();
+
+  let admin: ReturnType<typeof createAdminSupabase>;
+  try {
+    admin = createAdminSupabase();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    console.error("[verify:webcam] createAdminSupabase failed:", msg);
+    return { error: "Server misconfigured. SUPABASE_SERVICE_ROLE_KEY required." };
+  }
 
   const { error: uploadErr } = await admin.storage
     .from("verification-docs")
@@ -274,19 +330,25 @@ export async function saveWebcamCapture(
     console.error("[verify:webcam] storage:", uploadErr.message, uploadErr);
   }
 
-  const supabase = await createServerSupabase();
-  const { error: profileErr } = await supabase
-    .from("profiles")
-    .update({
+  const profileResult = await adminUpdateProfile(
+    user.id,
+    {
       identity_proofed: true,
       identity_document_path: path,
       identity_verified: true,
-    })
-    .eq("id", user.id);
+    },
+    {
+      identity_document_path: path,
+      identity_verified: true,
+    },
+  );
 
-  if (profileErr) {
-    console.error("[verify:webcam] profile update:", profileErr.message, profileErr);
-    return { error: profileErr.message };
+  if (profileResult.error) {
+    console.error("[verify:webcam] profile update:", profileResult.error);
+    return {
+      error: profileResult.error,
+      schemaSync: profileResult.schemaSync,
+    };
   }
 
   revalidatePath("/dashboard/settings");
@@ -296,7 +358,7 @@ export async function saveWebcamCapture(
 
 export async function uploadIdentityDocument(
   formData: FormData,
-): Promise<{ error?: string; path?: string }> {
+): Promise<{ error?: string; path?: string; schemaSync?: boolean }> {
   const user = await getSessionUser();
   if (!user) return { error: "Not authenticated." };
 
@@ -313,7 +375,15 @@ export async function uploadIdentityDocument(
   const path = `${user.id}/identity-${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const admin = createAdminSupabase();
+  let admin: ReturnType<typeof createAdminSupabase>;
+  try {
+    admin = createAdminSupabase();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    console.error("[verify:upload] createAdminSupabase failed:", msg);
+    return { error: "Server misconfigured. SUPABASE_SERVICE_ROLE_KEY required." };
+  }
+
   const { error: uploadErr } = await admin.storage
     .from("verification-docs")
     .upload(path, buffer, { contentType: file.type, upsert: true });
@@ -322,16 +392,29 @@ export async function uploadIdentityDocument(
     console.warn("[verify:upload] storage:", uploadErr.message);
   }
 
-  const supabase = await createServerSupabase();
-  await supabase
-    .from("profiles")
-    .update({
+  const profileResult = await adminUpdateProfile(
+    user.id,
+    {
+      identity_proofed: true,
       identity_document_path: path,
       identity_audit_status: "pending",
       clearance_tier: "pending",
       sovereign_pending: true,
-    })
-    .eq("id", user.id);
+    },
+    {
+      identity_document_path: path,
+      identity_audit_status: "pending",
+      sovereign_pending: true,
+    },
+  );
+
+  if (profileResult.error) {
+    console.error("[verify:upload] profile update:", profileResult.error);
+    return {
+      error: profileResult.error,
+      schemaSync: profileResult.schemaSync,
+    };
+  }
 
   revalidatePath("/dashboard/settings");
   return { path };

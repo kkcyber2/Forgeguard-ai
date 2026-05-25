@@ -6,7 +6,7 @@
 --   Supabase Dashboard → SQL Editor → New query → Run
 --
 -- Idempotent: safe to re-run on partially migrated projects.
--- Includes: Admin Command Center, Persona Switcher, Iron Wall, Ghost Protocol.
+-- Includes: Admin Command Center, Persona Switcher, Iron Wall, Ghost Protocol, Stronghold completion.
 -- =============================================================================
 
 BEGIN;
@@ -182,24 +182,57 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+ALTER TABLE public.profiles
+  ALTER COLUMN current_persona SET DEFAULT 'hacker';
+
+COMMENT ON COLUMN public.profiles.current_persona IS
+  'Active UI persona: client | hacker | dev (Sovereign admin console)';
+
 -- ─── 9. Iron Wall — verification pipeline repair ─────────────────────────────
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS company_domain      text,
   ADD COLUMN IF NOT EXISTS company_tag         text,
   ADD COLUMN IF NOT EXISTS domain_token        text,
-  ADD COLUMN IF NOT EXISTS domain_verify_token text;
+  ADD COLUMN IF NOT EXISTS domain_verify_token text,
+  ADD COLUMN IF NOT EXISTS domain_verified     boolean NOT NULL DEFAULT false;
+
+UPDATE public.profiles
+   SET domain_token = COALESCE(domain_token, domain_verify_token)
+ WHERE domain_token IS NULL AND domain_verify_token IS NOT NULL;
+
+UPDATE public.profiles
+   SET domain_verify_token = COALESCE(domain_verify_token, domain_token)
+ WHERE domain_verify_token IS NULL AND domain_token IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.otp_logs (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   phone         text NOT NULL,
-  status        text NOT NULL DEFAULT 'queued',
+  status        text NOT NULL DEFAULT 'queued'
+                CHECK (status IN ('queued', 'sent', 'failed', 'verified', 'expired')),
   provider      text,
   error_message text,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_otp_logs_user
+  ON public.otp_logs (user_id, created_at DESC);
+
 ALTER TABLE public.otp_logs ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "otp_logs: owner read"
+    ON public.otp_logs FOR SELECT TO authenticated
+    USING (user_id = auth.uid());
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "otp_logs: service all"
+    ON public.otp_logs FOR ALL
+    USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 10. Ghost Protocol — elite hacker stealth identity ──────────────────────
 ALTER TABLE public.profiles
@@ -246,6 +279,76 @@ CREATE INDEX IF NOT EXISTS idx_profiles_ghost_active
   ON public.profiles (is_ghost_active)
   WHERE is_ghost_active = true;
 
+-- ─── 11. Stronghold completion — OTP table, code_hash repair, wallet realtime ─
+CREATE TABLE IF NOT EXISTS public.verification_otps (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  phone       text        NOT NULL,
+  code_hash   text        NOT NULL,
+  expires_at  timestamptz NOT NULL,
+  consumed    boolean     NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_verification_otps_user
+  ON public.verification_otps (user_id, created_at DESC);
+
+ALTER TABLE public.verification_otps ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "verification_otps: owner read"
+    ON public.verification_otps FOR SELECT TO authenticated
+    USING (user_id = auth.uid());
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "verification_otps: service insert"
+    ON public.verification_otps FOR INSERT
+    WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Legacy repair: migrate old `code` column to `code_hash`
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'verification_otps'
+       AND column_name = 'code'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'verification_otps'
+       AND column_name = 'code_hash'
+  ) THEN
+    ALTER TABLE public.verification_otps ADD COLUMN code_hash text;
+    UPDATE public.verification_otps SET code_hash = code WHERE code_hash IS NULL;
+    ALTER TABLE public.verification_otps ALTER COLUMN code_hash SET NOT NULL;
+    ALTER TABLE public.verification_otps DROP COLUMN code;
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'verification_otps'
+       AND column_name = 'code'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'verification_otps'
+       AND column_name = 'code_hash'
+  ) THEN
+    UPDATE public.verification_otps SET code_hash = COALESCE(code_hash, code) WHERE code_hash IS NULL;
+    ALTER TABLE public.verification_otps DROP COLUMN IF EXISTS code;
+  END IF;
+END $$;
+
+-- Realtime wallet sync (required for postgres_changes on user_wallets)
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.user_wallets;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 COMMIT;
 
 -- =============================================================================
@@ -261,3 +364,9 @@ COMMIT;
 -- SELECT proname FROM pg_proc WHERE proname = 'increment_wallet';
 -- SELECT id FROM storage.buckets WHERE id = 'verification-docs';
 -- SELECT to_regclass('public.otp_logs');
+-- SELECT to_regclass('public.verification_otps');
+-- SELECT column_name FROM information_schema.columns
+--  WHERE table_schema = 'public' AND table_name = 'verification_otps'
+--    AND column_name = 'code_hash';
+-- SELECT tablename FROM pg_publication_tables
+--  WHERE pubname = 'supabase_realtime' AND tablename = 'user_wallets';

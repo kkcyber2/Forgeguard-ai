@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { Camera, FileSearch, Loader2, Upload } from "lucide-react";
 import { uploadIdentityDocument } from "./verification-actions";
 import { useSovereignStore } from "@/stores/use-sovereign-store";
+import {
+  cameraErrorMessage,
+  CameraPermissionOverlay,
+  CAMERA_PERMISSION_DENIED_MESSAGE,
+} from "./camera-permission-overlay";
 
 export function IdentityAuditor({
   documentPath,
@@ -61,8 +66,9 @@ export function IdentityAuditor({
         await videoRef.current.play();
       }
       setCamState("live");
-    } catch {
-      setCamError("Camera access denied or unavailable.");
+    } catch (err) {
+      console.error("[verify:auditor] getUserMedia failed:", err);
+      setCamError(cameraErrorMessage(err));
       setCamState("error");
     }
   }, []);
@@ -224,11 +230,13 @@ export function IdentityAuditor({
               className="absolute inset-0 h-full w-full object-cover"
               style={{ display: camState === "live" ? "block" : "none" }}
             />
-            {camState !== "live" && (
+            {camState === "error" && camError === CAMERA_PERMISSION_DENIED_MESSAGE ? (
+              <CameraPermissionOverlay compact />
+            ) : camState !== "live" ? (
               <div className="absolute inset-0 flex items-center justify-center text-xs text-white/40">
                 {camError ?? "Rear camera preferred on mobile for ID capture"}
               </div>
-            )}
+            ) : null}
             <canvas ref={canvasRef} className="hidden" />
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">

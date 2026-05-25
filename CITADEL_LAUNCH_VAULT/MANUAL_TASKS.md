@@ -32,7 +32,7 @@
 
 In **Supabase → SQL Editor → New query**, paste the **full** contents of `RUN_IN_SUPABASE.sql` and execute once.
 
-This single script includes Admin Command Center schema, Persona Switcher, Iron Wall verification repair, and **Ghost Protocol** (`is_ghost_active`, `subscription_tier`).
+This single script includes Admin Command Center schema, Persona Switcher, Iron Wall verification repair, Ghost Protocol, and **Stronghold completion** (`verification_otps`, `code_hash`, wallet Realtime).
 
 **Alternative (legacy):** `CITADEL_LAUNCH_VAULT/master-schema.sql` — same content, kept in sync; prefer `RUN_IN_SUPABASE.sql` for new deploys.
 
@@ -47,6 +47,7 @@ This adds:
 | Live map heartbeat | Realtime publication for `scan_logs`, `scans` |
 | ID document OCR path | `verification-docs` storage bucket + RLS |
 | Ghost Protocol | `profiles.is_ghost_active`, `profiles.subscription_tier` |
+| Stronghold OTP + wallet realtime | `verification_otps.code_hash`, `user_wallets` in Realtime publication |
 
 **Verify:**
 ```sql
@@ -56,6 +57,10 @@ SELECT proname FROM pg_proc WHERE proname = 'increment_wallet';
 SELECT id FROM storage.buckets WHERE id = 'verification-docs';
 SELECT column_name FROM information_schema.columns
  WHERE table_name = 'profiles' AND column_name IN ('is_ghost_active','subscription_tier');
+SELECT column_name FROM information_schema.columns
+ WHERE table_name = 'verification_otps' AND column_name = 'code_hash';
+SELECT tablename FROM pg_publication_tables
+ WHERE pubname = 'supabase_realtime' AND tablename = 'user_wallets';
 ```
 
 ---

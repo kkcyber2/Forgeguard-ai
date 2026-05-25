@@ -18,7 +18,6 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
   });
 
   const supabase = React.useMemo(() => createClient(), []);
-  const userIdRef = React.useRef<string | null>(null);
 
   const fetchWallet = React.useCallback(async () => {
     const {
@@ -26,9 +25,8 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
     } = await supabase.auth.getUser();
     if (!user) {
       setWallet((w) => ({ ...w, loading: false }));
-      return;
+      return null;
     }
-    userIdRef.current = user.id;
 
     const { data, error } = await supabase
       .from("user_wallets")
@@ -45,6 +43,8 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
       is_frozen: data?.is_frozen ?? false,
       loading: false,
     });
+
+    return user.id;
   }, [supabase]);
 
   React.useEffect(() => {
@@ -64,11 +64,8 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
     const interval = setInterval(() => void fetchWallet(), 5_000);
 
     void (async () => {
-      await fetchWallet();
-      if (cancelled) return;
-
-      const uid = userIdRef.current;
-      if (!uid) return;
+      const uid = await fetchWallet();
+      if (cancelled || !uid) return;
 
       channel = supabase
         .channel(`wallet:${uid}`)

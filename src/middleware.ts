@@ -117,6 +117,21 @@ function buildCsp(nonce: string, isDev: boolean): string {
   ].join("; ");
 }
 
+const VERIFICATION_CAMERA_PATHS = [
+  "/dashboard/settings",
+  "/auth/signup/identity",
+];
+
+function permissionsPolicy(pathname: string): string {
+  const allowsCamera = VERIFICATION_CAMERA_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+  if (allowsCamera) {
+    return "camera=(self), microphone=(self), geolocation=()";
+  }
+  return "camera=(), microphone=(), geolocation=()";
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -177,7 +192,7 @@ export function middleware(request: NextRequest) {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()",
+    permissionsPolicy(pathname),
   );
   response.headers.set("X-XSS-Protection", "1; mode=block");
 

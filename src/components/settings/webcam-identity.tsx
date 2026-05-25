@@ -13,30 +13,17 @@ import {
 import { saveWebcamCapture } from "./verification-actions";
 import { useSovereignStore } from "@/stores/use-sovereign-store";
 import { GhostPublicIdentity } from "@/components/dashboard/ghost-public-identity";
+import {
+  cameraErrorMessage,
+  CameraPermissionOverlay,
+  CAMERA_PERMISSION_DENIED_MESSAGE,
+} from "./camera-permission-overlay";
 
 type State = "idle" | "requesting" | "live" | "captured" | "error" | "saving";
 
 function isMobileDevice(): boolean {
   if (typeof navigator === "undefined") return false;
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-}
-
-function cameraErrorMessage(err: unknown): string {
-  if (err instanceof DOMException) {
-    if (err.name === "NotAllowedError") {
-      return "Camera access denied. Allow camera permission in browser settings.";
-    }
-    if (err.name === "NotFoundError") {
-      return "No camera found on this device.";
-    }
-    if (err.name === "NotReadableError") {
-      return "Camera is in use by another application.";
-    }
-    if (err.name === "SecurityError") {
-      return "Camera requires HTTPS. Open ForgeGuard over a secure connection.";
-    }
-  }
-  return "Could not access camera. Check permissions and try again.";
 }
 
 function isValidCapture(dataUrl: string | null): boolean {
@@ -265,12 +252,15 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
             </p>
           </div>
         )}
-        {state === "error" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-            <AlertCircle size={18} className="text-red-400/80" strokeWidth={1.5} />
-            <p className="text-xs text-red-400/90">{errorMsg}</p>
-          </div>
-        )}
+        {state === "error" &&
+          (errorMsg === CAMERA_PERMISSION_DENIED_MESSAGE ? (
+            <CameraPermissionOverlay />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+              <AlertCircle size={18} className="text-red-400/80" strokeWidth={1.5} />
+              <p className="text-xs text-red-400/90">{errorMsg}</p>
+            </div>
+          ))}
 
         <canvas ref={canvasRef} className="hidden" />
       </div>

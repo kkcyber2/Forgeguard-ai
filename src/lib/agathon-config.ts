@@ -17,13 +17,22 @@ export function resolveEngineAuthToken(): string | undefined {
 
 /** @deprecated Use engineAuthHeaders */
 export function engineAuthorizationHeader():
-  | { Authorization: string }
+  | Record<string, string>
   | undefined {
   return engineAuthHeaders();
 }
 
-/** Standard Bearer headers for all Vercel → Railway engine calls. */
-export function engineAuthHeaders(): { Authorization: string } | undefined {
+/**
+ * Standard auth headers for all Vercel → Railway Python engine calls.
+ * Sends x-internal-scan-token (primary) plus Bearer for legacy engine paths.
+ */
+export function engineAuthHeaders():
+  | { "x-internal-scan-token": string; Authorization: string }
+  | undefined {
   const token = resolveEngineAuthToken();
-  return token ? { Authorization: `Bearer ${token}` } : undefined;
+  if (!token) return undefined;
+  return {
+    "x-internal-scan-token": token,
+    Authorization: `Bearer ${token}`,
+  };
 }

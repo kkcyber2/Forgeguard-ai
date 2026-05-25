@@ -6,7 +6,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { isSovereignOperator, maskOperatorEmail } from "@/lib/access/sovereign-operator";
 
 interface RateLimitEntry {
   count: number;
@@ -265,6 +265,10 @@ async function enforceAdminSovereignGate(
     logAttackAttempt(request, "sovereign_violation", "adminGate");
     return NextResponse.redirect(new URL("/auth/force-logout", request.url));
   }
+
+  console.info(
+    `[Aegis] Sovereign Guard Active for Operator: ${maskOperatorEmail(user!.email!)}`,
+  );
 
   return null;
 }

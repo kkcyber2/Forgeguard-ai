@@ -39,6 +39,13 @@ export async function sendOtpSms(
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
       console.error("[sms:twilio]", resp.status, text.slice(0, 300));
+      if (text.includes("21608")) {
+        return {
+          ok: false,
+          error:
+            "SMS Error: Trial Account Restriction. Ensure number is verified in Twilio Console.",
+        };
+      }
       return { ok: false, error: "SMS delivery failed. Try again shortly." };
     }
     return { ok: true };

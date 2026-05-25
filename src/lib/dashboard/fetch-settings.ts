@@ -1,5 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { safeQueryRows } from "@/lib/supabase/safe-query";
+import { fetchUserApiKeys } from "@/lib/supabase/queries";
 import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
 import type { ApiKeyRow } from "@/app/dashboard/settings/api-keys-section";
 import type { Database } from "@/types/supabase";
@@ -84,16 +85,7 @@ export async function fetchSettingsPageData(
     let apiKeys: ApiKeyRow[] = [];
     try {
       const supabase = await createServerSupabase();
-      const { data: rawKeys } = await safeQueryRows<ApiKeyRow>(
-        "settings/user_api_keys",
-        () =>
-          supabase
-            .from("user_api_keys")
-            .select("id, name, key_prefix, created_at, last_used_at, revoked_at")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false }),
-      );
-      apiKeys = rawKeys;
+      apiKeys = await fetchUserApiKeys(supabase, user.id);
     } catch (keysErr) {
       console.error("[settings] user_api_keys fetch:", keysErr);
     }

@@ -204,21 +204,6 @@ function buildCsp(nonce: string, isDev: boolean): string {
   return directives.join("; ");
 }
 
-const VERIFICATION_CAMERA_PATHS = [
-  "/dashboard/settings",
-  "/auth/signup/identity",
-];
-
-function permissionsPolicy(pathname: string): string {
-  const allowsHardware = VERIFICATION_CAMERA_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
-  if (allowsHardware) {
-    return "camera=*, microphone=*, geolocation=*";
-  }
-  return "camera=(), microphone=(), geolocation=()";
-}
-
 function defaultAllowedOrigin(isDev: boolean): string {
   if (process.env.ALLOWED_ORIGINS) return process.env.ALLOWED_ORIGINS;
   return isDev ? "http://localhost:3000" : "https://www.forgeguard-ai.com";
@@ -333,7 +318,6 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Permissions-Policy", permissionsPolicy(pathname));
   response.headers.set("X-XSS-Protection", "1; mode=block");
 
   if (pathname.startsWith("/api/")) {

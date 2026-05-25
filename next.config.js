@@ -46,22 +46,10 @@ const nextConfig = {
 
   async headers() {
     const hardwarePolicy =
-      "camera=*, microphone=*, geolocation=*";
+      "camera=(self), microphone=(self), geolocation=(self)";
     return [
       {
-        source: "/dashboard/settings",
-        headers: [
-          { key: "Permissions-Policy", value: hardwarePolicy },
-        ],
-      },
-      {
-        source: "/dashboard/settings/:path*",
-        headers: [
-          { key: "Permissions-Policy", value: hardwarePolicy },
-        ],
-      },
-      {
-        source: "/auth/signup/identity",
+        source: "/:path*",
         headers: [
           { key: "Permissions-Policy", value: hardwarePolicy },
         ],

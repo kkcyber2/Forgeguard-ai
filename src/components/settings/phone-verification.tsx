@@ -131,6 +131,13 @@ export function PhoneVerification({
         <p className="font-mono text-[10px] text-red-400/90">{error}</p>
       )}
 
+      {!verified && error?.includes("Trial Account Restriction") && (
+        <p className="font-mono text-[10px] leading-relaxed text-amber-400/90">
+          Verify the destination number in your Twilio Console under Phone Numbers →
+          Verified Caller IDs before retrying SMS.
+        </p>
+      )}
+
       {!verified && error?.includes("SMS provider not configured") && (
         <p className="font-mono text-[10px] leading-relaxed text-white/35">
           Production SMS requires{" "}

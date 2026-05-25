@@ -17,6 +17,7 @@ import {
   cameraErrorMessage,
   CameraPermissionOverlay,
   CAMERA_PERMISSION_DENIED_MESSAGE,
+  isCameraPermissionDenied,
 } from "./camera-permission-overlay";
 
 type State = "idle" | "requesting" | "live" | "captured" | "error" | "saving";
@@ -40,6 +41,7 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
 
   const [state, setState] = useState<State>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [saved, setSaved] = useState(verified);
   const [pending, startTransition] = useTransition();
@@ -75,6 +77,7 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
     stopCamera();
     setState("requesting");
     setErrorMsg(null);
+    setPermissionDenied(false);
 
     try {
       const mobile = isMobileDevice();
@@ -112,9 +115,33 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
       console.error("[verify:webcam] getUserMedia failed:", err);
       stopCamera();
       setErrorMsg(cameraErrorMessage(err));
+      setPermissionDenied(isCameraPermissionDenied(err));
       setState("error");
     }
   }, [stopCamera]);
+
+  const forceRequestPermissions = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErrorMsg("Camera API unavailable. Use HTTPS or a modern browser.");
+      setState("error");
+      return;
+    }
+
+    setState("requesting");
+    setErrorMsg(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach((track) => track.stop());
+      setPermissionDenied(false);
+      await startCamera();
+    } catch (err) {
+      console.error("[verify:webcam] force permission request failed:", err);
+      setErrorMsg(cameraErrorMessage(err));
+      setPermissionDenied(isCameraPermissionDenied(err));
+      setState("error");
+    }
+  }, [startCamera]);
 
   function handleCapture() {
     if (!videoRef.current || !canvasRef.current) return;
@@ -147,6 +174,7 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
     setCapturedUrl(null);
     setState("idle");
     setErrorMsg(null);
+    setPermissionDenied(false);
   }
 
   function handleSubmit() {
@@ -274,14 +302,25 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {state === "idle" || state === "error" ? (
-          <button
-            type="button"
-            onClick={() => void startCamera()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-violet-500 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white"
-          >
-            <Camera size={12} strokeWidth={2} />
-            Start Camera
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => void startCamera()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-violet-500 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white"
+            >
+              <Camera size={12} strokeWidth={2} />
+              Start Camera
+            </button>
+            {permissionDenied && (
+              <button
+                type="button"
+                onClick={() => void forceRequestPermissions()}
+                className="flex flex-1 items-center justify-center gap-2 rounded-[3px] border-2 border-[#D1FF00] bg-[#D1FF00]/20 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#D1FF00] shadow-[0_0_24px_-4px_rgba(209,255,0,0.55)] hover:bg-[#D1FF00]/30"
+              >
+                Force Request Permissions
+              </button>
+            )}
+          </>
         ) : state === "live" ? (
           <>
             <button

@@ -112,6 +112,7 @@ export default async function SettingsPage() {
                 documentPath={data.docPath}
                 auditStatus={data.profile?.identity_audit_status ?? "none"}
                 auditScore={data.auditScore}
+                profileFullName={data.profile?.full_name ?? ""}
               />
             </div>
           </Section>

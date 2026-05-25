@@ -74,10 +74,12 @@ export function IdentityAuditor({
   documentPath,
   auditStatus,
   auditScore,
+  profileFullName,
 }: {
   documentPath: string | null;
   auditStatus: string;
   auditScore: number | null;
+  profileFullName?: string;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +212,19 @@ export function IdentityAuditor({
       }
 
       const passed = !!audit.passed;
+      const extractedName = audit.result?.extracted_name ?? "";
+      const profileName = audit.profile_full_name ?? profileFullName ?? "";
+
+      if (!passed && (extractedName || profileName)) {
+        console.warn("[verify:auditor] Identity name comparison:", {
+          extractedName: extractedName || "(none)",
+          profileName: profileName || "(none)",
+          nameMatch: audit.result?.name_match,
+          score: audit.result?.confidence_score,
+          failureReason: audit.failure_reason,
+        });
+      }
+
       setAuditResult({
         score: audit.result?.confidence_score ?? 0,
         passed,
@@ -270,15 +285,9 @@ export function IdentityAuditor({
   }
 
   return (
-    <form
+    <div
       id="clearance-audit"
       className="relative flex flex-col gap-4 scroll-mt-24"
-      onSubmit={(e) => e.preventDefault()}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && !(e.target instanceof HTMLTextAreaElement)) {
-          e.preventDefault();
-        }
-      }}
     >
       {isGhostMode && (
         <div
@@ -469,6 +478,6 @@ export function IdentityAuditor({
       {error && auditResult?.failureReason && error !== auditResult.failureReason && (
         <p className="font-mono text-[10px] text-red-400/90">{error}</p>
       )}
-    </form>
+    </div>
   );
 }

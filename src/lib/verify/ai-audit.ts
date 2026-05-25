@@ -28,6 +28,65 @@ export interface StoredDocumentInput {
 
 const MAX_IMAGE_BYTES = 900_000;
 const VISION_MODEL = "google/gemini-flash-1.5";
+const FUZZY_MATCH_THRESHOLD = 0.8;
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = i - 1;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const temp = row[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+      prev = temp;
+    }
+  }
+  return row[b.length]!;
+}
+
+function nameTokens(name: string): string[] {
+  return normalizeName(name).split(" ").filter((t) => t.length > 1);
+}
+
+/** 0–1 similarity; ≥0.8 counts as a fuzzy identity match. */
+export function fuzzyNameSimilarity(profileName: string, extractedName: string): number {
+  const p = normalizeName(profileName);
+  const e = normalizeName(extractedName);
+  if (!p || !e) return 0;
+  if (p === e) return 1;
+
+  const maxLen = Math.max(p.length, e.length);
+  const editSim = maxLen > 0 ? 1 - levenshtein(p, e) / maxLen : 0;
+
+  const pTokens = nameTokens(profileName);
+  const eTokens = nameTokens(extractedName);
+  if (pTokens.length === 0 || eTokens.length === 0) return editSim;
+
+  const required =
+    pTokens.length >= 2
+      ? [pTokens[0]!, pTokens[pTokens.length - 1]!]
+      : pTokens;
+
+  const tokenMatches = required.filter((t) =>
+    eTokens.some((et) => {
+      if (et === t) return true;
+      const maxT = Math.max(t.length, et.length);
+      return maxT > 0 && (1 - levenshtein(t, et) / maxT) >= 0.85;
+    }),
+  ).length;
+
+  const tokenSim = tokenMatches / required.length;
+  return Math.max(editSim, tokenSim);
+}
+
+export function fuzzyNamesMatch(profileName: string, extractedName: string): boolean {
+  return fuzzyNameSimilarity(profileName, extractedName) >= FUZZY_MATCH_THRESHOLD;
+}
 
 function normalizeName(s: string): string {
   return s
@@ -41,14 +100,27 @@ export function heuristicIdentityAudit(input: IdentityAuditInput): IdentityAudit
   const profile = normalizeName(input.profileFullName || "");
   const doc = input.documentText.toLowerCase();
   const tokens = profile.split(" ").filter((t) => t.length > 1);
-  const matched = tokens.length > 0 && tokens.every((t) => doc.includes(t));
-  const score = matched ? 72 : 35;
+  const tokenMatch = tokens.length > 0 && tokens.every((t) => doc.includes(t));
+
+  const extractedGuess =
+    input.documentText.match(/extracted_name="([^"]+)"/i)?.[1] ??
+    input.documentText.match(/name[:\s]+([a-z][a-z\s.'-]{2,60})/i)?.[1]?.trim() ??
+    "";
+
+  const fuzzyMatch =
+    extractedGuess.length > 0 &&
+    fuzzyNamesMatch(input.profileFullName, extractedGuess);
+
+  const matched = tokenMatch || fuzzyMatch;
+  const score = matched ? (fuzzyMatch ? 82 : 72) : 35;
   return {
-    extracted_name: input.profileFullName,
+    extracted_name: extractedGuess || input.profileFullName,
     name_match: matched,
     confidence_score: score,
     audit_notes: matched
-      ? "Heuristic: all profile name tokens found in document text."
+      ? fuzzyMatch
+        ? "Heuristic fuzzy match: extracted name aligns with profile."
+        : "Heuristic: all profile name tokens found in document text."
       : "Heuristic: name tokens not fully present in document.",
     mode: "heuristic",
   };
@@ -58,7 +130,11 @@ function buildPrompt(input: IdentityAuditInput): string {
   return `You are an identity verification auditor for a security research platform.
 
 Extract the legal full name from the identity document text below.
-Compare it to the registered profile name.
+Perform a FUZZY match between the extracted ID name and the profile name:
+- Ignore capitalization, punctuation, and accent marks
+- Allow minor OCR spelling variations (1–2 character typos per name part)
+- Missing middle names, initials, or suffixes on either side still count as a match
+- If the names are ≥80% similar, set name_match to true and confidence_score ≥ 85
 
 Profile name: "${input.profileFullName}"
 Profile email: "${input.profileEmail}"
@@ -190,7 +266,7 @@ Profile email: "${profileEmail}"
 Tasks:
 1. Read the legal full name printed on the document (OCR).
 2. Detect if the image is too blurry, dark, or cropped to read.
-3. Note any obvious name mismatch vs the profile name.
+3. Fuzzy-compare extracted name vs profile — ignore case, allow minor typos and missing middle names; ≥80% similar is a match.
 
 Respond ONLY with valid JSON:
 {
@@ -382,24 +458,47 @@ export async function runIdentityAudit(
     };
     const raw = completion.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(raw) as Partial<IdentityAuditResult>;
+    const extractedName = (parsed.extracted_name ?? "").trim();
 
     const profileNorm = normalizeName(input.profileFullName);
-    const extractedNorm = normalizeName(parsed.extracted_name ?? "");
+    const extractedNorm = normalizeName(extractedName);
+    const fuzzySim = fuzzyNameSimilarity(input.profileFullName, extractedName);
+    const fuzzyMatch = fuzzySim >= FUZZY_MATCH_THRESHOLD;
+
     const nameMatch =
-      parsed.name_match ??
+      parsed.name_match === true ||
+      fuzzyMatch ||
       (profileNorm.length > 0 &&
         extractedNorm.length > 0 &&
         (profileNorm === extractedNorm ||
           profileNorm.split(" ").every((t) => extractedNorm.includes(t))));
 
-    return {
-      extracted_name: parsed.extracted_name ?? input.profileFullName,
-      name_match: nameMatch,
-      confidence_score: Math.min(
-        100,
-        Math.max(0, Number(parsed.confidence_score) || (nameMatch ? 85 : 40)),
+    if (!nameMatch && extractedName) {
+      console.warn("[verify:ai-audit] Name mismatch:", {
+        extractedName,
+        profileName: input.profileFullName,
+        fuzzySimilarity: Math.round(fuzzySim * 100),
+      });
+    }
+
+    const confidence = Math.min(
+      100,
+      Math.max(
+        0,
+        Number(parsed.confidence_score) ||
+          (nameMatch ? (fuzzyMatch ? 88 : 85) : 40),
       ),
-      audit_notes: parsed.audit_notes ?? "DeepSeek-R1 identity audit complete.",
+    );
+
+    return {
+      extracted_name: extractedName || input.profileFullName,
+      name_match: nameMatch,
+      confidence_score: nameMatch && fuzzyMatch && confidence < 80 ? 85 : confidence,
+      audit_notes:
+        parsed.audit_notes ??
+        (fuzzyMatch
+          ? "DeepSeek-R1 fuzzy identity match (≥80% similar)."
+          : "DeepSeek-R1 identity audit complete."),
       mode: "deepseek-r1",
     };
   } catch {

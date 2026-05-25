@@ -11,6 +11,7 @@ export interface RunAiAuditResponse {
   ok?: boolean;
   error?: string;
   failure_reason?: string;
+  profile_full_name?: string;
   result?: IdentityAuditResult;
   passed?: boolean;
   status?: string;
@@ -62,6 +63,7 @@ export async function runAiAudit(
     passed: outcome.passed,
     status: outcome.status,
     failure_reason: outcome.failure_reason,
+    profile_full_name: profile.full_name ?? undefined,
   };
 }
 

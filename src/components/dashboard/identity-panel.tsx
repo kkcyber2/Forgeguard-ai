@@ -21,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeHackerRankLabel } from "@/lib/access/ranks";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
@@ -29,7 +30,7 @@ import { cn } from "@/lib/utils";
 export interface IdentityPanelProps {
   userType: "client" | "hacker" | "developer" | null;
   accessLevel: number;
-  hackerRank: string | null;
+  hackerRank: string | number | null;
   reputation: number;
   missionsCompleted: number;
   openBounties: number;
@@ -54,9 +55,9 @@ const RANK_CONFIG: Record<
   TRAITOR:  { label: "TRAITOR",  color: "text-red-400",     glow: "shadow-red-400/30", description: "Account frozen. Wallet locked." },
 };
 
-function getRank(rank: string | null) {
-  if (!rank) return RANK_CONFIG.GHOST!;
-  return RANK_CONFIG[rank.toUpperCase()] ?? RANK_CONFIG.GHOST!;
+function getRank(rank: string | number | null) {
+  if (rank == null) return RANK_CONFIG.GHOST!;
+  return RANK_CONFIG[normalizeHackerRankLabel(rank)] ?? RANK_CONFIG.GHOST!;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -112,7 +113,7 @@ function HackerPanel({
   | "fullName"
 >) {
   const rank = getRank(hackerRank);
-  const isTraitor = hackerRank?.toUpperCase() === "TRAITOR";
+  const isTraitor = normalizeHackerRankLabel(hackerRank) === "TRAITOR";
 
   return (
     <div

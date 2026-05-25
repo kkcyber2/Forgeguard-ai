@@ -5,14 +5,20 @@ import { ShieldAlert, Terminal } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 
+/** Settings rank TypeError digest (hacker_rank integer vs string). */
+export const RANK_MISMATCH_DIGEST = "4073462472";
+
 export function StrongholdRecovering({
   message = "A subsystem failed to load. Your session and navigation remain secure.",
   systemLog,
+  digest,
   reset,
 }: {
   message?: string;
   /** Raw error text — visible to sovereign operator via System Log. */
   systemLog?: string;
+  /** Next.js error digest for known recovery hints. */
+  digest?: string;
   reset?: () => void;
 }) {
   const [showLog, setShowLog] = React.useState(false);
@@ -35,6 +41,17 @@ export function StrongholdRecovering({
     systemLog ??
     "No system log attached. Check browser console and Vercel function logs.";
 
+  const resolvedDigest =
+    digest ??
+    (systemLog?.includes(`digest: ${RANK_MISMATCH_DIGEST}`)
+      ? RANK_MISMATCH_DIGEST
+      : undefined);
+
+  const displayMessage =
+    resolvedDigest === RANK_MISMATCH_DIGEST
+      ? "Rank Data Mismatch Detected — Applying Fix…"
+      : message;
+
   return (
     <div
       className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-[4px] border border-white/[0.08] bg-[#0A0A0A]/80 px-6 py-10 text-center"
@@ -47,7 +64,7 @@ export function StrongholdRecovering({
         <h2 className="font-mono text-sm font-semibold uppercase tracking-[0.14em] text-white">
           Stronghold Recovering
         </h2>
-        <p className="font-mono text-[12px] leading-relaxed text-white/45">{message}</p>
+        <p className="font-mono text-[12px] leading-relaxed text-white/45">{displayMessage}</p>
       </div>
 
       {showLog && isSovereign && (

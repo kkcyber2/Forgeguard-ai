@@ -34,6 +34,7 @@ export default function DashboardError({
     <StrongholdRecovering
       message={messageForPath(pathname)}
       systemLog={strongholdLogFromError(error)}
+      digest={error.digest}
       reset={reset}
     />
   );

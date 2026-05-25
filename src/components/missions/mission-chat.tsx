@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useTransition, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Send, Loader2 } from "lucide-react";
 import { OperatorNameBadge } from "@/components/dashboard/verified-badge";
-import { rankBadgeClass } from "@/lib/access/ranks";
+import { normalizeHackerRankLabel, rankBadgeClass } from "@/lib/access/ranks";
 import { operatorAlias } from "@/lib/access/ghost-mode";
 import { cn } from "@/lib/utils";
 import { sendMissionMessage } from "./actions";
@@ -19,7 +19,7 @@ interface Message {
 
 interface SenderMeta {
   fullName: string | null;
-  hackerRank: string;
+  hackerRank: string | number;
   identityVerified: boolean;
   companyTag: string | null;
   domainVerified: boolean;
@@ -213,7 +213,7 @@ function ChatBubble({
     minute: "2-digit",
     hour12: false,
   });
-  const rank = (meta?.hackerRank ?? "RECRUIT").toUpperCase();
+  const rank = normalizeHackerRankLabel(meta?.hackerRank);
   const label = message.isOwn
     ? "YOU"
     : meta?.isGhostActive

@@ -74,6 +74,21 @@ SELECT relrowsecurity FROM pg_class WHERE relname = 'attack_logs';
 
 ---
 
+## 1b. API Keys table (Settings / CI-CD)
+
+If Vercel logs show `PGRST205` / `Could not find the table 'public.user_api_keys'`:
+
+**File:** `sql/api_keys.sql`
+
+In **Supabase → SQL Editor**, paste and run the full script. This creates `user_api_keys`, indexes, and RLS policies for the Settings → API Keys section and `/api/v1/scans` bearer auth.
+
+**Verify:**
+```sql
+SELECT to_regclass('public.user_api_keys');
+```
+
+---
+
 ## 2. Environment Variables
 
 Add to **Vercel / `.env.local`**:

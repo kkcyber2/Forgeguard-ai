@@ -1,11 +1,11 @@
 import { OperatorNameBadge } from "@/components/dashboard/verified-badge";
 import { cn } from "@/lib/utils";
-import { rankBadgeClass } from "@/lib/access/ranks";
+import { normalizeHackerRankLabel, rankBadgeClass } from "@/lib/access/ranks";
 
 export interface HackerProfileProps {
   fullName: string | null;
   email: string;
-  hackerRank: string | null;
+  hackerRank: string | number | null;
   reputation: number;
   identityVerified: boolean;
   companyTag: string | null;
@@ -26,7 +26,7 @@ export function HackerProfile({
   compact = false,
 }: HackerProfileProps) {
   const display = fullName ?? email.split("@")[0];
-  const rank = (hackerRank ?? "RECRUIT").toUpperCase();
+  const rank = normalizeHackerRankLabel(hackerRank);
 
   return (
     <div

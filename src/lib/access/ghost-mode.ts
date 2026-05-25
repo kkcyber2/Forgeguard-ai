@@ -3,6 +3,8 @@
  * Gate: hacker rank tier ≥ 3 AND subscription_tier = enterprise.
  */
 
+import { normalizeHackerRankLabel } from "@/lib/access/ranks";
+
 export const GHOST_ACCENT = {
   primary: "#4A4A4A",
   glow: "rgba(74,74,74,0.35)",
@@ -25,10 +27,16 @@ const RANK_TIER: Record<string, number> = {
 };
 
 export function resolveHackerRankTier(
-  hackerRank: string | null | undefined,
+  hackerRank: string | number | null | undefined,
   accessLevel: number | null | undefined,
 ): number {
-  const fromRank = RANK_TIER[(hackerRank ?? "").toUpperCase()] ?? 0;
+  if (typeof hackerRank === "number" && Number.isFinite(hackerRank)) {
+    const fromNumeric = Math.min(5, Math.max(0, Math.round(hackerRank)));
+    const fromLevel =
+      accessLevel != null ? Math.max(1, Math.min(5, accessLevel)) : 0;
+    return Math.max(fromNumeric, fromLevel);
+  }
+  const fromRank = RANK_TIER[normalizeHackerRankLabel(hackerRank, "")] ?? 0;
   const fromLevel =
     accessLevel != null ? Math.max(1, Math.min(5, accessLevel)) : 0;
   return Math.max(fromRank, fromLevel);
@@ -48,7 +56,7 @@ export function normalizeSubscriptionTier(
 }
 
 export function canEnableGhostMode(
-  hackerRank: string | null | undefined,
+  hackerRank: string | number | null | undefined,
   subscriptionTier: string | null | undefined,
   accessLevel?: number | null,
   currentPlan?: string | null,

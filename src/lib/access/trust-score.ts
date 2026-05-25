@@ -13,9 +13,12 @@ const HACKER_RANK_TRUST: Record<string, number> = {
 
 /** TopNav trust badge — tier from profile.hacker_rank only; null/undefined → 0. */
 export function resolveTrustLevelFromHackerRank(
-  hackerRank: string | null | undefined,
+  hackerRank: string | number | null | undefined,
 ): number {
   if (hackerRank == null) return 0;
+  if (typeof hackerRank === "number" && Number.isFinite(hackerRank)) {
+    return Math.min(5, Math.max(0, Math.round(hackerRank)));
+  }
   const normalized =
     typeof hackerRank === "string" ? hackerRank : String(hackerRank);
   if (normalized.trim() === "") return 0;

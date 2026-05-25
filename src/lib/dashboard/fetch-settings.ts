@@ -46,7 +46,7 @@ function normalizeProfile(row: ProfileRow | null): ProfileRow | null {
   if (!row) return null;
   return {
     ...row,
-    hacker_rank: row.hacker_rank ?? null,
+    hacker_rank: row.hacker_rank != null ? String(row.hacker_rank) : null,
     access_level: row.access_level ?? 1,
     role: row.role ?? "user",
   };

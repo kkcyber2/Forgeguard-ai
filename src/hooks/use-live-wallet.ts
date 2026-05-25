@@ -19,6 +19,11 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
   const [userId, setUserId] = React.useState<string | null>(null);
 
   const supabase = React.useMemo(() => createClient(), []);
+  const sessionIdRef = React.useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `sess-${Date.now()}`,
+  );
 
   const fetchWallet = React.useCallback(async (): Promise<string | null> => {
     const {
@@ -78,8 +83,9 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
   React.useEffect(() => {
     if (!userId) return;
 
+    const channelName = `wallet:${userId}:${sessionIdRef.current}`;
     const channel = supabase
-      .channel(`wallet:${userId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {

@@ -18,6 +18,7 @@ export default function SettingsError({
     <StrongholdRecovering
       message="Settings could not load — profile and verification forms are temporarily unavailable."
       systemLog={strongholdLogFromError(error)}
+      digest={error.digest}
       reset={reset}
     />
   );

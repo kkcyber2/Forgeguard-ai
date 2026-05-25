@@ -26,6 +26,7 @@ export default function GlobalError({
           <StrongholdRecovering
             message="A critical subsystem fault was detected. Reload to re-establish the Stronghold link."
             systemLog={strongholdLogFromError(error)}
+            digest={error.digest}
             reset={reset}
           />
         </div>

@@ -164,6 +164,15 @@ export function redirectForBlockedPath(pathname: string): string {
   return "/dashboard";
 }
 
+/** Coerce DB hacker_rank (string | number | null) to uppercase label — never throws. */
+export function normalizeHackerRankLabel(
+  rank: string | number | null | undefined,
+  fallback = "RECRUIT",
+): string {
+  if (rank == null || rank === "") return fallback;
+  return String(rank).trim().toUpperCase() || fallback;
+}
+
 /** Map numeric access_level to display tier */
 export function accessRankLabel(accessLevel: number, role: string | null): string {
   const rank = resolveAccessRank(accessLevel, role);
@@ -174,8 +183,10 @@ export function accessRankLabel(accessLevel: number, role: string | null): strin
 }
 
 /** Color-coded hacker rank badge */
-export function rankBadgeClass(hackerRank: string | null): string {
-  switch ((hackerRank ?? "RECRUIT").toUpperCase()) {
+export function rankBadgeClass(
+  hackerRank: string | number | null | undefined,
+): string {
+  switch (normalizeHackerRankLabel(hackerRank)) {
     case "GHOST":
     case "HACKER":
       return "text-blue-400 border-blue-400/30 bg-blue-400/10";

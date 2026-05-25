@@ -1,14 +1,14 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { rankBadgeClass } from "@/lib/access/ranks";
+import { normalizeHackerRankLabel, rankBadgeClass } from "@/lib/access/ranks";
 import { VerifiedCheckmark, CompanyTagBadge } from "@/components/dashboard/verified-badge";
 import { WalletCredits } from "@/components/dashboard/wallet-credits";
 import type { LiveWalletState } from "@/hooks/use-live-wallet";
 import type { ViewMode } from "@/lib/access/parallel-sovereignty";
 
 export interface IdentityBadgeProps {
-  hackerRank: string | null;
+  hackerRank: string | number | null;
   walletBalance: number;
   wallet?: LiveWalletState;
   walletFrozen?: boolean;
@@ -30,7 +30,7 @@ export function IdentityBadge({
   viewMode = "hacker",
   trustScore = 0,
 }: IdentityBadgeProps) {
-  const rankLabel = (hackerRank ?? "RECRUIT").toUpperCase();
+  const rankLabel = normalizeHackerRankLabel(hackerRank);
   const isClient = viewMode === "client";
 
   return (

@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { HackerProfile } from "@/components/dashboard/hacker-profile";
+import { normalizeHackerRankLabel } from "@/lib/access/ranks";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
@@ -44,7 +45,7 @@ export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
               <HackerProfile
                 fullName={op.full_name}
                 email={op.email}
-                hackerRank={op.hacker_rank}
+                hackerRank={normalizeHackerRankLabel(op.hacker_rank)}
                 reputation={op.reputation ?? 0}
                 identityVerified={op.identity_verified ?? false}
                 companyTag={op.company_tag}

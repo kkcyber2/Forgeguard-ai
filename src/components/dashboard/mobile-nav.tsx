@@ -6,7 +6,7 @@ import { Menu, X } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { type NavItem, type ShellUser, NAV_ICONS } from "@/components/dashboard/shell";
 import { IdentitySwitcher } from "@/components/dashboard/identity-switcher";
-import type { ViewMode } from "@/lib/access/parallel-sovereignty";
+import type { SovereignRole, ViewMode } from "@/lib/access/parallel-sovereignty";
 
 /**
  * MobileNav — hamburger sheet for sub-lg viewports.
@@ -19,6 +19,7 @@ export function MobileNav({
   scope,
   activePath,
   viewMode = "hacker",
+  sovereignRole,
   identityChosen = true,
   canSwitchIdentity = false,
 }: {
@@ -27,6 +28,7 @@ export function MobileNav({
   scope: "user" | "admin";
   activePath: string;
   viewMode?: ViewMode;
+  sovereignRole?: SovereignRole;
   identityChosen?: boolean;
   canSwitchIdentity?: boolean;
 }) {
@@ -89,9 +91,13 @@ export function MobileNav({
           </button>
         </div>
 
-        {scope === "user" && (
+        {canSwitchIdentity && (
           <div className="border-b-[0.5px] border-white/[0.06] px-5 py-3">
-            <IdentitySwitcher activeMode={viewMode} canSwitch={canSwitchIdentity} compact />
+            <IdentitySwitcher
+              activeMode={sovereignRole ?? viewMode}
+              canSwitch={canSwitchIdentity}
+              compact
+            />
           </div>
         )}
 

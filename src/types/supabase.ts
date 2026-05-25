@@ -1422,6 +1422,7 @@ export type Database = {
         Row: {
           access_level: number | null
           active_view_mode: "client" | "hacker" | null
+          current_persona: "client" | "hacker" | "dev" | null
           ai_audit_score: number | null
           avatar_url: string | null
           bio: string | null
@@ -1459,6 +1460,8 @@ export type Database = {
           signature_data: string | null
           signature_at: string | null
           sovereign_pending: boolean | null
+          subscription_tier: string | null
+          is_ghost_active: boolean | null
           theme_preference: string | null
           updated_at: string | null
           user_type: "client" | "hacker" | "developer" | null
@@ -1467,6 +1470,7 @@ export type Database = {
         Insert: {
           access_level?: number | null
           active_view_mode?: "client" | "hacker" | null
+          current_persona?: "client" | "hacker" | "dev" | null
           ai_audit_score?: number | null
           avatar_url?: string | null
           bio?: string | null
@@ -1504,6 +1508,8 @@ export type Database = {
           signature_data?: string | null
           signature_at?: string | null
           sovereign_pending?: boolean | null
+          subscription_tier?: string | null
+          is_ghost_active?: boolean | null
           theme_preference?: string | null
           updated_at?: string | null
           user_type?: "client" | "hacker" | "developer" | null
@@ -1512,6 +1518,7 @@ export type Database = {
         Update: {
           access_level?: number | null
           active_view_mode?: "client" | "hacker" | null
+          current_persona?: "client" | "hacker" | "dev" | null
           ai_audit_score?: number | null
           avatar_url?: string | null
           bio?: string | null
@@ -1549,6 +1556,8 @@ export type Database = {
           signature_data?: string | null
           signature_at?: string | null
           sovereign_pending?: boolean | null
+          subscription_tier?: string | null
+          is_ghost_active?: boolean | null
           theme_preference?: string | null
           updated_at?: string | null
           user_type?: "client" | "hacker" | "developer" | null
@@ -2660,6 +2669,36 @@ export type Database = {
           is_frozen?: boolean
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      otp_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          phone: string
+          status: string
+          provider: string | null
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          phone: string
+          status?: string
+          provider?: string | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          phone?: string
+          status?: string
+          provider?: string | null
+          error_message?: string | null
+          created_at?: string
         }
         Relationships: []
       }

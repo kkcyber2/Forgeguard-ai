@@ -33,6 +33,7 @@ export async function setUserIdentity(userType: UserType): Promise<void> {
       user_type:         userType,
       access_level:      ACCESS_LEVELS[userType],
       active_view_mode:  activeViewMode,
+      current_persona:   activeViewMode,
     })
     .eq("id", user.id);
 

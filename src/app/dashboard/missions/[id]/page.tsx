@@ -7,6 +7,8 @@ import { ProposalForm } from "@/components/missions/proposal-form";
 import { ProposalList } from "@/components/missions/proposal-list";
 import { MissionChat } from "@/components/missions/mission-chat";
 import { CompleteMissionButton } from "@/components/missions/complete-mission-button";
+import { MissionEscrowIdentity } from "@/components/missions/mission-escrow-identity";
+import { operatorAlias } from "@/lib/access/ghost-mode";
 
 /**
  * /dashboard/missions/[id] — Mission detail page
@@ -91,12 +93,18 @@ export default async function MissionDetailPage({ params }: Props) {
   );
 
   const senderIds = [...new Set(initialMessages.map((m: { senderId: string }) => m.senderId))];
+  const profileIds = new Set(senderIds);
+  if (mission.selected_hacker_id) profileIds.add(mission.selected_hacker_id as string);
+  if (mission.client_id) profileIds.add(mission.client_id as string);
+
   const { data: senderProfiles } =
-    senderIds.length > 0
+    profileIds.size > 0
       ? await db
           .from("profiles")
-          .select("id, full_name, hacker_rank, identity_verified, company_tag, domain_verified")
-          .in("id", senderIds)
+          .select(
+            "id, full_name, hacker_rank, identity_verified, company_tag, domain_verified, is_ghost_active, signature_data",
+          )
+          .in("id", [...profileIds])
       : { data: [] };
 
   const initialSenders: Record<
@@ -107,17 +115,23 @@ export default async function MissionDetailPage({ params }: Props) {
       identityVerified: boolean;
       companyTag: string | null;
       domainVerified: boolean;
+      isGhostActive: boolean;
     }
   > = {};
   for (const p of senderProfiles ?? []) {
     initialSenders[p.id] = {
-      fullName: p.full_name,
+      fullName: p.is_ghost_active ? operatorAlias(p.id) : p.full_name,
       hackerRank: p.hacker_rank ?? "RECRUIT",
       identityVerified: p.identity_verified ?? false,
       companyTag: p.company_tag,
       domainVerified: p.domain_verified ?? false,
+      isGhostActive: p.is_ghost_active ?? false,
     };
   }
+
+  const selectedHackerProfile = (senderProfiles ?? []).find(
+    (p: { id: string }) => p.id === mission.selected_hacker_id,
+  );
 
   const RANK_COLORS: Record<string, string> = {
     RECRUIT:   "rgba(255,255,255,0.35)",
@@ -274,7 +288,18 @@ export default async function MissionDetailPage({ params }: Props) {
         </div>
 
         {/* Right: real-time DM chat (only for mission participants) */}
-        {canChat ? (
+        <div className="flex flex-col gap-4">
+          {mission.status === "in_progress" && selectedHackerProfile && (
+            <MissionEscrowIdentity
+              operatorId={selectedHackerProfile.id}
+              fullName={selectedHackerProfile.full_name}
+              signatureData={selectedHackerProfile.signature_data}
+              isGhostActive={selectedHackerProfile.is_ghost_active ?? false}
+              isOwnProfile={selectedHackerProfile.id === user.id}
+            />
+          )}
+
+          {canChat ? (
           <MissionChat
             missionId={id}
             currentUserId={user.id}
@@ -298,6 +323,7 @@ export default async function MissionDetailPage({ params }: Props) {
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

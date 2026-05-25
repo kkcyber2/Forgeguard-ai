@@ -24,9 +24,17 @@
 
 ## 1. Database — Run Master Schema
 
-**File:** `CITADEL_LAUNCH_VAULT/master-schema.sql`
+**⚠️ Cursor is NOT connected to your Supabase project. You must run SQL manually.**
 
-In **Supabase → SQL Editor → New query**, paste the full contents of `master-schema.sql` and execute.
+**Recommended — one file, everything included:**
+
+**File:** `CITADEL_LAUNCH_VAULT/RUN_IN_SUPABASE.sql`
+
+In **Supabase → SQL Editor → New query**, paste the **full** contents of `RUN_IN_SUPABASE.sql` and execute once.
+
+This single script includes Admin Command Center schema, Persona Switcher, Iron Wall verification repair, and **Ghost Protocol** (`is_ghost_active`, `subscription_tier`).
+
+**Alternative (legacy):** `CITADEL_LAUNCH_VAULT/master-schema.sql` — same content, kept in sync; prefer `RUN_IN_SUPABASE.sql` for new deploys.
 
 This adds:
 | Feature | Schema change |
@@ -38,6 +46,7 @@ This adds:
 | Wallet debit on assign | `increment_wallet()` RPC with `balance_usd` |
 | Live map heartbeat | Realtime publication for `scan_logs`, `scans` |
 | ID document OCR path | `verification-docs` storage bucket + RLS |
+| Ghost Protocol | `profiles.is_ghost_active`, `profiles.subscription_tier` |
 
 **Verify:**
 ```sql
@@ -45,6 +54,8 @@ SELECT is_certified FROM bazaar_scripts LIMIT 1;
 SELECT tx_type FROM platform_transactions WHERE tx_type = 'escrow_hold' LIMIT 1;
 SELECT proname FROM pg_proc WHERE proname = 'increment_wallet';
 SELECT id FROM storage.buckets WHERE id = 'verification-docs';
+SELECT column_name FROM information_schema.columns
+ WHERE table_name = 'profiles' AND column_name IN ('is_ghost_active','subscription_tier');
 ```
 
 ---

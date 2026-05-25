@@ -14,6 +14,32 @@ function hashOtp(code: string): string {
   return createHash("sha256").update(code).digest("hex");
 }
 
+function logOtpError(context: string, err: { message?: string; code?: string; details?: string; hint?: string }) {
+  console.error(
+    `[verify:otp] ${context}:`,
+    err.message ?? "unknown",
+    "| code:", err.code ?? "—",
+    "| details:", err.details ?? "—",
+    "| hint:", err.hint ?? "—",
+  );
+}
+
+async function writeOtpLog(
+  admin: ReturnType<typeof createAdminSupabase>,
+  payload: {
+    user_id: string;
+    phone: string;
+    status: "queued" | "sent" | "failed" | "verified" | "expired";
+    provider?: string;
+    error_message?: string;
+  },
+) {
+  const { error } = await admin.from("otp_logs").insert(payload);
+  if (error) {
+    logOtpError("otp_logs insert", error);
+  }
+}
+
 export async function sendOTP(phone: string): Promise<{ error?: string; devCode?: string }> {
   const user = await getSessionUser();
   if (!user) return { error: "Not authenticated." };
@@ -21,10 +47,25 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
   const normalized = phone.replace(/\D/g, "");
   if (normalized.length < 10) return { error: "Enter a valid phone number." };
 
+  let admin: ReturnType<typeof createAdminSupabase>;
+  try {
+    admin = createAdminSupabase();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    console.error("[verify:otp] createAdminSupabase failed:", msg);
+    return { error: "Server misconfigured. SUPABASE_SERVICE_ROLE_KEY required for OTP." };
+  }
+
   const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
-  const admin = createAdminSupabase();
+  await writeOtpLog(admin, {
+    user_id: user.id,
+    phone: normalized,
+    status: "queued",
+    provider: process.env.TWILIO_ACCOUNT_SID ? "twilio" : "dev",
+  });
+
   const { error: insertErr } = await admin.from("verification_otps").insert({
     user_id: user.id,
     phone: normalized,
@@ -33,14 +74,36 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
   });
 
   if (insertErr) {
-    console.error("[verify:otp] insert failed:", insertErr.message);
-    return { error: "Could not queue OTP. Try again." };
+    logOtpError("verification_otps insert", insertErr);
+    await writeOtpLog(admin, {
+      user_id: user.id,
+      phone: normalized,
+      status: "failed",
+      error_message: insertErr.message,
+    });
+    return {
+      error: `Could not queue OTP: ${insertErr.message}`,
+    };
   }
 
   const sms = await sendOtpSms(normalized, code);
   if (!sms.ok) {
+    await writeOtpLog(admin, {
+      user_id: user.id,
+      phone: normalized,
+      status: "failed",
+      provider: "twilio",
+      error_message: sms.error ?? "SMS delivery failed",
+    });
     return { error: sms.error ?? "SMS delivery failed." };
   }
+
+  await writeOtpLog(admin, {
+    user_id: user.id,
+    phone: normalized,
+    status: "sent",
+    provider: process.env.TWILIO_ACCOUNT_SID ? "twilio" : "dev",
+  });
 
   if (process.env.NODE_ENV === "development") {
     return { devCode: code };
@@ -57,8 +120,16 @@ export async function verifyOTP(
   if (!user) return { error: "Not authenticated." };
 
   const normalized = phone.replace(/\D/g, "");
-  const admin = createAdminSupabase();
-  const { data: row } = await admin
+  let admin: ReturnType<typeof createAdminSupabase>;
+  try {
+    admin = createAdminSupabase();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    console.error("[verify:otp] createAdminSupabase failed:", msg);
+    return { error: "Server misconfigured." };
+  }
+
+  const { data: row, error: fetchErr } = await admin
     .from("verification_otps")
     .select("id, code_hash, expires_at, consumed")
     .eq("user_id", user.id)
@@ -68,9 +139,21 @@ export async function verifyOTP(
     .limit(1)
     .maybeSingle();
 
+  if (fetchErr) {
+    logOtpError("verification_otps fetch", fetchErr);
+    return { error: fetchErr.message };
+  }
+
   if (!row) return { error: "No OTP pending. Request a new code." };
   if (row.consumed) return { error: "Code already used." };
-  if (new Date(row.expires_at) < new Date()) return { error: "Code expired." };
+  if (new Date(row.expires_at) < new Date()) {
+    await writeOtpLog(admin, {
+      user_id: user.id,
+      phone: normalized,
+      status: "expired",
+    });
+    return { error: "Code expired." };
+  }
   if (row.code_hash !== hashOtp(code.trim())) return { error: "Invalid code." };
 
   await admin
@@ -79,10 +162,21 @@ export async function verifyOTP(
     .eq("id", row.id);
 
   const supabase = await createServerSupabase();
-  await supabase
+  const { error: profileErr } = await supabase
     .from("profiles")
     .update({ phone_verified: true, phone: normalized })
     .eq("id", user.id);
+
+  if (profileErr) {
+    logOtpError("profiles phone update", profileErr);
+    return { error: profileErr.message };
+  }
+
+  await writeOtpLog(admin, {
+    user_id: user.id,
+    phone: normalized,
+    status: "verified",
+  });
 
   revalidatePath("/dashboard/settings");
   return { verified: true };
@@ -131,19 +225,28 @@ export async function saveSignatureSeal(
   return { custodyHash };
 }
 
+function isValidCaptureDataUrl(dataUrl: string): boolean {
+  if (!dataUrl.startsWith("data:image/jpeg;base64,")) return false;
+  const base64 = dataUrl.split(",")[1];
+  if (!base64 || base64.length < 100) return false;
+  try {
+    return Buffer.from(base64, "base64").byteLength > 512;
+  } catch {
+    return false;
+  }
+}
+
 export async function saveWebcamCapture(
   dataUrl: string,
 ): Promise<{ error?: string; verified?: boolean }> {
   const user = await getSessionUser();
   if (!user) return { error: "Not authenticated." };
-  if (!dataUrl.startsWith("data:image/")) {
-    return { error: "Invalid capture format." };
+  if (!isValidCaptureDataUrl(dataUrl)) {
+    return { error: "Invalid capture. Retake photo with camera active." };
   }
 
   const path = `${user.id}/webcam-${Date.now()}.jpg`;
-  const base64 = dataUrl.split(",")[1];
-  if (!base64) return { error: "Empty capture." };
-
+  const base64 = dataUrl.split(",")[1]!;
   const buffer = Buffer.from(base64, "base64");
   const admin = createAdminSupabase();
 
@@ -152,11 +255,11 @@ export async function saveWebcamCapture(
     .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
 
   if (uploadErr) {
-    console.warn("[verify:webcam] storage:", uploadErr.message);
+    console.error("[verify:webcam] storage:", uploadErr.message, uploadErr);
   }
 
   const supabase = await createServerSupabase();
-  await supabase
+  const { error: profileErr } = await supabase
     .from("profiles")
     .update({
       identity_proofed: true,
@@ -164,6 +267,11 @@ export async function saveWebcamCapture(
       identity_verified: true,
     })
     .eq("id", user.id);
+
+  if (profileErr) {
+    console.error("[verify:webcam] profile update:", profileErr.message, profileErr);
+    return { error: profileErr.message };
+  }
 
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard");

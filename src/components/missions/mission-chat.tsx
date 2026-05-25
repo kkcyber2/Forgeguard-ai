@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Send, Loader2 } from "lucide-react";
 import { OperatorNameBadge } from "@/components/dashboard/verified-badge";
 import { rankBadgeClass } from "@/lib/access/ranks";
+import { operatorAlias } from "@/lib/access/ghost-mode";
 import { cn } from "@/lib/utils";
 import { sendMissionMessage } from "./actions";
 
@@ -22,6 +23,7 @@ interface SenderMeta {
   identityVerified: boolean;
   companyTag: string | null;
   domainVerified: boolean;
+  isGhostActive?: boolean;
 }
 
 interface Props {
@@ -50,18 +52,23 @@ export function MissionChat({
       if (senders[senderId]) return;
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, hacker_rank, identity_verified, company_tag, domain_verified")
+        .select(
+          "full_name, hacker_rank, identity_verified, company_tag, domain_verified, is_ghost_active",
+        )
         .eq("id", senderId)
         .maybeSingle();
       if (!data) return;
       setSenders((prev) => ({
         ...prev,
         [senderId]: {
-          fullName: data.full_name,
+          fullName: data.is_ghost_active
+            ? operatorAlias(senderId)
+            : data.full_name,
           hackerRank: data.hacker_rank ?? "RECRUIT",
           identityVerified: data.identity_verified ?? false,
           companyTag: data.company_tag,
           domainVerified: data.domain_verified ?? false,
+          isGhostActive: data.is_ghost_active ?? false,
         },
       }));
     },
@@ -207,7 +214,11 @@ function ChatBubble({
     hour12: false,
   });
   const rank = (meta?.hackerRank ?? "RECRUIT").toUpperCase();
-  const label = message.isOwn ? "YOU" : meta?.fullName ?? `OP:${message.senderId.slice(0, 6)}`;
+  const label = message.isOwn
+    ? "YOU"
+    : meta?.isGhostActive
+      ? operatorAlias(message.senderId)
+      : meta?.fullName ?? `OP:${message.senderId.slice(0, 6)}`;
 
   return (
     <div className={cn("flex flex-col gap-1", message.isOwn ? "items-end" : "items-start")}>

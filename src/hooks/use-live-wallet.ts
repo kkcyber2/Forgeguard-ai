@@ -18,6 +18,7 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
   });
 
   const supabase = React.useMemo(() => createClient(), []);
+  const userIdRef = React.useRef<string | null>(null);
 
   const fetchWallet = React.useCallback(async () => {
     const {
@@ -27,12 +28,17 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
       setWallet((w) => ({ ...w, loading: false }));
       return;
     }
+    userIdRef.current = user.id;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("user_wallets")
       .select("balance_usd, is_frozen")
       .eq("user_id", user.id)
       .maybeSingle();
+
+    if (error) {
+      console.error("[wallet:fetch]", error.message);
+    }
 
     setWallet({
       balance_usd: Number(data?.balance_usd ?? 0),
@@ -42,7 +48,8 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
   }, [supabase]);
 
   React.useEffect(() => {
-    void fetchWallet();
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const onRefresh = (e: Event) => {
       const detail = (e as CustomEvent<{ balance?: number }>).detail;
@@ -56,28 +63,41 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
     window.addEventListener(WALLET_REFRESH_EVENT, onRefresh);
     const interval = setInterval(() => void fetchWallet(), 5_000);
 
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+    void (async () => {
+      await fetchWallet();
+      if (cancelled) return;
+
+      const uid = userIdRef.current;
+      if (!uid) return;
+
       channel = supabase
-        .channel(`wallet:${user.id}`)
+        .channel(`wallet:${uid}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "user_wallets",
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${uid}`,
           },
-          () => void fetchWallet(),
+          () => {
+            if (!cancelled) void fetchWallet();
+          },
         )
-        .subscribe();
-    });
+        .subscribe((status) => {
+          if (status === "CHANNEL_ERROR") {
+            console.error("[wallet:realtime] channel error for user", uid);
+          }
+        });
+    })();
 
     return () => {
+      cancelled = true;
       window.removeEventListener(WALLET_REFRESH_EVENT, onRefresh);
       clearInterval(interval);
-      if (channel) void supabase.removeChannel(channel);
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
     };
   }, [fetchWallet, supabase]);
 

@@ -4,11 +4,16 @@ import { redirect } from "next/navigation";
 import { ActivePath } from "@/components/dashboard/active-path";
 import {
   buildSovereignNav,
+  canAccessDevMode,
+  canShowPersonaSwitcher,
   isPathAllowedForView,
+  personaToViewMode,
   redirectForViewBlocked,
+  resolvePersona,
   resolveViewMode,
   type ViewMode,
 } from "@/lib/access/parallel-sovereignty";
+import { canEnableGhostMode, normalizeSubscriptionTier } from "@/lib/access/ghost-mode";
 import { resolveAccessRank, type UserType } from "@/lib/access/ranks";
 import { computeTrustScore } from "@/lib/access/trust-score";
 import {
@@ -19,7 +24,7 @@ import {
 
 /**
  * Authenticated dashboard shell — Parallel Sovereignty.
- * active_view_mode drives nav, accent, and route guards (client vs hacker).
+ * current_persona + active_view_mode drive nav, accent, and route guards.
  */
 
 export default async function DashboardLayout({
@@ -30,7 +35,6 @@ export default async function DashboardLayout({
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard");
 
-  // Profile row can lag the auth.users insert trigger on fresh signups.
   let profile = await getCurrentProfile();
   if (!profile) {
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -41,6 +45,16 @@ export default async function DashboardLayout({
     redirect("/auth/signup/identity");
   }
 
+  const persona = resolvePersona(
+    profile.current_persona,
+    profile.active_view_mode,
+    profile.user_type,
+  );
+
+  if (persona === "dev") {
+    redirect("/admin");
+  }
+
   const viewMode: ViewMode = resolveViewMode(
     profile.active_view_mode,
     profile.user_type,
@@ -49,7 +63,8 @@ export default async function DashboardLayout({
   const accessLevel = profile.access_level ?? 1;
   const rank = resolveAccessRank(accessLevel, profile.role ?? null);
   const userType = (profile.user_type ?? "hacker") as UserType;
-  const canSwitchIdentity = userType === "developer";
+  const canDev = canAccessDevMode(profile.clearance_tier, profile.role);
+  const canSwitchIdentity = canShowPersonaSwitcher(profile.user_type, profile.clearance_tier);
 
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "/dashboard";
@@ -59,11 +74,42 @@ export default async function DashboardLayout({
   }
 
   const supabase = await createServerSupabase();
-  const { data: wallet } = await supabase
-    .from("user_wallets")
-    .select("balance_usd, is_frozen")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [{ data: wallet }, { data: subscription }] = await Promise.all([
+    supabase
+      .from("user_wallets")
+      .select("balance_usd, is_frozen")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("subscriptions")
+      .select("plan, status")
+      .eq("user_id", user.id)
+      .in("status", ["active", "trialing", "past_due"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const subscriptionPlan =
+    subscription?.status === "active" ||
+    subscription?.status === "trialing" ||
+    subscription?.status === "past_due"
+      ? subscription.plan
+      : null;
+
+  const subscriptionTier = normalizeSubscriptionTier(
+    profile.subscription_tier,
+    profile.current_plan,
+    subscriptionPlan,
+  );
+
+  const canGhost = canEnableGhostMode(
+    profile.hacker_rank,
+    subscriptionTier,
+    profile.access_level,
+    profile.current_plan,
+    subscriptionPlan,
+  );
 
   const { primary, secondary } = buildSovereignNav(
     viewMode,
@@ -102,7 +148,16 @@ export default async function DashboardLayout({
       nav={[...primary, ...secondary]}
       user={shellUser}
       scope="user"
-      viewMode={viewMode}
+      viewMode={personaToViewMode(persona)}
+      sovereign={{
+        activeRole: persona,
+        clearanceTier: profile.clearance_tier ?? null,
+        canDev,
+        canSwitch: canSwitchIdentity,
+        isGhostMode: profile.is_ghost_active ?? false,
+        canGhost,
+        operatorId: user.id.replace(/-/g, "").slice(0, 8).toUpperCase(),
+      }}
       identityChosen={Boolean(profile.user_type)}
       canSwitchIdentity={canSwitchIdentity}
     >

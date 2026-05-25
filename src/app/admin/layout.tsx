@@ -1,38 +1,19 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
-import { type NavItem } from "@/components/dashboard/shell";
 import { ActivePath } from "@/components/dashboard/active-path";
+import {
+  buildDevNav,
+  canAccessDevMode,
+  canShowPersonaSwitcher,
+} from "@/lib/access/parallel-sovereignty";
 import {
   getSessionUser,
   requireAdminProfile,
 } from "@/lib/supabase/server";
 
 /**
- * /admin/* — Admin scope.
- * -----------------------
- * Two gates apply at the layout level:
- *   1. Authentication via getSessionUser(); unauth → /auth/login
- *   2. Role check via requireAdminProfile(); non-admin → /dashboard
- *
- * Both gates run on the server before any admin component renders, so
- * a curious user can't ever flash the admin chrome by tampering with
- * client-side flags.
- *
- * Note: NavItem.icon is a string key (resolved client-side in the shell),
- * because Lucide icon components cannot cross the server→client boundary.
+ * /admin/* — Admin scope (DEV persona).
  */
-
-const adminNav: NavItem[] = [
-  { href: "/admin", label: "Overview", icon: "layout-dashboard" },
-  { href: "/admin/threats", label: "Global threats", icon: "shield-alert" },
-  { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store" },
-  { href: "/admin/bounties", label: "Bounty Escrow", icon: "credit-card" },
-  { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark" },
-  { href: "/admin/users", label: "Users", icon: "users" },
-  { href: "/admin/verification", label: "Verification", icon: "shield-check" },
-  { href: "/admin/system", label: "System health", icon: "activity" },
-  { href: "/admin/settings", label: "Settings", icon: "settings" },
-];
 
 export default async function AdminLayout({
   children,
@@ -45,6 +26,10 @@ export default async function AdminLayout({
   const profile = await requireAdminProfile();
   if (!profile) redirect("/dashboard");
 
+  const canDev = canAccessDevMode(profile.clearance_tier, profile.role);
+  const canSwitchIdentity = canShowPersonaSwitcher(profile.user_type, profile.clearance_tier);
+  const { primary, secondary } = buildDevNav();
+
   const shellUser = {
     email: user.email ?? "",
     fullName: profile.full_name ?? user.user_metadata?.full_name ?? null,
@@ -52,7 +37,23 @@ export default async function AdminLayout({
   };
 
   return (
-    <ActivePath nav={adminNav} user={shellUser} scope="admin">
+    <ActivePath
+      primaryNav={primary}
+      secondaryNav={secondary}
+      nav={[...primary, ...secondary]}
+      user={shellUser}
+      scope="admin"
+      sovereign={{
+        activeRole: "dev",
+        clearanceTier: profile.clearance_tier ?? null,
+        canDev,
+        canSwitch: canSwitchIdentity,
+        isGhostMode: false,
+        canGhost: false,
+        operatorId: "",
+      }}
+      canSwitchIdentity={canSwitchIdentity}
+    >
       {children}
     </ActivePath>
   );

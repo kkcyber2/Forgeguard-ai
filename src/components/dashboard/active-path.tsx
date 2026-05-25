@@ -3,7 +3,12 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { DashboardShell, type NavItem, type ShellUser } from "@/components/dashboard/shell";
-import type { ViewMode } from "@/lib/access/parallel-sovereignty";
+import { SovereignProvider } from "@/components/dashboard/sovereign-provider";
+import type { SovereignHydratePayload } from "@/stores/use-sovereign-store";
+import {
+  personaToViewMode,
+  type ViewMode,
+} from "@/lib/access/parallel-sovereignty";
 
 export function ActivePath({
   nav,
@@ -12,6 +17,7 @@ export function ActivePath({
   user,
   scope,
   viewMode,
+  sovereign,
   identityChosen,
   canSwitchIdentity,
   children,
@@ -22,12 +28,16 @@ export function ActivePath({
   user: ShellUser;
   scope: "user" | "admin";
   viewMode?: ViewMode;
+  sovereign?: SovereignHydratePayload;
   identityChosen?: boolean;
   canSwitchIdentity?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
-  return (
+  const resolvedViewMode =
+    viewMode ?? (sovereign ? personaToViewMode(sovereign.activeRole) : "hacker");
+
+  const shell = (
     <DashboardShell
       nav={nav}
       primaryNav={primaryNav}
@@ -35,11 +45,16 @@ export function ActivePath({
       user={user}
       scope={scope}
       activePath={pathname}
-      viewMode={viewMode ?? "hacker"}
+      viewMode={resolvedViewMode}
+      sovereignRole={sovereign?.activeRole}
       identityChosen={identityChosen ?? true}
-      canSwitchIdentity={canSwitchIdentity ?? false}
+      canSwitchIdentity={canSwitchIdentity ?? sovereign?.canSwitch ?? false}
     >
       {children}
     </DashboardShell>
   );
+
+  if (!sovereign) return shell;
+
+  return <SovereignProvider initial={sovereign}>{shell}</SovereignProvider>;
 }

@@ -1,8 +1,12 @@
 -- =============================================================================
--- CITADEL LAUNCH VAULT — Master Schema Updates
--- ForgeGuard Admin Command Center (Sovereign Intelligence OS)
--- Run this in Supabase SQL Editor AFTER reviewing MANUAL_TASKS.md
--- Idempotent: safe to re-run on partially migrated projects
+-- FORGEGUARD — RUN THIS ONE FILE IN SUPABASE SQL EDITOR
+-- =============================================================================
+-- IMPORTANT: Cursor / your local dev environment is NOT connected to Supabase.
+-- KK must paste and execute this entire script manually in:
+--   Supabase Dashboard → SQL Editor → New query → Run
+--
+-- Idempotent: safe to re-run on partially migrated projects.
+-- Includes: Admin Command Center, Persona Switcher, Iron Wall, Ghost Protocol.
 -- =============================================================================
 
 BEGIN;
@@ -41,7 +45,6 @@ ALTER TABLE public.platform_transactions
 COMMENT ON COLUMN public.platform_transactions.tx_type IS
   'escrow_hold = client wallet debited on mission assignment';
 
--- Ensure amount_credits column exists (legacy reconcile)
 ALTER TABLE public.platform_transactions
   ADD COLUMN IF NOT EXISTS amount_credits integer DEFAULT 0;
 
@@ -67,7 +70,6 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS identity_audit_notes text,
   ADD COLUMN IF NOT EXISTS sovereign_pending boolean NOT NULL DEFAULT false;
 
--- Expand clearance_tier to include 'pending'
 ALTER TABLE public.profiles
   DROP CONSTRAINT IF EXISTS profiles_clearance_tier_check;
 
@@ -114,7 +116,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.increment_wallet(uuid, numeric) TO service_role;
 
--- ─── 6. Realtime: scan_logs for live world map heartbeat ─────────────────────
+-- ─── 6. Realtime: scan_logs + scans ───────────────────────────────────────────
 DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.scan_logs;
 EXCEPTION WHEN duplicate_object THEN NULL;
@@ -125,7 +127,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 7. Storage: verification-docs bucket (private, service-role read) ───────
+-- ─── 7. Storage: verification-docs bucket ────────────────────────────────────
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'verification-docs',
@@ -139,7 +141,6 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Users upload to their own folder; admins read via service role
 DO $$ BEGIN
   CREATE POLICY "verification_docs_owner_upload"
     ON storage.objects FOR INSERT TO authenticated
@@ -209,9 +210,8 @@ COMMENT ON COLUMN public.profiles.is_ghost_active IS
   'When true, operator identity is masked platform-wide (Ghost Protocol)';
 
 COMMENT ON COLUMN public.profiles.subscription_tier IS
-  'Cached plan tier for gatekeeping — enterprise unlocks Ghost Protocol';
+  'Cached plan tier — enterprise + rank 3+ unlocks Ghost Protocol toggle';
 
--- Backfill subscription_tier from current_plan + active subscriptions
 UPDATE public.profiles p
    SET subscription_tier = COALESCE(
      (
@@ -234,7 +234,6 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- Auto-disable ghost if operator no longer qualifies
 UPDATE public.profiles
    SET is_ghost_active = false
  WHERE is_ghost_active = true
@@ -249,9 +248,16 @@ CREATE INDEX IF NOT EXISTS idx_profiles_ghost_active
 
 COMMIT;
 
--- ─── Post-run verification queries ───────────────────────────────────────────
--- SELECT column_name FROM information_schema.columns WHERE table_name = 'bazaar_scripts' AND column_name = 'is_certified';
--- SELECT conname FROM pg_constraint WHERE conname = 'platform_transactions_tx_type_check';
+-- =============================================================================
+-- POST-RUN VERIFICATION (run these SELECTs after COMMIT succeeds)
+-- =============================================================================
+-- SELECT column_name FROM information_schema.columns
+--  WHERE table_schema = 'public' AND table_name = 'profiles'
+--    AND column_name IN ('is_ghost_active','subscription_tier','current_persona','company_domain');
+--
+-- SELECT column_name FROM information_schema.columns
+--  WHERE table_schema = 'public' AND table_name = 'bazaar_scripts' AND column_name = 'is_certified';
+--
 -- SELECT proname FROM pg_proc WHERE proname = 'increment_wallet';
 -- SELECT id FROM storage.buckets WHERE id = 'verification-docs';
--- SELECT column_name FROM information_schema.columns WHERE table_name = 'profiles' AND column_name IN ('is_ghost_active','subscription_tier');
+-- SELECT to_regclass('public.otp_logs');

@@ -43,8 +43,10 @@ export function DomainVerifier({ existingDomain, domainVerified }: Props) {
     setError(null);
     startTransition(async () => {
       const res = await initiateDomainVerification(domain.trim().toLowerCase());
-      if (res.error) setError(res.error);
-      else setToken(res.token ?? null);
+      if (res.error) {
+        console.error("[verify:domain:client]", res.error);
+        setError(res.error);
+      } else setToken(res.token ?? null);
     });
   }
 

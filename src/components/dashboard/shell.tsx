@@ -3,7 +3,7 @@ import { TopBar } from "@/components/dashboard/top-bar";
 import { CommandBar } from "@/components/dashboard/command-bar";
 import { EngineStatus } from "@/components/dashboard/engine-status";
 import { DashboardHolographicMonolith } from "@/components/dashboard/holographic-monolith";
-import type { ViewMode } from "@/lib/access/parallel-sovereignty";
+import type { SovereignRole, ViewMode } from "@/lib/access/parallel-sovereignty";
 import {
   Activity,
   CalendarClock,
@@ -111,6 +111,7 @@ export function DashboardShell({
   scope,
   activePath: _activePath,
   viewMode = "hacker",
+  sovereignRole,
   identityChosen = true,
   canSwitchIdentity = false,
   systemDegraded = false,
@@ -127,6 +128,7 @@ export function DashboardShell({
    */
   activePath?: string;
   viewMode?: ViewMode;
+  sovereignRole?: SovereignRole;
   identityChosen?: boolean;
   canSwitchIdentity?: boolean;
   /** Set to true when Railway reports infrastructure degradation. */
@@ -149,6 +151,7 @@ export function DashboardShell({
         user={user}
         scope={scope}
         viewMode={viewMode}
+        sovereignRole={sovereignRole}
         identityChosen={identityChosen}
         canSwitchIdentity={canSwitchIdentity}
         systemDegraded={systemDegraded}

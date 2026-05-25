@@ -4,6 +4,7 @@ import { useRef, useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, FileSearch, Loader2, Upload } from "lucide-react";
 import { uploadIdentityDocument } from "./verification-actions";
+import { useSovereignStore } from "@/stores/use-sovereign-store";
 
 export function IdentityAuditor({
   documentPath,
@@ -30,6 +31,7 @@ export function IdentityAuditor({
     notes: string;
   } | null>(null);
   const [pending, startTransition] = useTransition();
+  const isGhostMode = useSovereignStore((s) => s.isGhostMode);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -150,7 +152,24 @@ export function IdentityAuditor({
   }
 
   return (
-    <div id="clearance-audit" className="flex flex-col gap-4 scroll-mt-24">
+    <div id="clearance-audit" className="relative flex flex-col gap-4 scroll-mt-24">
+      {isGhostMode && (
+        <div
+          className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[4px]"
+          style={{
+            backdropFilter: "blur(0.2px)",
+            background: "rgba(5,5,5,0.55)",
+            border: "0.5px solid rgba(74,74,74,0.35)",
+          }}
+        >
+          <p
+            className="font-mono text-[11px] uppercase tracking-[0.28em] text-[#4A4A4A]"
+            style={{ textShadow: "0 0 12px rgba(74,74,74,0.45)" }}
+          >
+            Ghost Encrypted
+          </p>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <FileSearch size={12} className="text-[#D1FF00]/80" />
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">

@@ -3,17 +3,18 @@ import { cn } from "@/lib/utils";
 
 /**
  * ForgeGuard AI wordmark.
- * ----------------------
- * A hairline monogram + small-caps wordmark. The mark itself is the
- * only brand ornament — no emojis, no shield icons. The "G" glyph is
- * hand-traced so the mark doesn't read as Lucide.
+ * Optional accentColor drives the pip glow for persona sync.
  */
 export function Logo({
   className,
   showWordmark = true,
+  accentColor = "#ADFF2F",
+  glow,
 }: {
   className?: string;
   showWordmark?: boolean;
+  accentColor?: string;
+  glow?: string;
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
@@ -25,13 +26,15 @@ export function Logo({
         strokeWidth={1.25}
         strokeLinecap="square"
         aria-hidden
+        style={
+          glow
+            ? { filter: `drop-shadow(0 0 6px ${glow})` }
+            : undefined
+        }
       >
-        {/* Outer octagon */}
         <path d="M7 2 L17 2 L22 7 L22 17 L17 22 L7 22 L2 17 L2 7 Z" />
-        {/* Inner 'G' cut-out */}
         <path d="M15.5 9 A4 4 0 1 0 15.5 15 L12 15 L12 12" />
-        {/* Acid indicator pip */}
-        <circle cx="18.5" cy="5.5" r="0.9" fill="#D1FF00" stroke="none" />
+        <circle cx="18.5" cy="5.5" r="0.9" fill={accentColor} stroke="none" />
       </svg>
       {showWordmark ? (
         <span className="font-sans text-sm font-semibold tracking-[0.18em] uppercase">

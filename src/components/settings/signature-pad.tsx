@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import SignatureCanvas from "react-signature-canvas";
 import { PenLine, RotateCcw, Check, Loader2, ShieldCheck } from "lucide-react";
 import { saveSignatureSeal } from "./verification-actions";
+import { useSovereignStore } from "@/stores/use-sovereign-store";
+import { GhostPublicIdentity } from "@/components/dashboard/ghost-public-identity";
 
 interface Props {
   existingSignature: string | null;
@@ -26,6 +28,7 @@ export function SignaturePad({ existingSignature }: Props) {
   const [custodyHash, setCustodyHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isGhostMode = useSovereignStore((s) => s.isGhostMode);
 
   function handleClear() {
     canvasRef.current?.clear();
@@ -167,6 +170,15 @@ export function SignaturePad({ existingSignature }: Props) {
           {isPending ? "Saving…" : "Save Signature"}
         </button>
       </div>
+
+      {isGhostMode && (
+        <div className="mt-2 flex flex-col gap-2">
+          <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
+            Public view (Ghost Protocol active)
+          </p>
+          <GhostPublicIdentity compact />
+        </div>
+      )}
     </div>
   );
 }

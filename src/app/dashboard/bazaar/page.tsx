@@ -22,7 +22,7 @@ import {
   Shield, CheckCircle, AlertTriangle, XCircle,
   Star, Code2, Tag, DollarSign, X, ChevronDown,
   Package, Terminal, Loader2, ShieldCheck, Copy, Check,
-  Download,
+  Download, Ghost,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ interface Script {
     full_name: string;
     username:  string;
     rank:      string;
+    is_ghost?: boolean;
   } | null;
 }
 
@@ -303,8 +304,17 @@ function ScriptCard({
               <ShoppingCart size={10} />
               {script.purchase_count.toLocaleString()}
             </span>
-            <span className="text-[#6B7280]">
-              {script.author?.username ?? "anon"}
+            <span className="flex items-center gap-1 text-[#6B7280]">
+              {script.author?.is_ghost ? (
+                <>
+                  <Ghost size={10} style={{ color: "#4A4A4A" }} />
+                  <span style={{ color: "#4A4A4A" }}>
+                    {script.author.username}
+                  </span>
+                </>
+              ) : (
+                script.author?.username ?? "anon"
+              )}
             </span>
           </div>
         </div>

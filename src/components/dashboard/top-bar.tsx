@@ -38,9 +38,13 @@ import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { UpgradeRequiredModal } from "@/components/dashboard/upgrade-required-modal";
 import { NAV_ICONS, type NavItem, type ShellUser } from "@/components/dashboard/shell";
 import {
-  VIEW_MODE_ACCENTS,
+  personaToViewMode,
+  SOVEREIGN_ACCENTS,
+  type SovereignRole,
   type ViewMode,
 } from "@/lib/access/parallel-sovereignty";
+import { useSovereignStore, useSovereignAccent } from "@/stores/use-sovereign-store";
+import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                   */
@@ -428,6 +432,7 @@ export function TopBar({
   user,
   scope,
   viewMode = "hacker",
+  sovereignRole,
   identityChosen = true,
   canSwitchIdentity = false,
   systemDegraded = false,
@@ -438,6 +443,7 @@ export function TopBar({
   user: ShellUser;
   scope: "user" | "admin";
   viewMode?: ViewMode;
+  sovereignRole?: SovereignRole;
   identityChosen?: boolean;
   canSwitchIdentity?: boolean;
   systemDegraded?: boolean;
@@ -447,15 +453,22 @@ export function TopBar({
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [lockedFeature, setLockedFeature] = useState("The Forge");
 
+  const storeRole = useSovereignStore((s) => s.activeRole);
+  const hydrated = useSovereignStore((s) => s.hydrated);
+  const storeAccent = useSovereignAccent();
+
+  const activeRole: SovereignRole =
+    hydrated ? storeRole : (sovereignRole ?? (scope === "admin" ? "dev" : viewMode));
+  const dashboardViewMode = personaToViewMode(activeRole);
+  const accent = hydrated ? storeAccent : SOVEREIGN_ACCENTS[activeRole];
+  const accentHex = accent.primary;
+
   const resolvedPrimary = primaryNav ?? nav;
   const resolvedSecondary = secondaryNav ?? [];
   const overflowNav = resolvedSecondary.filter(
     (item) => !ACCOUNT_HREFS.has(item.href),
   );
   const accountNav = nav.filter((item) => ACCOUNT_HREFS.has(item.href));
-
-  const accentHex =
-    scope === "admin" ? "#A78BFA" : VIEW_MODE_ACCENTS[viewMode].primary;
 
   return (
     <>
@@ -491,17 +504,17 @@ export function TopBar({
               user={user}
               scope={scope}
               activePath={pathname}
-              viewMode={viewMode}
-              identityChosen={identityChosen}
+              viewMode={dashboardViewMode}
+              sovereignRole={activeRole}
               canSwitchIdentity={canSwitchIdentity}
             />
           </div>
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <Logo />
+          <Link href={scope === "admin" ? "/admin" : "/dashboard"} className="flex items-center hover:opacity-80 transition-opacity">
+            <Logo accentColor={accentHex} glow={accent.glow} />
           </Link>
           {scope === "admin" && (
             <Badge tone="admin" className="hidden sm:flex">
-              Admin
+              Dev
             </Badge>
           )}
         </div>
@@ -571,14 +584,20 @@ export function TopBar({
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 border-l-[0.5px] border-white/[0.06] px-3">
-          {scope === "user" && (
+          {canSwitchIdentity && (
             <IdentitySwitcher
-              activeMode={viewMode}
+              activeMode={activeRole}
               canSwitch={canSwitchIdentity}
             />
           )}
 
-          <QuickActionMenu scope={scope} accentHex={accentHex} viewMode={viewMode} />
+          {scope === "user" && activeRole === "hacker" && (
+            <GhostProtocolToggle />
+          )}
+
+          {scope === "user" && activeRole !== "dev" && (
+            <QuickActionMenu scope={scope} accentHex={accentHex} viewMode={dashboardViewMode} />
+          )}
 
           {/* Theme toggle */}
           <button
@@ -601,7 +620,7 @@ export function TopBar({
             identityVerified={user.identityVerified}
             companyTag={user.companyTag}
             domainVerified={user.domainVerified}
-            viewMode={viewMode}
+            viewMode={dashboardViewMode}
             trustScore={user.trustScore ?? 0}
           />
 

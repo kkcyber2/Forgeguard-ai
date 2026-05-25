@@ -7,16 +7,46 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { operatorAlias } from "@/lib/access/ghost-mode";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type AuthorRow = {
+  id: string;
+  full_name: string | null;
+  hacker_rank: string | null;
+  is_ghost_active: boolean | null;
+};
+
+function maskAuthor(author: AuthorRow | null) {
+  if (!author) return null;
+
+  if (author.is_ghost_active) {
+    const alias = operatorAlias(author.id);
+    return {
+      id: author.id,
+      full_name: alias,
+      username: alias,
+      rank: author.hacker_rank ?? "ELITE",
+      is_ghost: true as const,
+    };
+  }
+
+  return {
+    id: author.id,
+    full_name: author.full_name ?? "anon",
+    username: author.full_name?.split(" ")[0]?.toLowerCase() ?? "anon",
+    rank: author.hacker_rank ?? "RECRUIT",
+    is_ghost: false as const,
+  };
+}
+
 export async function GET(req: NextRequest) {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Public listing — auth not strictly required but unlocks purchase flag
   const url = req.nextUrl;
   const page    = Math.max(1,  Number(url.searchParams.get("page")  ?? 1));
   const limit   = Math.min(50, Math.max(1, Number(url.searchParams.get("limit") ?? 20)));
@@ -33,7 +63,7 @@ export async function GET(req: NextRequest) {
       audit_verdict, audit_risk_score,
       is_published, created_at, updated_at,
       author:author_id (
-        full_name, hacker_rank
+        id, full_name, hacker_rank, is_ghost_active
       )
     `, { count: "exact" })
     .eq("is_published", true)
@@ -51,7 +81,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Database error" }, { status: 500 });
   }
 
-  // If authed, attach purchase status for each script
   let purchased: Set<string> = new Set();
   if (user) {
     const { data: purchaseRows } = await supabase
@@ -65,10 +94,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const enriched = (scripts ?? []).map((s) => ({
-    ...s,
-    is_purchased: purchased.has(s.id),
-  }));
+  const enriched = (scripts ?? []).map((s) => {
+    const rawAuthor = s.author as AuthorRow | AuthorRow[] | null;
+    const authorRow = Array.isArray(rawAuthor) ? rawAuthor[0] ?? null : rawAuthor;
+
+    return {
+      ...s,
+      author: maskAuthor(authorRow),
+      is_purchased: purchased.has(s.id),
+    };
+  });
 
   return NextResponse.json({
     ok:      true,

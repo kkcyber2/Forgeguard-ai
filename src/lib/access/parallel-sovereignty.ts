@@ -1,6 +1,6 @@
 /**
  * Parallel Sovereignty — context-aware dashboard environments.
- * Client workspace (Electric Purple) vs Hacker workspace (Acid Green).
+ * Client (Electric Purple) · Hacker (Acid Green) · Dev (Sovereign console).
  */
 
 import type { NavItem } from "@/components/dashboard/shell";
@@ -12,21 +12,36 @@ import {
 } from "@/lib/access/ranks";
 
 export type ViewMode = "client" | "hacker";
+export type SovereignRole = "client" | "hacker" | "dev";
 
+export const SOVEREIGN_ACCENTS: Record<
+  SovereignRole,
+  { primary: string; glow: string; label: string }
+> = {
+  client: {
+    primary: "#A020F0",
+    glow: "rgba(160,32,240,0.35)",
+    label: "Client Sovereign",
+  },
+  hacker: {
+    primary: "#ADFF2F",
+    glow: "rgba(173,255,47,0.35)",
+    label: "Hacker Sovereign",
+  },
+  dev: {
+    primary: "#D1FF00",
+    glow: "rgba(209,255,0,0.35)",
+    label: "Dev Sovereign",
+  },
+};
+
+/** @deprecated Use SOVEREIGN_ACCENTS */
 export const VIEW_MODE_ACCENTS: Record<
   ViewMode,
   { primary: string; glow: string; label: string }
 > = {
-  client: {
-    primary: "#A855F7",
-    glow: "rgba(168,85,247,0.35)",
-    label: "Client Sovereign",
-  },
-  hacker: {
-    primary: "#D1FF00",
-    glow: "rgba(209,255,0,0.35)",
-    label: "Hacker Sovereign",
-  },
+  client: SOVEREIGN_ACCENTS.client,
+  hacker: SOVEREIGN_ACCENTS.hacker,
 };
 
 const ACCOUNT_NAV: NavItem[] = [
@@ -48,6 +63,24 @@ const LEGEND_NAV: NavItem[] = [
   { href: "/admin", label: "Admin", icon: "shield-alert", section: "Legend" },
   { href: "/admin/threats", label: "Global Map", icon: "globe", section: "Legend" },
 ];
+
+/** Admin Command Center nav — DEV persona */
+export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
+  const primary: NavItem[] = [
+    { href: "/admin", label: "Overview", icon: "layout-dashboard", section: "Command" },
+    { href: "/admin/threats", label: "Global threats", icon: "shield-alert", section: "Command" },
+    { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "Command" },
+    { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark", section: "Command" },
+  ];
+  const secondary: NavItem[] = [
+    { href: "/admin/bounties", label: "Bounty Escrow", icon: "credit-card", section: "Ops" },
+    { href: "/admin/users", label: "Users", icon: "users", section: "Ops" },
+    { href: "/admin/verification", label: "Verification", icon: "shield-check", section: "Ops" },
+    { href: "/admin/system", label: "System health", icon: "activity", section: "Ops" },
+    { href: "/admin/settings", label: "Settings", icon: "settings", section: "Account" },
+  ];
+  return { primary, secondary };
+}
 
 /** Primary nav per Genesis 3.0 spec */
 export function buildSovereignNav(
@@ -94,12 +127,6 @@ export function buildSovereignNav(
     return isPathAllowed(item.href, rank, userType);
   }).map(({ minRank: _r, viewModes: _v, ...item }) => item);
 
-  const nav = [...filteredPrimary, ...secondary, ...ACCOUNT_NAV];
-
-  if (rank >= 5) {
-    nav.push(...LEGEND_NAV);
-  }
-
   const secondaryNav = [...secondary, ...ACCOUNT_NAV];
   if (rank >= 5) {
     secondaryNav.push(...LEGEND_NAV);
@@ -126,6 +153,35 @@ export function resolveViewMode(
   return "hacker";
 }
 
+export function resolvePersona(
+  currentPersona: string | null | undefined,
+  activeViewMode: string | null | undefined,
+  userType: string | null | undefined,
+): SovereignRole {
+  if (currentPersona === "client" || currentPersona === "hacker" || currentPersona === "dev") {
+    return currentPersona;
+  }
+  return resolveViewMode(activeViewMode, userType);
+}
+
+export function personaToViewMode(role: SovereignRole): ViewMode {
+  return role === "client" ? "client" : "hacker";
+}
+
+export function canAccessDevMode(
+  clearanceTier: string | null | undefined,
+  role: string | null | undefined,
+): boolean {
+  return clearanceTier === "sovereign" && role === "admin";
+}
+
+export function canShowPersonaSwitcher(
+  userType: string | null | undefined,
+  clearanceTier: string | null | undefined,
+): boolean {
+  return userType === "developer" || clearanceTier === "sovereign";
+}
+
 export function isPathAllowedForView(
   pathname: string,
   viewMode: ViewMode,
@@ -148,4 +204,8 @@ export function redirectForViewBlocked(pathname: string, viewMode: ViewMode): st
     return pathname.startsWith("/dashboard/forge") ? "/dashboard/scans" : "/dashboard";
   }
   return redirectForBlockedPath(pathname);
+}
+
+export function redirectForPersona(role: SovereignRole): "/admin" | "/dashboard" {
+  return role === "dev" ? "/admin" : "/dashboard";
 }

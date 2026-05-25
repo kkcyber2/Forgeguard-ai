@@ -17,6 +17,7 @@ import { WebcamIdentity } from "@/components/settings/webcam-identity";
 import { ClearanceProgress } from "@/components/settings/clearance-progress";
 import { PhoneVerification } from "@/components/settings/phone-verification";
 import { IdentityAuditor } from "@/components/settings/identity-auditor";
+import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
 import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
 
 /**
@@ -160,6 +161,11 @@ export default async function SettingsPage() {
 
         {/* ── Right sidebar ──────────────────────────────── */}
         <aside className="space-y-4">
+          <div className="rounded-sm border-hairline border-white/[0.06] bg-surface p-5">
+            <p className="text-eyebrow text-foreground-subtle mb-3">Stealth</p>
+            <GhostProtocolToggle compact />
+          </div>
+
           {/* Verification progress widget */}
           <ClearanceProgress
             emailVerified={emailVerified}

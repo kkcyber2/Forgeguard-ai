@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useTransition } from "react";
+import { useState, useRef, useCallback, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Camera,
@@ -11,6 +11,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { saveWebcamCapture } from "./verification-actions";
+import { useSovereignStore } from "@/stores/use-sovereign-store";
+import { GhostPublicIdentity } from "@/components/dashboard/ghost-public-identity";
 
 type State = "idle" | "requesting" | "live" | "captured" | "error" | "saving";
 
@@ -30,8 +32,17 @@ function cameraErrorMessage(err: unknown): string {
     if (err.name === "NotReadableError") {
       return "Camera is in use by another application.";
     }
+    if (err.name === "SecurityError") {
+      return "Camera requires HTTPS. Open ForgeGuard over a secure connection.";
+    }
   }
   return "Could not access camera. Check permissions and try again.";
+}
+
+function isValidCapture(dataUrl: string | null): boolean {
+  if (!dataUrl?.startsWith("data:image/jpeg;base64,")) return false;
+  const base64 = dataUrl.split(",")[1];
+  return Boolean(base64 && base64.length > 100);
 }
 
 export function WebcamIdentity({ verified }: { verified: boolean }) {
@@ -45,14 +56,36 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [saved, setSaved] = useState(verified);
   const [pending, startTransition] = useTransition();
+  const isGhostMode = useSovereignStore((s) => s.isGhostMode);
+
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   const startCamera = useCallback(async () => {
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setErrorMsg("Camera requires HTTPS. Use a secure URL (not plain HTTP).");
+      setState("error");
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setErrorMsg("Camera API unavailable. Use HTTPS or a modern browser.");
       setState("error");
       return;
     }
 
+    stopCamera();
     setState("requesting");
     setErrorMsg(null);
 
@@ -67,30 +100,58 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+
+      const video = videoRef.current;
+      if (!video) {
+        stopCamera();
+        setErrorMsg("Video element not ready. Try again.");
+        setState("error");
+        return;
       }
+
+      video.srcObject = stream;
+      video.playsInline = true;
+      video.muted = true;
+      await video.play();
+
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        await new Promise<void>((resolve) => {
+          video.onloadedmetadata = () => resolve();
+        });
+      }
+
       setState("live");
     } catch (err) {
+      console.error("[verify:webcam] getUserMedia failed:", err);
+      stopCamera();
       setErrorMsg(cameraErrorMessage(err));
       setState("error");
     }
-  }, []);
-
-  function stopCamera() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  }
+  }, [stopCamera]);
 
   function handleCapture() {
     if (!videoRef.current || !canvasRef.current) return;
+    if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+      setErrorMsg("Camera not ready. Wait for live preview, then capture.");
+      setState("error");
+      return;
+    }
+
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
+
     canvasRef.current.width = videoRef.current.videoWidth;
     canvasRef.current.height = videoRef.current.videoHeight;
     ctx.drawImage(videoRef.current, 0, 0);
-    setCapturedUrl(canvasRef.current.toDataURL("image/jpeg", 0.85));
+
+    const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.85);
+    if (!isValidCapture(dataUrl)) {
+      setErrorMsg("Capture failed — empty frame. Retake with camera active.");
+      setState("error");
+      return;
+    }
+
+    setCapturedUrl(dataUrl);
     stopCamera();
     setState("captured");
   }
@@ -102,11 +163,17 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   }
 
   function handleSubmit() {
-    if (!capturedUrl) return;
+    if (!capturedUrl || !isValidCapture(capturedUrl)) {
+      setErrorMsg("Invalid capture data. Retake photo.");
+      setState("error");
+      return;
+    }
+
     setState("saving");
     startTransition(async () => {
       const res = await saveWebcamCapture(capturedUrl);
       if (res.error) {
+        console.error("[verify:webcam] save failed:", res.error);
         setErrorMsg(res.error);
         setState("error");
         return;
@@ -119,19 +186,29 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
 
   if (saved || verified) {
     return (
-      <div className="flex items-center gap-3">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-[3px]"
-          style={{ background: "rgba(139,92,246,0.1)", border: "0.5px solid rgba(139,92,246,0.3)" }}
-        >
-          <CheckCircle2 size={16} style={{ color: "#8B5CF6" }} strokeWidth={1.5} />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-[3px]"
+            style={{ background: "rgba(139,92,246,0.1)", border: "0.5px solid rgba(139,92,246,0.3)" }}
+          >
+            <CheckCircle2 size={16} style={{ color: "#8B5CF6" }} strokeWidth={1.5} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white">Identity Verified</p>
+            <p className="text-xs text-white/50">
+              Biometric proof on file. Enterprise missions unlocked.
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-medium text-white">Identity Verified</p>
-          <p className="text-xs text-white/50">
-            Biometric proof on file. Enterprise missions unlocked.
-          </p>
-        </div>
+        {isGhostMode && (
+          <div>
+            <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
+              Public view (Identity Proofing)
+            </p>
+            <GhostPublicIdentity compact />
+          </div>
+        )}
       </div>
     );
   }
@@ -146,7 +223,7 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
       </div>
 
       <p className="text-xs text-white/50">
-        Required for SOVEREIGN-rank missions. On mobile, the rear camera is used for ID capture.
+        Required for SOVEREIGN-rank missions. Tap Start Camera — permission is requested only on button press.
       </p>
 
       <div
@@ -160,11 +237,10 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
       >
         <video
           ref={videoRef}
-          autoPlay
           playsInline
           muted
           className="absolute inset-0 h-full w-full object-cover"
-          style={{ display: state === "live" ? "block" : "none" }}
+          style={{ display: state === "live" || state === "requesting" ? "block" : "none" }}
         />
 
         {capturedUrl && (
@@ -203,7 +279,7 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
         {state === "idle" || state === "error" ? (
           <button
             type="button"
-            onClick={startCamera}
+            onClick={() => void startCamera()}
             className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-violet-500 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white"
           >
             <Camera size={12} strokeWidth={2} />

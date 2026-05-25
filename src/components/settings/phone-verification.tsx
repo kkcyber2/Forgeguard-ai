@@ -23,8 +23,10 @@ export function PhoneVerification({
     setError(null);
     startTransition(async () => {
       const res = await sendOTP(phone);
-      if (res.error) setError(res.error);
-      else {
+      if (res.error) {
+        console.error("[verify:otp:client]", res.error);
+        setError(res.error);
+      } else {
         setSent(true);
         if (res.devCode) setDevCode(res.devCode);
       }

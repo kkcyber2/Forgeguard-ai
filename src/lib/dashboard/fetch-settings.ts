@@ -1,4 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { safeQueryRows } from "@/lib/supabase/safe-query";
+import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
 import type { ApiKeyRow } from "@/app/dashboard/settings/api-keys-section";
 import type { Database } from "@/types/supabase";
 import type { User } from "@supabase/supabase-js";
@@ -19,6 +21,8 @@ export interface SettingsPageData {
   auditScore: number | null;
   sovereignPending: boolean;
   docPath: string | null;
+  /** Trust tier from hacker_rank — 0 when rank missing. */
+  hackerRankTrust: number;
 }
 
 const EMPTY: SettingsPageData = {
@@ -35,13 +39,43 @@ const EMPTY: SettingsPageData = {
   auditScore: null,
   sovereignPending: false,
   docPath: null,
+  hackerRankTrust: 0,
 };
+
+function normalizeProfile(row: ProfileRow | null): ProfileRow | null {
+  if (!row) return null;
+  return {
+    ...row,
+    hacker_rank: row.hacker_rank ?? null,
+    access_level: row.access_level ?? 1,
+    role: row.role ?? "user",
+  };
+}
+
+async function fetchProfileRow(userId: string): Promise<ProfileRow | null> {
+  try {
+    const supabase = await createServerSupabase();
+    const { data } = await safeQueryRows<ProfileRow>(
+      "settings/profile",
+      () => supabase.from("profiles").select("*").eq("id", userId).limit(1),
+    );
+    return normalizeProfile(data[0] ?? null);
+  } catch (err) {
+    console.error("[settings] profile fetch:", err);
+    return null;
+  }
+}
 
 export async function fetchSettingsPageData(
   user: User,
-  profile: ProfileRow | null,
+  profileInput: ProfileRow | null,
 ): Promise<SettingsPageData> {
   try {
+    let profile = normalizeProfile(profileInput);
+    if (!profile) {
+      profile = await fetchProfileRow(user.id);
+    }
+
     const lastSignIn =
       user.last_sign_in_at ??
       (user as { email_confirmed_at?: string | null }).email_confirmed_at ??
@@ -50,17 +84,16 @@ export async function fetchSettingsPageData(
     let apiKeys: ApiKeyRow[] = [];
     try {
       const supabase = await createServerSupabase();
-      const { data: rawKeys, error } = await supabase
-        .from("user_api_keys")
-        .select("id, name, key_prefix, created_at, last_used_at, revoked_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("[settings] user_api_keys:", error.message);
-      } else {
-        apiKeys = (rawKeys ?? []) as ApiKeyRow[];
-      }
+      const { data: rawKeys } = await safeQueryRows<ApiKeyRow>(
+        "settings/user_api_keys",
+        () =>
+          supabase
+            .from("user_api_keys")
+            .select("id, name, key_prefix, created_at, last_used_at, revoked_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false }),
+      );
+      apiKeys = rawKeys;
     } catch (keysErr) {
       console.error("[settings] user_api_keys fetch:", keysErr);
     }
@@ -71,6 +104,10 @@ export async function fetchSettingsPageData(
       clearanceRaw === "professional" || clearanceRaw === "sovereign"
         ? clearanceRaw
         : "tactical";
+
+    const hackerRankTrust = profile?.hacker_rank
+      ? resolveTrustLevelFromHackerRank(profile.hacker_rank)
+      : 0;
 
     return {
       profile,
@@ -88,9 +125,10 @@ export async function fetchSettingsPageData(
         : null,
       sovereignPending: profile?.sovereign_pending ?? false,
       docPath: profile?.identity_document_path ?? null,
+      hackerRankTrust,
     };
   } catch (err) {
     console.error("[settings] fetchSettingsPageData:", err);
-    return { ...EMPTY, profile };
+    return { ...EMPTY, profile: normalizeProfile(profileInput) };
   }
 }

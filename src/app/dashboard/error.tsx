@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { StrongholdRecovering } from "@/components/dashboard/stronghold-recovering";
+import { StrongholdRecovering, strongholdLogFromError } from "@/components/dashboard/stronghold-recovering";
 
 function messageForPath(pathname: string): string {
   if (pathname.startsWith("/dashboard/settings")) {
@@ -31,6 +31,10 @@ export default function DashboardError({
   }, [error, pathname]);
 
   return (
-    <StrongholdRecovering message={messageForPath(pathname)} reset={reset} />
+    <StrongholdRecovering
+      message={messageForPath(pathname)}
+      systemLog={strongholdLogFromError(error)}
+      reset={reset}
+    />
   );
 }

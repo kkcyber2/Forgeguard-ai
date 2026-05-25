@@ -28,7 +28,12 @@ export default async function SettingsPage() {
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard/settings");
 
-  const profile = await getCurrentProfile();
+  let profile = await getCurrentProfile();
+  if (!profile) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    profile = await getCurrentProfile();
+  }
+
   const data = await fetchSettingsPageData(user, profile);
 
   return (

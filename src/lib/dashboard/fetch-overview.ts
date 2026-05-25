@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { fetchTotalAleRisk, fetchRecentScans } from "@/lib/scans/queries";
+import { safeQueryRows } from "@/lib/supabase/safe-query";
 import type { RedTeamLog } from "@/components/dashboard/red-team-feed";
 
 type ServerSupabase = SupabaseClient<Database>;
@@ -60,27 +61,33 @@ export async function fetchDashboardOverview(
     } | null = null;
 
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(
-          "user_type, access_level, domain_verified, domain_token, active_view_mode, reputation",
-        )
-        .eq("id", userId)
-        .maybeSingle();
-      if (error) console.error("[dashboard] identity:", error.message);
-      identityRow = data;
+      const { data } = await safeQueryRows<{
+        user_type: string | null;
+        access_level: number | null;
+        domain_verified: boolean | null;
+        domain_token: string | null;
+        reputation: number | null;
+      }>("dashboard/identity", () =>
+        supabase
+          .from("profiles")
+          .select(
+            "user_type, access_level, domain_verified, domain_token, active_view_mode, reputation",
+          )
+          .eq("id", userId)
+          .limit(1),
+      );
+      identityRow = data[0] ?? null;
     } catch (err) {
       console.error("[dashboard] identity fetch:", err);
     }
 
     let scanIds: string[] = [];
     try {
-      const { data: userScanIds, error } = await supabase
-        .from("scans")
-        .select("id")
-        .eq("user_id", userId);
-      if (error) console.error("[dashboard] scan ids:", error.message);
-      scanIds = (userScanIds ?? []).map((s) => s.id);
+      const { data: userScanIds } = await safeQueryRows<{ id: string }>(
+        "dashboard/scan-ids",
+        () => supabase.from("scans").select("id").eq("user_id", userId),
+      );
+      scanIds = userScanIds.map((s) => s.id);
     } catch (err) {
       console.error("[dashboard] scan ids:", err);
     }
@@ -139,14 +146,17 @@ export async function fetchDashboardOverview(
 
     let rawLogs: DashboardOverviewData["rawLogs"] = [];
     try {
-      const { data, error } = await supabase
-        .from("scan_logs")
-        .select("id, scan_id, type, severity, attack_name, payload, created_at")
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) console.error("[dashboard] scan_logs:", error.message);
-      rawLogs = (data ?? []) as DashboardOverviewData["rawLogs"];
+      const { data } = await safeQueryRows<DashboardOverviewData["rawLogs"][0]>(
+        "dashboard/scan_logs",
+        () =>
+          supabase
+            .from("scan_logs")
+            .select("id, scan_id, type, severity, attack_name, payload, created_at")
+            .gte("created_at", since)
+            .order("created_at", { ascending: false })
+            .limit(50),
+      );
+      rawLogs = data;
     } catch (err) {
       console.error("[dashboard] scan_logs:", err);
     }

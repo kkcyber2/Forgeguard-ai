@@ -1,0 +1,25 @@
+---
+description: ForgeGuard launch standards — Obsidian UI, sovereign gate, Supabase RLS
+alwaysApply: true
+---
+
+# ForgeGuard Launch Standards
+
+## Visual system
+- Background: Deep Obsidian `#050505`
+- Borders: `0.5px` — `border-[0.5px] border-white/[0.08]`
+- Labels: `font-mono text-[10px] uppercase tracking-[0.14em]`
+- Animations: Framer Motion via thin client wrappers only; pages stay Server Components by default
+
+## Sovereign operator gate
+- Only `SOVEREIGN_OPERATOR_EMAIL` (default `ksk805763@gmail.com`) may access `/admin` or Dev/Sovereign persona features
+- Enforce server-side in `requireAdminProfile()`, layouts, and server actions — never trust client state
+
+## Supabase security
+- Enable RLS on every new public table
+- Service-role-only tables (e.g. `attack_logs`): RLS on, no anon/authenticated policies
+- UPDATE requires SELECT policy under RLS
+
+## New routes checklist
+- Register in `parallel-sovereignty.ts` and `ranks.ts` path guards
+- Use live Supabase data; show `EmptyState` when zero rows, not placeholder TODOs

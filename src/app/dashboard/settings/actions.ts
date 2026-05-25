@@ -96,7 +96,11 @@ export async function updateProfile(
 const PasswordSchema = z
   .object({
     current_password: z.string().min(1, "Required"),
-    new_password: z.string().min(10, "At least 10 characters"),
+    new_password: z
+      .string()
+      .min(10, "At least 10 characters")
+      .regex(/[A-Z]/, "Include at least one uppercase letter")
+      .regex(/\d/, "Include at least one number"),
     confirm_password: z.string(),
   })
   .refine((d) => d.new_password === d.confirm_password, {

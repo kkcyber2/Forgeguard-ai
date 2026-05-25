@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
   const tag     = url.searchParams.get("tag")  ?? null;
   const lang    = url.searchParams.get("lang") ?? null;
   const freeOnly = url.searchParams.get("free") === "true";
+  const certifiedOnly = url.searchParams.get("certified") === "1";
   const offset  = (page - 1) * limit;
 
   let query = supabase
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
       id, name, description, language, tags,
       price_usd, is_free, purchase_count,
       audit_verdict, audit_risk_score,
-      is_published, created_at, updated_at,
+      is_published, is_certified, created_at, updated_at,
       author:author_id (
         id, full_name, hacker_rank, is_ghost_active
       )
@@ -71,6 +72,8 @@ export async function GET(req: NextRequest) {
     .eq("audit_verdict", "cleared")
     .order("purchase_count", { ascending: false })
     .range(offset, offset + limit - 1);
+
+  if (certifiedOnly) query = query.eq("is_certified", true);
 
   if (tag)      query = query.contains("tags", [tag]);
   if (lang)     query = query.eq("language", lang);

@@ -1,17 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { requireAdminProfile } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { PlanId } from "@/lib/plans";
 
+async function requireSovereignAdmin() {
+  const profile = await requireAdminProfile();
+  if (!profile) return null;
+  return profile;
+}
+
 export async function setUserRole(formData: FormData): Promise<void> {
+  if (!(await requireSovereignAdmin())) return;
+
   const userId = formData.get("user_id") as string;
   const role = formData.get("role") as string;
   if (!userId || !["admin", "client"].includes(role)) return;
 
-  const supabase = await createServerSupabase();
-  const { error } = await supabase
+  const admin = createAdminSupabase();
+  const { error } = await admin
     .from("profiles")
     .update({ role: role as "admin" | "client" })
     .eq("id", userId);
@@ -21,12 +30,14 @@ export async function setUserRole(formData: FormData): Promise<void> {
 }
 
 export async function setVerified(formData: FormData): Promise<void> {
+  if (!(await requireSovereignAdmin())) return;
+
   const userId = formData.get("user_id") as string;
   const val = formData.get("is_verified") === "true";
   if (!userId) return;
 
-  const supabase = await createServerSupabase();
-  const { error } = await supabase
+  const admin = createAdminSupabase();
+  const { error } = await admin
     .from("profiles")
     .update({ is_verified: val })
     .eq("id", userId);
@@ -36,13 +47,14 @@ export async function setVerified(formData: FormData): Promise<void> {
 }
 
 export async function setHackerRank(formData: FormData): Promise<void> {
+  if (!(await requireSovereignAdmin())) return;
+
   const userId = formData.get("user_id") as string;
   const rank   = formData.get("hacker_rank") as string;
   if (!userId || rank !== "TRAITOR") return;
 
   const admin = createAdminSupabase();
 
-  // Stamp hacker_rank in profiles
   const { error } = await admin
     .from("profiles")
     .update({ hacker_rank: "TRAITOR" })
@@ -50,7 +62,6 @@ export async function setHackerRank(formData: FormData): Promise<void> {
 
   if (error) console.error("[admin/users] setHackerRank:", error.message);
 
-  // Freeze wallet via SECURITY DEFINER RPC (mirrors Traitor Protocol)
   await admin.rpc("freeze_wallet", { p_user_id: userId }).then(
     () => undefined,
     (e: Error) => console.error("[admin/users] freeze_wallet:", e.message),
@@ -62,24 +73,9 @@ export async function setHackerRank(formData: FormData): Promise<void> {
 export async function overrideSubscription(
   formData: FormData,
 ): Promise<{ ok: boolean; message: string }> {
-  // ── Caller must be admin ──────────────────────────────────────────────────
-  const supabase = await createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "Not authenticated." };
+  const profile = await requireSovereignAdmin();
+  if (!profile) return { ok: false, message: "Forbidden." };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profile?.role !== "admin") {
-    return { ok: false, message: "Forbidden." };
-  }
-
-  // ── Payload ───────────────────────────────────────────────────────────────
   const targetUserId = (formData.get("user_id") as string | null)?.trim();
   const plan = (formData.get("plan") as string | null)?.trim() as PlanId;
   const days = parseInt(formData.get("days") as string, 10) || 30;
@@ -91,7 +87,6 @@ export async function overrideSubscription(
   const periodEnd = new Date();
   periodEnd.setDate(periodEnd.getDate() + days);
 
-  // ── Upsert subscription ───────────────────────────────────────────────────
   const admin = createAdminSupabase();
   const { error } = await admin.from("subscriptions").upsert(
     {

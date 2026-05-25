@@ -11,6 +11,24 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
 import { RoleActions } from "./role-actions";
+import {
+  UsersAnalyticsStrip,
+  type UsersAnalyticsData,
+} from "@/components/admin/users-analytics-strip";
+
+function bucketSignupsByDay(dates: string[], days = 30): number[] {
+  const buckets = Array.from({ length: days }, () => 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  for (const iso of dates) {
+    const d = new Date(iso);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+    const idx = days - 1 - diff;
+    if (idx >= 0 && idx < days) buckets[idx]! += 1;
+  }
+  return buckets;
+}
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -57,6 +75,22 @@ export default async function UsersPage() {
       new Date(p.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
   ).length;
 
+  const analyticsData: UsersAnalyticsData = {
+    signupTrend: bucketSignupsByDay(
+      profiles.map((p) => p.created_at).filter(Boolean) as string[],
+    ),
+    roleCounts: {
+      admin: profiles.filter((p) => p.role === "admin").length,
+      user: profiles.filter((p) => p.role === "client" || p.role === "user").length,
+      other: profiles.filter(
+        (p) => p.role !== "admin" && p.role !== "client" && p.role !== "user",
+      ).length,
+    },
+    verifiedCount,
+    unverifiedCount: totalUsers - verifiedCount,
+    pendingVerification: profiles.filter((p) => !p.is_verified).length,
+  };
+
   return (
     <>
       <PageHeader
@@ -86,6 +120,8 @@ export default async function UsersPage() {
           <StatTile label="Joined this week" value={recentCount} tone="neutral" icon={Clock} />
         </StaggerItem>
       </Stagger>
+
+      <UsersAnalyticsStrip data={analyticsData} />
 
       {/* Directory table */}
       <div className="mt-4 rounded-sm border border-white/[0.06] bg-surface">

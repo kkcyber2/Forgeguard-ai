@@ -401,6 +401,110 @@ UPDATE public.otp_logs
 
 ALTER TABLE public.user_wallets REPLICA IDENTITY FULL;
 
+-- ─── 13. Aegis attack_logs — rate-limit burst telemetry ───────────────────────
+CREATE TABLE IF NOT EXISTS public.attack_logs (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  ip_address  text        NOT NULL,
+  path        text,
+  method      text,
+  user_agent  text,
+  reason      text        NOT NULL DEFAULT 'rate_limit_burst',
+  blocked_at  timestamptz NOT NULL DEFAULT now(),
+  metadata    jsonb       DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_attack_logs_blocked_at
+  ON public.attack_logs (blocked_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_attack_logs_ip
+  ON public.attack_logs (ip_address, blocked_at DESC);
+
+ALTER TABLE public.attack_logs ENABLE ROW LEVEL SECURITY;
+
+-- ─── 14. ForgeGuard Certified bazaar seed (5 scripts) ───────────────────────
+DO $$
+DECLARE
+  v_author uuid;
+BEGIN
+  SELECT id INTO v_author FROM public.profiles ORDER BY created_at LIMIT 1;
+  IF v_author IS NULL THEN
+    RAISE NOTICE 'Section 14 skipped — no profiles row for author_id';
+    RETURN;
+  END IF;
+
+  INSERT INTO public.bazaar_scripts (
+    id, name, title, description, code, language, tags,
+    author_id, is_certified, audit_verdict, is_published, is_removed,
+    price_usd, audit_risk_score, safety_score, purchase_count
+  ) VALUES
+  (
+    'aaaaaaaa-0001-4000-8000-000000000001'::uuid,
+    'llm-jailbreak-probe',
+    'LLM Jailbreak Probe',
+    'Multi-vector jailbreak harness for LLM guardrail evaluation and red-team probing.',
+    '# ForgeGuard Certified — LLM Jailbreak Probe\nprint("jailbreak probe ready")',
+    'python',
+    ARRAY['llm', 'jailbreak', 'red-team'],
+    v_author, true, 'cleared', true, false, 13, 22, 92, 156
+  ),
+  (
+    'aaaaaaaa-0002-4000-8000-000000000002'::uuid,
+    'rag-injection-scanner',
+    'RAG Injection Scanner',
+    'Detects document-poisoning and retrieval injection vectors in RAG pipelines.',
+    '# ForgeGuard Certified — RAG Injection Scanner\nprint("rag scanner ready")',
+    'python',
+    ARRAY['rag', 'injection', 'llm'],
+    v_author, true, 'cleared', true, false, 15, 35, 88, 98
+  ),
+  (
+    'aaaaaaaa-0003-4000-8000-000000000003'::uuid,
+    'prompt-exfil-kit',
+    'Prompt Exfil Kit',
+    'Structured prompt exfiltration toolkit for system-prompt and secret leakage tests.',
+    '# ForgeGuard Certified — Prompt Exfil Kit\nprint("exfil kit ready")',
+    'python',
+    ARRAY['prompt', 'exfil', 'llm'],
+    v_author, true, 'cleared', true, false, 10, 41, 85, 203
+  ),
+  (
+    'aaaaaaaa-0004-4000-8000-000000000004'::uuid,
+    'agent-tool-hijack',
+    'Agent Tool Hijack',
+    'Simulates tool-calling hijacks against autonomous agent frameworks.',
+    '# ForgeGuard Certified — Agent Tool Hijack\nprint("tool hijack ready")',
+    'javascript',
+    ARRAY['agent', 'tool-calling', 'hijack'],
+    v_author, true, 'cleared', true, false, 12, 48, 90, 74
+  ),
+  (
+    'aaaaaaaa-0005-4000-8000-000000000005'::uuid,
+    'multi-turn-bypass',
+    'Multi-Turn Bypass',
+    'Progressive multi-turn bypass sequences for conversational guardrail evasion.',
+    '# ForgeGuard Certified — Multi-Turn Bypass\nprint("multi-turn bypass ready")',
+    'python',
+    ARRAY['multi-turn', 'bypass', 'llm'],
+    v_author, true, 'cleared', true, false, 9, 38, 87, 131
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    title = EXCLUDED.title,
+    description = EXCLUDED.description,
+    code = EXCLUDED.code,
+    language = EXCLUDED.language,
+    tags = EXCLUDED.tags,
+    is_certified = EXCLUDED.is_certified,
+    audit_verdict = EXCLUDED.audit_verdict,
+    is_published = EXCLUDED.is_published,
+    is_removed = EXCLUDED.is_removed,
+    price_usd = EXCLUDED.price_usd,
+    audit_risk_score = EXCLUDED.audit_risk_score,
+    safety_score = EXCLUDED.safety_score,
+    purchase_count = EXCLUDED.purchase_count,
+    updated_at = now();
+END $$;
+
 COMMIT;
 
 -- =============================================================================
@@ -427,3 +531,5 @@ COMMIT;
 --    AND column_name IN ('phone', 'code_hash', 'consumed');
 -- SELECT relreplident FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 --  WHERE n.nspname = 'public' AND c.relname = 'user_wallets';
+-- SELECT to_regclass('public.attack_logs');
+-- SELECT relrowsecurity FROM pg_class WHERE relname = 'attack_logs';

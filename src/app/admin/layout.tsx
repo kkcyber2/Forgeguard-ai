@@ -26,8 +26,12 @@ export default async function AdminLayout({
   const profile = await requireAdminProfile();
   if (!profile) redirect("/dashboard");
 
-  const canDev = canAccessDevMode(profile.clearance_tier, profile.role);
-  const canSwitchIdentity = canShowPersonaSwitcher(profile.user_type, profile.clearance_tier);
+  const canDev = canAccessDevMode(profile.clearance_tier, profile.role, user.email);
+  const canSwitchIdentity = canShowPersonaSwitcher(
+    profile.user_type,
+    profile.clearance_tier,
+    user.email,
+  );
   const { primary, secondary } = buildDevNav();
 
   const shellUser = {

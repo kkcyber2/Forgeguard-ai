@@ -34,7 +34,7 @@ export function IdentityBadge({
   const isClient = viewMode === "client";
 
   return (
-    <div className="hidden items-center gap-2 sm:flex">
+    <div className="hidden items-center gap-2 md:flex">
       {identityVerified && <VerifiedCheckmark />}
       {domainVerified && companyTag && <CompanyTagBadge tag={companyTag} />}
       {isClient ? (

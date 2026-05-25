@@ -10,6 +10,7 @@ import {
   SOVEREIGN_ACCENTS,
   type SovereignRole,
 } from "@/lib/access/parallel-sovereignty";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { useSovereignStore, useHackerPersonaAccent } from "@/stores/use-sovereign-store";
 
 const PERSONA_MODES: Array<{
@@ -29,10 +30,12 @@ const PERSONA_MODES: Array<{
 export function IdentitySwitcher({
   activeMode: activeModeProp,
   canSwitch: canSwitchProp,
+  operatorEmail,
   compact = false,
 }: {
   activeMode?: SovereignRole;
   canSwitch?: boolean;
+  operatorEmail?: string | null;
   compact?: boolean;
 }) {
   const router = useRouter();
@@ -43,15 +46,23 @@ export function IdentitySwitcher({
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
   const hackerAccent = useHackerPersonaAccent();
 
+  const isSovereign = isSovereignOperator(operatorEmail);
   const activeMode = activeModeProp ?? storeRole;
   const canSwitch = canSwitchProp ?? canSwitchStore;
+  const showDevChip = isSovereign && canDev;
 
   const [pending, setPending] = React.useState<SovereignRole | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (activeMode === "dev" && !isSovereign) {
+      window.location.href = "/auth/force-logout";
+    }
+  }, [activeMode, isSovereign]);
+
   async function handleSwitch(role: SovereignRole) {
     if (!canSwitch || role === activeMode || pending) return;
-    if (role === "dev" && !canDev) return;
+    if (role === "dev" && !showDevChip) return;
 
     setPending(role);
     setError(null);
@@ -63,6 +74,9 @@ export function IdentitySwitcher({
     if (result.error) {
       setActiveRole(activeMode);
       setError(result.error);
+      if (result.redirectTo) {
+        window.location.href = result.redirectTo;
+      }
       return;
     }
 
@@ -76,7 +90,7 @@ export function IdentitySwitcher({
     activeMode === "hacker" && isGhostMode
       ? hackerAccent
       : SOVEREIGN_ACCENTS[activeMode].primary;
-  const visibleModes = PERSONA_MODES.filter((m) => m.role !== "dev" || canDev);
+  const visibleModes = PERSONA_MODES.filter((m) => m.role !== "dev" || showDevChip);
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -92,7 +106,7 @@ export function IdentitySwitcher({
         {visibleModes.map(({ role, label, Icon }) => {
           const isActive = activeMode === role;
           const isLoading = pending === role;
-          const isDisabled = !canSwitch || !!pending || (role === "dev" && !canDev);
+          const isDisabled = !canSwitch || !!pending || (role === "dev" && !showDevChip);
           const modeAccent =
             role === "hacker" && isGhostMode
               ? hackerAccent
@@ -104,7 +118,7 @@ export function IdentitySwitcher({
               type="button"
               disabled={isDisabled}
               title={
-                role === "dev" && !canDev
+                role === "dev" && !showDevChip
                   ? "Requires Sovereign clearance"
                   : undefined
               }
@@ -112,7 +126,7 @@ export function IdentitySwitcher({
               className={cn(
                 "relative flex items-center gap-1.5 rounded-[3px] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.14em] transition-colors duration-150",
                 isActive ? "text-white" : "text-white/40 hover:text-white/65",
-                role === "dev" && !canDev && "cursor-not-allowed opacity-40",
+                role === "dev" && !showDevChip && "cursor-not-allowed opacity-40",
               )}
             >
               {isActive && (

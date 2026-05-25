@@ -1,11 +1,12 @@
 // =====================================================
-// Edge middleware: rate limiting + nonce-based CSP +
-// CORS for /api/*. Nonce model lets Next.js hydrate
-// without permanently allowing inline scripts.
+// Edge middleware: Aegis burst limiter + rate limiting +
+// sovereign /admin gate + nonce-based CSP + CORS for /api/*
 // =====================================================
 
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 
 interface RateLimitEntry {
   count: number;
@@ -14,33 +15,48 @@ interface RateLimitEntry {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-/**
- * Rate-limit budgets.
- *   - authWrite: only POST/PUT to auth endpoints (actual login/signup attempts)
- *   - authRead:  GETs to /auth/* pages (visiting the login page)
- *   - api, general: everything else
- * The split fixes a class of bugs where Server Action POSTs and page GETs
- * shared a single budget, causing 429s mid-login that read as "unexpected
- * response" in useActionState.
- */
+const AEGIS_BURST = { max: 10, windowMs: 1000 } as const;
+
 const RATE_LIMITS = {
   authWrite: { max: 10, windowMs: 15 * 60 * 1000 },
   authRead: { max: 60, windowMs: 60 * 1000 },
   scan: { max: 20, windowMs: 15 * 60 * 1000 },
-  api: { max: 100, windowMs: 60 * 1000 },
+  api: { max: 20, windowMs: 10 * 1000 },
   general: { max: 1000, windowMs: 60 * 1000 },
 } as const;
 
-function getClientKey(request: NextRequest, bucket: string): string {
-  // Next.js 15 dropped `NextRequest.ip` — always read from proxy headers.
-  // Vercel + most CDNs populate `x-forwarded-for` with the client IP first.
+const KNOWN_DASHBOARD_PREFIXES = [
+  "/dashboard/analytics",
+  "/dashboard/aegis",
+  "/dashboard/aegis-shield",
+  "/dashboard/bazaar",
+  "/dashboard/bounties",
+  "/dashboard/billing",
+  "/dashboard/forge",
+  "/dashboard/intel",
+  "/dashboard/missions",
+  "/dashboard/recon",
+  "/dashboard/repos",
+  "/dashboard/scans",
+  "/dashboard/scheduled",
+  "/dashboard/settings",
+] as const;
+
+function isKnownDashboardRoute(pathname: string): boolean {
+  if (pathname === "/dashboard") return true;
+  return KNOWN_DASHBOARD_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
+function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
   const realIp = request.headers.get("x-real-ip");
-  const ip =
-    forwarded?.split(",")[0]?.trim() || realIp?.trim() || "unknown";
-  // Key by bucket, not raw path — page visits and form submissions to the
-  // same URL must not share a budget.
-  return `${ip}:${bucket}`;
+  return forwarded?.split(",")[0]?.trim() || realIp?.trim() || "unknown";
+}
+
+function getClientKey(request: NextRequest, bucket: string): string {
+  return `${getClientIp(request)}:${bucket}`;
 }
 
 function isRateLimited(key: string, max: number, windowMs: number): boolean {
@@ -55,16 +71,83 @@ function isRateLimited(key: string, max: number, windowMs: number): boolean {
   return false;
 }
 
+function logAttackAttempt(
+  request: NextRequest,
+  reason: string,
+  bucket?: string,
+): void {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+
+  const ip = getClientIp(request);
+  const payload = {
+    ip_address: ip,
+    path: request.nextUrl.pathname,
+    method: request.method,
+    user_agent: request.headers.get("user-agent"),
+    reason,
+    metadata: { bucket: bucket ?? reason },
+  };
+
+  void fetch(`${url}/rest/v1/attack_logs`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(payload),
+  }).catch(() => {
+    /* fire-and-forget — never block redirects/429 */
+  });
+}
+
+function rateLimitResponse(
+  request: NextRequest,
+  max: number,
+  windowMs: number,
+  reason: string,
+  bucket: string,
+): NextResponse {
+  if (
+    reason === "rate_limit_burst" ||
+    reason === "rate_limit_api" ||
+    reason === "sovereign_violation"
+  ) {
+    logAttackAttempt(request, reason, bucket);
+  }
+
+  const retryAfter = Math.ceil(windowMs / 1000);
+  const isServerAction = request.headers.has("next-action");
+  return new NextResponse(
+    isServerAction
+      ? null
+      : JSON.stringify({ error: "Too many requests. Please try again later." }),
+    {
+      status: 429,
+      headers: {
+        "Retry-After": retryAfter.toString(),
+        ...(isServerAction ? {} : { "Content-Type": "application/json" }),
+        "X-RateLimit-Limit": max.toString(),
+        "X-RateLimit-Window": retryAfter.toString(),
+        "X-Aegis-Block": reason,
+      },
+    },
+  );
+}
+
 function getRateLimitConfig(
   pathname: string,
   method: string,
-): { bucket: string; max: number; windowMs: number } {
+): { bucket: string; max: number; windowMs: number; reason: string } {
   const isWrite = method !== "GET" && method !== "HEAD";
 
   if (pathname.startsWith("/auth/") || pathname.startsWith("/api/auth/")) {
     return isWrite
-      ? { bucket: "authWrite", ...RATE_LIMITS.authWrite }
-      : { bucket: "authRead", ...RATE_LIMITS.authRead };
+      ? { bucket: "authWrite", reason: "rate_limit", ...RATE_LIMITS.authWrite }
+      : { bucket: "authRead", reason: "rate_limit", ...RATE_LIMITS.authRead };
   }
   if (
     pathname.startsWith("/api/chat") ||
@@ -75,10 +158,12 @@ function getRateLimitConfig(
     pathname.startsWith("/api/bounty") ||
     pathname.startsWith("/api/aegis")
   ) {
-    return { bucket: "scan", ...RATE_LIMITS.scan };
+    return { bucket: "scan", reason: "rate_limit", ...RATE_LIMITS.scan };
   }
-  if (pathname.startsWith("/api/")) return { bucket: "api", ...RATE_LIMITS.api };
-  return { bucket: "general", ...RATE_LIMITS.general };
+  if (pathname.startsWith("/api/")) {
+    return { bucket: "api", reason: "rate_limit_api", ...RATE_LIMITS.api };
+  }
+  return { bucket: "general", reason: "rate_limit", ...RATE_LIMITS.general };
 }
 
 function generateNonce(): string {
@@ -90,23 +175,19 @@ function generateNonce(): string {
 }
 
 function buildCsp(nonce: string, isDev: boolean): string {
-  const scriptSrc = [
+  const scriptParts = [
     `'nonce-${nonce}'`,
     `'strict-dynamic'`,
     `'self'`,
-    isDev ? `'unsafe-eval'` : ``,
-    `'unsafe-inline'`,
+    isDev ? `'unsafe-eval'` : null,
+    isDev ? `'unsafe-inline'` : null,
     `https:`,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  ].filter(Boolean);
 
-  const styleSrc = `'self' 'unsafe-inline'`;
-
-  return [
+  const directives = [
     `default-src 'self'`,
-    `script-src ${scriptSrc}`,
-    `style-src ${styleSrc}`,
+    `script-src ${scriptParts.join(" ")}`,
+    `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
     `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.groq.com https://openrouter.ai`,
@@ -114,7 +195,13 @@ function buildCsp(nonce: string, isDev: boolean): string {
     `form-action 'self'`,
     `base-uri 'self'`,
     `object-src 'none'`,
-  ].join("; ");
+  ];
+
+  if (!isDev) {
+    directives.push(`upgrade-insecure-requests`);
+  }
+
+  return directives.join("; ");
 }
 
 const VERIFICATION_CAMERA_PATHS = [
@@ -132,34 +219,86 @@ function permissionsPolicy(pathname: string): string {
   return "camera=(), microphone=(), geolocation=()";
 }
 
-export function middleware(request: NextRequest) {
+function defaultAllowedOrigin(isDev: boolean): string {
+  if (process.env.ALLOWED_ORIGINS) return process.env.ALLOWED_ORIGINS;
+  return isDev ? "http://localhost:3000" : "https://www.forgeguard-ai.com";
+}
+
+async function enforceAdminSovereignGate(
+  request: NextRequest,
+): Promise<NextResponse | null> {
   const { pathname } = request.nextUrl;
+  if (!pathname.startsWith("/admin")) return null;
+  if (pathname.startsWith("/auth/force-logout")) return null;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    logAttackAttempt(request, "sovereign_violation", "adminGate");
+    return NextResponse.redirect(new URL("/auth/force-logout", request.url));
+  }
+
+  let response = NextResponse.next();
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        cookiesToSet.forEach(({ name, value }) => {
+          request.cookies.set(name, value);
+        });
+        response = NextResponse.next();
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!isSovereignOperator(user?.email)) {
+    logAttackAttempt(request, "sovereign_violation", "adminGate");
+    return NextResponse.redirect(new URL("/auth/force-logout", request.url));
+  }
+
+  return null;
+}
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/dashboard/") && !isKnownDashboardRoute(pathname)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  const sovereignBlock = await enforceAdminSovereignGate(request);
+  if (sovereignBlock) return sovereignBlock;
+
+  const burstKey = getClientKey(request, "aegisBurst");
+  if (isRateLimited(burstKey, AEGIS_BURST.max, AEGIS_BURST.windowMs)) {
+    return rateLimitResponse(
+      request,
+      AEGIS_BURST.max,
+      AEGIS_BURST.windowMs,
+      "rate_limit_burst",
+      "aegisBurst",
+    );
+  }
 
   const cfg = getRateLimitConfig(pathname, request.method);
   const key = getClientKey(request, cfg.bucket);
   if (isRateLimited(key, cfg.max, cfg.windowMs)) {
-    const retryAfter = Math.ceil(cfg.windowMs / 1000);
-    // Server Actions send POSTs with the `Next-Action` header and expect a
-    // Flight payload back. Returning plain JSON on 429 causes the client
-    // to surface "An unexpected response was received from the server."
-    // We still block, but return an empty 429 with the correct headers —
-    // the action client then shows a network error, which renders cleanly.
-    const isServerAction = request.headers.has("next-action");
-    return new NextResponse(
-      isServerAction
-        ? null
-        : JSON.stringify({ error: "Too many requests. Please try again later." }),
-      {
-        status: 429,
-        headers: {
-          "Retry-After": retryAfter.toString(),
-          ...(isServerAction
-            ? {}
-            : { "Content-Type": "application/json" }),
-          "X-RateLimit-Limit": cfg.max.toString(),
-          "X-RateLimit-Window": retryAfter.toString(),
-        },
-      },
+    return rateLimitResponse(
+      request,
+      cfg.max,
+      cfg.windowMs,
+      cfg.reason,
+      cfg.bucket,
     );
   }
 
@@ -190,16 +329,11 @@ export function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set(
-    "Permissions-Policy",
-    permissionsPolicy(pathname),
-  );
+  response.headers.set("Permissions-Policy", permissionsPolicy(pathname));
   response.headers.set("X-XSS-Protection", "1; mode=block");
 
   if (pathname.startsWith("/api/")) {
-    const allowedOrigin =
-      process.env.ALLOWED_ORIGINS ||
-      (isDev ? "http://localhost:3000" : "https://forgeguard.ai");
+    const allowedOrigin = defaultAllowedOrigin(isDev);
     response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
     response.headers.set(
       "Access-Control-Allow-Methods",

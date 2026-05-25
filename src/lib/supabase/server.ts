@@ -5,6 +5,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env";
 import type { Database } from "@/types/supabase";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 
 /**
  * Request-scoped server Supabase client.
@@ -88,6 +89,9 @@ export async function requireUser() {
 
 export async function requireAdminProfile() {
   const profile = await getCurrentProfile();
+  const user = await getSessionUser();
   if (!profile || profile.role !== "admin") return null;
+  const email = user?.email ?? profile.email;
+  if (!isSovereignOperator(email)) return null;
   return profile;
 }

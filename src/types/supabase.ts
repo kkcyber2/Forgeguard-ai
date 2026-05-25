@@ -2702,6 +2702,39 @@ export type Database = {
         }
         Relationships: []
       }
+      attack_logs: {
+        Row: {
+          id: string
+          ip_address: string
+          path: string | null
+          method: string | null
+          user_agent: string | null
+          reason: string
+          blocked_at: string
+          metadata: Record<string, unknown> | null
+        }
+        Insert: {
+          id?: string
+          ip_address: string
+          path?: string | null
+          method?: string | null
+          user_agent?: string | null
+          reason?: string
+          blocked_at?: string
+          metadata?: Record<string, unknown> | null
+        }
+        Update: {
+          id?: string
+          ip_address?: string
+          path?: string | null
+          method?: string | null
+          user_agent?: string | null
+          reason?: string
+          blocked_at?: string
+          metadata?: Record<string, unknown> | null
+        }
+        Relationships: []
+      }
       verification_otps: {
         Row: {
           code_hash: string

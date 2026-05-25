@@ -101,6 +101,12 @@ export default async function AdminBazaarPage() {
         <span className="rounded-sm border border-acid/20 bg-acid/5 px-3 py-1 font-mono text-[10px] text-acid">
           {scripts.length} pending
         </span>
+        <Link
+          href="/admin/bazaar/verified"
+          className="rounded-sm border border-white/[0.08] px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground-muted hover:text-acid"
+        >
+          Verified catalog →
+        </Link>
       </div>
 
       {scripts.length === 0 ? (

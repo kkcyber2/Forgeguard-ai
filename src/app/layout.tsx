@@ -16,10 +16,10 @@ assertPublicEnv();
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "https://forgeguard.ai",
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://www.forgeguard-ai.com",
   ),
   title: {
-    default: "ForgeGuard AI — Adversarial Red-Teaming for LLMs",
+    default: "ForgeGuard AI | #1 Adversarial Intelligence Platform",
     template: "%s · ForgeGuard AI",
   },
   description:
@@ -32,19 +32,24 @@ export const metadata: Metadata = {
     "adversarial testing",
     "agent security",
     "ForgeGuard",
+    "adversarial intelligence",
   ],
   authors: [{ name: "ForgeGuard AI" }],
+  alternates: {
+    canonical: "https://www.forgeguard-ai.com",
+  },
   openGraph: {
     type: "website",
     siteName: "ForgeGuard AI",
-    title: "ForgeGuard AI — Adversarial Red-Teaming for LLMs",
+    title: "ForgeGuard AI | #1 Adversarial Intelligence Platform",
     description:
       "Continuous red-teaming and runtime guardrails for production LLM deployments.",
+    url: "https://www.forgeguard-ai.com",
     images: ["/og.png"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ForgeGuard AI",
+    title: "ForgeGuard AI | #1 Adversarial Intelligence Platform",
     description:
       "Adversarial red-teaming and runtime guardrails for production LLM deployments.",
     images: ["/og.png"],

@@ -4,6 +4,7 @@
  */
 
 import type { NavItem } from "@/components/dashboard/shell";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import {
   type UserType,
   resolveAccessRank,
@@ -54,6 +55,7 @@ const SECONDARY_NAV: Array<NavItem & { minRank: number; viewModes?: ViewMode[] }
   { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "Operations", minRank: 1 },
   { href: "/dashboard/repos", label: "Repository", icon: "git-branch", section: "Operations", minRank: 3, viewModes: ["hacker"] },
   { href: "/dashboard/intel", label: "Intel", icon: "zap", section: "Operations", minRank: 3 },
+  { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations", minRank: 2 },
   { href: "/dashboard/recon", label: "Recon Map", icon: "globe", section: "Stronghold", minRank: 4 },
   { href: "/dashboard/scheduled", label: "Scheduled", icon: "calendar-clock", section: "Operations", minRank: 4 },
   { href: "/dashboard/missions", label: "Mission Feed", icon: "crosshair", section: "Operations", minRank: 1, viewModes: ["client"] },
@@ -70,6 +72,7 @@ export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
     { href: "/admin", label: "Overview", icon: "layout-dashboard", section: "Command" },
     { href: "/admin/threats", label: "Global threats", icon: "shield-alert", section: "Command" },
     { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "Command" },
+    { href: "/admin/bazaar/verified", label: "Verified Catalog", icon: "shield-check", section: "Command" },
     { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark", section: "Command" },
   ];
   const secondary: NavItem[] = [
@@ -95,12 +98,14 @@ export function buildSovereignNav(
     viewMode === "client"
       ? [
           { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold" },
+          { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations" },
           { href: "/dashboard/aegis", label: "Aegis Shield", icon: "shield-check", section: "Operations" },
           { href: "/dashboard/bounties", label: "Bounty Management", icon: "shield-alert", section: "Operations" },
           { href: "/dashboard/scans", label: "Financial Risk", icon: "radar", section: "Operations" },
         ]
       : [
           { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold" },
+          { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations" },
           { href: "/dashboard/missions", label: "Mission Feed", icon: "crosshair", section: "Stronghold" },
           { href: "/dashboard/forge", label: "The Forge", icon: "flask-conical", section: "Stronghold" },
           { href: "/dashboard/bazaar", label: "Bazaar", icon: "store", section: "Operations" },
@@ -171,14 +176,18 @@ export function personaToViewMode(role: SovereignRole): ViewMode {
 export function canAccessDevMode(
   clearanceTier: string | null | undefined,
   role: string | null | undefined,
+  email?: string | null,
 ): boolean {
+  if (!isSovereignOperator(email)) return false;
   return clearanceTier === "sovereign" && role === "admin";
 }
 
 export function canShowPersonaSwitcher(
   userType: string | null | undefined,
   clearanceTier: string | null | undefined,
+  email?: string | null,
 ): boolean {
+  if (!isSovereignOperator(email)) return false;
   return userType === "developer" || clearanceTier === "sovereign";
 }
 

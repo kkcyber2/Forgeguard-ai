@@ -39,6 +39,7 @@ interface Script {
   audit_verdict:    "cleared" | "flagged" | "rejected" | "pending";
   audit_risk_score: number;
   is_purchased:     boolean;
+  is_certified?:    boolean;
   created_at:       string;
   author: {
     full_name: string;
@@ -63,54 +64,6 @@ const VERDICT_CONFIG = {
   rejected: { label: "REJECTED", color: "#EF4444", icon: XCircle,        bg: "rgba(239,68,68,0.08)"   },
   pending:  { label: "PENDING",  color: "#6B7280", icon: Shield,          bg: "rgba(107,114,128,0.08)" },
 };
-
-const DEMO_SCRIPTS: Script[] = [
-  {
-    id: "demo-1",
-    name: "sql-blindfire",
-    description: "Automated time-based blind SQLi probe with adaptive delay tuning. Supports MySQL, PostgreSQL, MSSQL.",
-    language: "python",
-    tags: ["sqli", "blind", "automation"],
-    price_usd: 0,
-    is_free: true,
-    purchase_count: 342,
-    audit_verdict: "cleared",
-    audit_risk_score: 12,
-    is_purchased: false,
-    created_at: new Date().toISOString(),
-    author: { full_name: "0xPhantom", username: "phantom", rank: "Legend" },
-  },
-  {
-    id: "demo-2",
-    name: "dns-exfil-tunnel",
-    description: "Bidirectional DNS exfiltration channel. Chunks data into TXT record queries. Evades basic DPI.",
-    language: "python",
-    tags: ["dns", "exfil", "covert-channel"],
-    price_usd: 4.99,
-    is_free: false,
-    purchase_count: 87,
-    audit_verdict: "cleared",
-    audit_risk_score: 68,
-    is_purchased: false,
-    created_at: new Date().toISOString(),
-    author: { full_name: "DeepSea_9", username: "deepsea9", rank: "Hacker" },
-  },
-  {
-    id: "demo-3",
-    name: "ssrf-chainbreaker",
-    description: "SSRF payload generator targeting cloud metadata endpoints (AWS/GCP/Azure). Auto-detects WAF bypass routes.",
-    language: "bash",
-    tags: ["ssrf", "cloud", "bypass"],
-    price_usd: 9.99,
-    is_free: false,
-    purchase_count: 214,
-    audit_verdict: "cleared",
-    audit_risk_score: 55,
-    is_purchased: true,
-    created_at: new Date().toISOString(),
-    author: { full_name: "r00tkitchen", username: "rootkitchen", rank: "Legend" },
-  },
-];
 
 // ─── Language → file extension ───────────────────────────────────────────────
 const LANG_EXT: Record<string, string> = {
@@ -276,6 +229,18 @@ function ScriptCard({
             <span className="font-mono text-[13px] font-semibold text-white truncate">
               {script.name}
             </span>
+            {script.is_certified && (
+              <span
+                className="shrink-0 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest"
+                style={{
+                  background: "rgba(209,255,0,0.12)",
+                  color: "#D1FF00",
+                  border: "1px solid rgba(209,255,0,0.35)",
+                }}
+              >
+                Certified
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {script.audit_risk_score <= 10 && <VerifiedBadge />}
@@ -725,6 +690,7 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
 
 export default function BazaarPage() {
   const [scripts, setScripts]         = React.useState<Script[]>([]);
+  const [certifiedScripts, setCertifiedScripts] = React.useState<Script[]>([]);
   const [loadError, setLoadError]       = React.useState<string | null>(null);
   const [purchaseError, setPurchaseError] = React.useState<string | null>(null);
   const [loading, setLoading]         = React.useState(true);
@@ -744,13 +710,21 @@ export default function BazaarPage() {
         const params = new URLSearchParams({ limit: "50" });
         if (filterLang !== "all") params.set("lang",  filterLang);
         if (filterFree)           params.set("free",  "true");
-        const res  = await fetch(`/api/bazaar/list?${params.toString()}`);
+        const certParams = new URLSearchParams({ certified: "1", limit: "5" });
+        const [res, certRes] = await Promise.all([
+          fetch(`/api/bazaar/list?${params.toString()}`),
+          fetch(`/api/bazaar/list?${certParams.toString()}`),
+        ]);
         const data = await res.json() as { ok: boolean; scripts?: Script[] };
+        const certData = await certRes.json() as { ok: boolean; scripts?: Script[] };
         if (data.ok) {
           setScripts(data.scripts ?? []);
           setLoadError(null);
         } else {
           setLoadError("Could not load marketplace scripts.");
+        }
+        if (certData.ok) {
+          setCertifiedScripts(certData.scripts ?? []);
         }
       } catch {
         setLoadError("Network error loading Bazaar.");
@@ -789,7 +763,10 @@ export default function BazaarPage() {
     }
   };
 
+  const certifiedIds = new Set(certifiedScripts.map((s) => s.id));
+
   const filtered = scripts.filter((s) => {
+    if (certifiedIds.has(s.id)) return false;
     const q = search.toLowerCase();
     return (
       s.name.toLowerCase().includes(q) ||
@@ -948,6 +925,31 @@ export default function BazaarPage() {
 
       {/* Grid */}
       <div className="mx-auto max-w-6xl px-6 py-6">
+        {certifiedScripts.length > 0 && (
+          <section className="mb-8">
+            <div className="mb-4 flex items-center gap-2">
+              <ShieldCheck size={16} className="text-[#D1FF00]" />
+              <h2 className="font-mono text-[13px] font-semibold uppercase tracking-[0.14em] text-[#D1FF00]">
+                ForgeGuard Certified
+              </h2>
+            </div>
+            <motion.div
+              className="grid gap-4"
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}
+              layout
+            >
+              {certifiedScripts.map((script) => (
+                <ScriptCard
+                  key={script.id}
+                  script={{ ...script, is_certified: true }}
+                  onPurchase={handlePurchase}
+                  purchasing={purchasing}
+                />
+              ))}
+            </motion.div>
+          </section>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={20} className="animate-spin text-[#D1FF00]" />

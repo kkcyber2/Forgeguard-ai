@@ -49,6 +49,7 @@ This adds:
 | Ghost Protocol | `profiles.is_ghost_active`, `profiles.subscription_tier` |
 | Stronghold OTP + wallet realtime | `verification_otps.code_hash`, `user_wallets` in Realtime publication |
 | Section 12 legacy repair | `phone_number`→`phone`, `consumed`, `otp_logs` columns, `REPLICA IDENTITY FULL` on wallets |
+| Section 13 Aegis telemetry | `attack_logs` table (RLS on, service-role inserts only) |
 
 **Verify:**
 ```sql
@@ -67,6 +68,8 @@ SELECT column_name FROM information_schema.columns
    AND column_name IN ('phone', 'code_hash', 'consumed');
 SELECT relreplident FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE n.nspname = 'public' AND c.relname = 'user_wallets';
+SELECT to_regclass('public.attack_logs');
+SELECT relrowsecurity FROM pg_class WHERE relname = 'attack_logs';
 ```
 
 ---
@@ -77,8 +80,11 @@ Add to **Vercel / `.env.local`**:
 
 | Variable | Required for | Notes |
 |----------|--------------|-------|
+| `NEXT_PUBLIC_APP_URL` | SEO, OG, canonical | `https://www.forgeguard-ai.com` |
+| `ALLOWED_ORIGINS` | API CORS | `https://www.forgeguard-ai.com` |
+| `SOVEREIGN_OPERATOR_EMAIL` | Admin + Dev persona gate | Default `ksk805763@gmail.com` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Aegis attack_logs middleware writes | Server-only — never `NEXT_PUBLIC_` |
 | `OPENROUTER_API_KEY` | AI Verification Triage (`/admin/verification`) | DeepSeek-R1 via OpenRouter. Without it, heuristic fallback runs (lower confidence). |
-| `NEXT_PUBLIC_APP_URL` | OpenRouter referer header | e.g. `https://your-domain.com` |
 | `TWILIO_ACCOUNT_SID` | User OTP flow (Stronghold) | Optional for admin triage |
 | `TWILIO_AUTH_TOKEN` | User OTP flow | Optional for admin triage |
 | `TWILIO_PHONE_NUMBER` | User OTP flow | Optional for admin triage |
@@ -92,14 +98,15 @@ Add to **Vercel / `.env.local`**:
 
 ## 3. Admin Role Assignment
 
-Admin pages gate on `profiles.role = 'admin'` (via `requireAdminProfile()`).
+Admin pages gate on `profiles.role = 'admin'` **and** sovereign operator email (via `requireAdminProfile()`).
 
-**Promote your operator account:**
+**Promote your operator account (sovereign operator only):**
 ```sql
 UPDATE public.profiles
    SET role = 'admin',
-       is_admin = true
- WHERE email = 'YOUR_ADMIN_EMAIL@domain.com';
+       is_admin = true,
+       clearance_tier = 'sovereign'
+ WHERE email = 'ksk805763@gmail.com';
 ```
 
 ---

@@ -21,11 +21,13 @@ export interface NavAccessItem {
 export const DASHBOARD_NAV: NavAccessItem[] = [
   { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold", minRank: 1 },
   { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "Stronghold", minRank: 1 },
+  { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations", minRank: 2 },
   { href: "/dashboard/missions", label: "Missions", icon: "crosshair", section: "Stronghold", minRank: 3 },
   { href: "/dashboard/aegis", label: "Aegis", icon: "shield-check", section: "Operations", minRank: 1, userTypes: ["client", "developer"] },
   { href: "/dashboard/bounties", label: "Bounties", icon: "shield-alert", section: "Operations", minRank: 1, userTypes: ["client", "developer"] },
   { href: "/dashboard/forge", label: "Forge", icon: "flask-conical", section: "Stronghold", minRank: 3, userTypes: ["hacker", "developer"] },
   { href: "/dashboard/bazaar", label: "Bazaar", icon: "store", section: "Operations", minRank: 3 },
+  { href: "/dashboard/bazaar/verified", label: "Verified", icon: "shield-check", section: "Operations", minRank: 3 },
   { href: "/dashboard/intel", label: "Intel", icon: "zap", section: "Operations", minRank: 3 },
   { href: "/dashboard/repos", label: "Repos", icon: "git-branch", section: "Operations", minRank: 3 },
   { href: "/dashboard/recon", label: "Recon", icon: "globe", section: "Stronghold", minRank: 4 },
@@ -33,6 +35,9 @@ export const DASHBOARD_NAV: NavAccessItem[] = [
   { href: "/dashboard/billing", label: "Billing", icon: "credit-card", section: "Account", minRank: 1 },
   { href: "/dashboard/settings", label: "Settings", icon: "settings", section: "Account", minRank: 1 },
 ];
+
+/** Paths that require rank ≥ 2 */
+const RANK_2_PREFIXES = ["/dashboard/analytics"];
 
 /** Paths that require rank ≥ 3 */
 const RANK_3_PREFIXES = [
@@ -137,6 +142,9 @@ export function isPathAllowed(
   }
   if (pathname.startsWith("/dashboard/billing") || pathname.startsWith("/dashboard/settings")) {
     return rank >= 1;
+  }
+  if (RANK_2_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return rank >= 2;
   }
   if (RANK_5_PREFIXES.some((p) => pathname.startsWith(p))) {
     return rank >= 5;

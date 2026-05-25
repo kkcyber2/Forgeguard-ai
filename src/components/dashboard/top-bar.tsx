@@ -498,9 +498,9 @@ export function TopBar({
         )}
       >
         {/* Logo cell */}
-        <div className="flex items-center gap-2.5 border-r-[0.5px] border-white/[0.06] px-5">
+        <div className="flex min-w-0 items-center gap-2.5 border-r-[0.5px] border-white/[0.06] px-5">
           {/* Hamburger — mobile only */}
-          <div className="lg:hidden">
+          <div className="shrink-0 md:hidden">
             <MobileNav
               nav={nav}
               user={user}
@@ -511,7 +511,7 @@ export function TopBar({
               canSwitchIdentity={canSwitchIdentity}
             />
           </div>
-          <Link href={scope === "admin" ? "/admin" : "/dashboard"} className="flex items-center hover:opacity-80 transition-opacity">
+          <Link href={scope === "admin" ? "/admin" : "/dashboard"} className="flex min-w-0 items-center hover:opacity-80 transition-opacity">
             <Logo accentColor={accentHex} glow={accent.glow} />
           </Link>
           {scope === "admin" && (
@@ -522,7 +522,7 @@ export function TopBar({
         </div>
 
         {/* Primary nav tabs — desktop only */}
-        <nav className="hidden h-full flex-1 items-stretch overflow-x-auto scrollbar-none lg:flex">
+        <nav className="hidden h-full flex-1 items-stretch overflow-x-auto scrollbar-none md:flex">
           {resolvedPrimary.map((item) => {
             const active =
               pathname === item.href ||
@@ -590,6 +590,7 @@ export function TopBar({
             <IdentitySwitcher
               activeMode={activeRole}
               canSwitch={canSwitchIdentity}
+              operatorEmail={user.email}
             />
           )}
 

@@ -7,10 +7,12 @@ import {
   redirectForPersona,
   type SovereignRole,
 } from "@/lib/access/parallel-sovereignty";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { SOVEREIGN_VIOLATION_LOGIN } from "@/lib/auth/sovereign-violation";
 
 export async function switchPersona(
   role: SovereignRole,
-): Promise<{ error?: string; redirectTo?: "/admin" | "/dashboard" }> {
+): Promise<{ error?: string; redirectTo?: "/admin" | "/dashboard" | typeof SOVEREIGN_VIOLATION_LOGIN }> {
   if (role !== "client" && role !== "hacker" && role !== "dev") {
     return { error: "Invalid persona." };
   }
@@ -36,7 +38,14 @@ export async function switchPersona(
   }
 
   if (role === "dev") {
-    if (!canAccessDevMode(profile.clearance_tier, profile.role)) {
+    if (!isSovereignOperator(user.email)) {
+      await supabase.auth.signOut();
+      return {
+        error: "Sovereign operator clearance required.",
+        redirectTo: SOVEREIGN_VIOLATION_LOGIN,
+      };
+    }
+    if (!canAccessDevMode(profile.clearance_tier, profile.role, user.email)) {
       return { error: "Sovereign clearance and admin role required for Dev mode." };
     }
   } else {

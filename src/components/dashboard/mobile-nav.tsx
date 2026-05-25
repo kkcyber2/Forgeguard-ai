@@ -9,9 +9,7 @@ import { IdentitySwitcher } from "@/components/dashboard/identity-switcher";
 import type { SovereignRole, ViewMode } from "@/lib/access/parallel-sovereignty";
 
 /**
- * MobileNav — hamburger sheet for sub-lg viewports.
- * Opens a slide-in drawer over the content area.
- * Uses local React state so no shadcn Sheet dep needed.
+ * MobileNav — Command Burger menu for viewports < 768px (md).
  */
 export function MobileNav({
   nav,
@@ -33,58 +31,102 @@ export function MobileNav({
   canSwitchIdentity?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
+  const drawerRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
 
-  // Close on route change
   React.useEffect(() => {
     setOpen(false);
   }, [activePath]);
 
-  // Lock body scroll when open
   React.useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+      if (e.key === "Tab" && drawerRef.current) {
+        const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0]!;
+        const last = focusable[focusable.length - 1]!;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    const closeBtn = drawerRef.current?.querySelector<HTMLElement>(
+      'button[aria-label="Close command menu"]',
+    );
+    closeBtn?.focus();
+
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
   return (
     <>
-      {/* Hamburger button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Open navigation"
+        aria-label="Open command menu"
+        aria-expanded={open}
         className="flex h-8 w-8 items-center justify-center rounded-sm border border-white/[0.08] bg-obsidian-800/60 text-foreground-muted transition-colors hover:text-foreground"
       >
         <Menu size={15} strokeWidth={1.75} />
       </button>
 
-      {/* Backdrop */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={() => setOpen(false)}
+          aria-hidden
         />
       )}
 
-      {/* Drawer */}
       <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal={open}
+        aria-label="Command navigation"
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r-[0.5px] border-white/[0.06] bg-obsidian-950 transition-transform duration-200",
-          open ? "translate-x-0" : "-translate-x-full",
+          open ? "translate-x-0" : "-translate-x-full pointer-events-none",
         )}
       >
-        {/* Drawer header */}
         <div className="flex h-14 items-center justify-between border-b-[0.5px] border-white/[0.06] px-5">
-          <Link
-            href="/"
-            onClick={() => setOpen(false)}
-            className="font-mono text-sm font-bold tracking-widest text-foreground hover:text-acid transition-colors"
-          >
-            FORGEGUARD
-          </Link>
+          <div>
+            <Link
+              href="/"
+              onClick={() => setOpen(false)}
+              className="font-mono text-sm font-bold tracking-widest text-foreground hover:text-acid transition-colors"
+            >
+              FORGEGUARD
+            </Link>
+            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-foreground-subtle">
+              Command OS
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            aria-label="Close navigation"
+            aria-label="Close command menu"
             className="flex h-7 w-7 items-center justify-center rounded-sm text-foreground-subtle hover:text-foreground"
           >
             <X size={15} strokeWidth={1.75} />
@@ -96,12 +138,12 @@ export function MobileNav({
             <IdentitySwitcher
               activeMode={sovereignRole ?? viewMode}
               canSwitch={canSwitchIdentity}
+              operatorEmail={user.email}
               compact
             />
           </div>
         )}
 
-        {/* Nav links */}
         <nav className="flex-1 overflow-y-auto px-3 py-5">
           <ul className="space-y-0.5">
             {nav.map((item) => {
@@ -143,7 +185,6 @@ export function MobileNav({
           </ul>
         </nav>
 
-        {/* User footer */}
         <div className="border-t-[0.5px] border-white/[0.06] px-3 py-3">
           <div className="flex items-center gap-3 rounded-sm px-3 py-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border-hairline border-white/10 bg-obsidian-800 font-mono text-xs text-foreground">

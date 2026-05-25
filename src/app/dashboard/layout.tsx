@@ -21,6 +21,9 @@ import {
   getCurrentProfile,
   createServerSupabase,
 } from "@/lib/supabase/server";
+import { forceLogout } from "@/lib/auth/force-logout";
+import { SOVEREIGN_VIOLATION_LOGIN } from "@/lib/auth/sovereign-violation";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 
 /**
  * Authenticated dashboard shell — Parallel Sovereignty.
@@ -52,6 +55,10 @@ export default async function DashboardLayout({
   );
 
   if (persona === "dev") {
+    if (!isSovereignOperator(user.email)) {
+      await forceLogout();
+      redirect(SOVEREIGN_VIOLATION_LOGIN);
+    }
     redirect("/admin");
   }
 
@@ -63,8 +70,12 @@ export default async function DashboardLayout({
   const accessLevel = profile.access_level ?? 1;
   const rank = resolveAccessRank(accessLevel, profile.role ?? null);
   const userType = (profile.user_type ?? "hacker") as UserType;
-  const canDev = canAccessDevMode(profile.clearance_tier, profile.role);
-  const canSwitchIdentity = canShowPersonaSwitcher(profile.user_type, profile.clearance_tier);
+  const canDev = canAccessDevMode(profile.clearance_tier, profile.role, user.email);
+  const canSwitchIdentity = canShowPersonaSwitcher(
+    profile.user_type,
+    profile.clearance_tier,
+    user.email,
+  );
 
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "/dashboard";

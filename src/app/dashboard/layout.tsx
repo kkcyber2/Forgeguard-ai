@@ -2,23 +2,17 @@ import * as React from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ActivePath } from "@/components/dashboard/active-path";
-import { StrongholdRecovering } from "@/components/dashboard/stronghold-recovering";
-import {
-  resolvePersona,
-} from "@/lib/access/parallel-sovereignty";
+import { ShellDegradedBanner } from "@/components/dashboard/shell-degraded-banner";
+import { resolvePersona } from "@/lib/access/parallel-sovereignty";
 import { loadDashboardShell } from "@/lib/dashboard/load-shell";
-import {
-  getSessionUser,
-  getCurrentProfile,
-} from "@/lib/supabase/server";
+import { getSessionUser, getCurrentProfile } from "@/lib/supabase/server";
 import { safeForceLogout } from "@/lib/auth/force-logout";
 import { SOVEREIGN_VIOLATION_LOGIN } from "@/lib/auth/sovereign-violation";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 
 /**
  * Authenticated dashboard shell — Parallel Sovereignty.
- * Shell loading is defensive: layout always renders Top Nav even when
- * telemetry subsystems fail.
+ * Page content always renders; shell telemetry failures show a banner only.
  */
 
 export default async function DashboardLayout({
@@ -64,18 +58,11 @@ export default async function DashboardLayout({
     pathname,
   });
 
-  if (shellResult.ok && !shellResult.pathAllowed) {
+  if (!shellResult.pathAllowed && shellResult.redirectTo) {
     redirect(shellResult.redirectTo);
   }
 
   const { payload } = shellResult;
-  const content = shellResult.ok ? (
-    children
-  ) : (
-    <StrongholdRecovering
-      message="Dashboard telemetry could not load. Top navigation remains active — reload to retry."
-    />
-  );
 
   return (
     <ActivePath
@@ -89,7 +76,10 @@ export default async function DashboardLayout({
       identityChosen={payload.identityChosen}
       canSwitchIdentity={payload.canSwitchIdentity}
     >
-      {content}
+      {shellResult.degraded && (
+        <ShellDegradedBanner message={shellResult.errorMessage} />
+      )}
+      {children}
     </ActivePath>
   );
 }

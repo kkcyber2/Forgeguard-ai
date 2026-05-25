@@ -3,14 +3,11 @@ import { redirect } from "next/navigation";
 import { KeyRound, ShieldAlert, User2, Globe, PenLine, Camera } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { Badge } from "@/components/ui/badge";
-import {
-  createServerSupabase,
-  getCurrentProfile,
-  getSessionUser,
-} from "@/lib/supabase/server";
+import { getCurrentProfile, getSessionUser } from "@/lib/supabase/server";
+import { fetchSettingsPageData } from "@/lib/dashboard/fetch-settings";
 import { ProfileForm } from "./profile-form";
 import { PasswordForm } from "./password-form";
-import { ApiKeysSection, type ApiKeyRow } from "./api-keys-section";
+import { ApiKeysSection } from "./api-keys-section";
 import { SignaturePad } from "@/components/settings/signature-pad";
 import { DomainVerifier } from "@/components/settings/domain-verifier";
 import { WebcamIdentity } from "@/components/settings/webcam-identity";
@@ -22,10 +19,7 @@ import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard
 
 /**
  * /dashboard/settings — operator profile management.
- * --------------------------------------------------
- * Server-rendered shell + two client forms (profile + password) wired
- * to Server Actions. Anything role-gated stays read-only here; admins
- * promote/demote users from /admin/users.
+ * Defensive rendering: all Supabase fetches degrade safely.
  */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,37 +29,7 @@ export default async function SettingsPage() {
   if (!user) redirect("/auth/login?next=/dashboard/settings");
 
   const profile = await getCurrentProfile();
-
-  // Last sign-in for the audit panel — pulled directly from Supabase auth.
-  const supabase = await createServerSupabase();
-  const { data: sessionData } = await supabase.auth.getSession();
-  const lastSignIn = sessionData.session?.user.last_sign_in_at ?? null;
-
-  // Fetch user's API keys for the CI/CD section
-  const { data: rawKeys } = await supabase
-    .from("user_api_keys")
-    .select("id, name, key_prefix, created_at, last_used_at, revoked_at")
-    .order("created_at", { ascending: false });
-
-  const apiKeys: ApiKeyRow[] = (rawKeys ?? []) as ApiKeyRow[];
-
-  // Derive verification booleans server-side to pass to VerificationProgress
-  const emailVerified = !!(user as { email_confirmed_at?: string | null })
-    .email_confirmed_at;
-  const phoneVerified = profile?.phone_verified ?? false;
-  const domainVerified = profile?.domain_verified ?? false;
-  const hasSignature = !!profile?.signature_data;
-  const identityProofed = profile?.identity_proofed ?? false;
-  const identityVerified = profile?.identity_verified ?? false;
-  const clearanceTier = (profile?.clearance_tier ?? "tactical") as
-    | "tactical"
-    | "professional"
-    | "sovereign";
-  const auditScore = profile?.identity_audit_score
-    ? Number(profile.identity_audit_score)
-    : null;
-  const sovereignPending = profile?.sovereign_pending ?? false;
-  const docPath = profile?.identity_document_path ?? null;
+  const data = await fetchSettingsPageData(user, profile);
 
   return (
     <>
@@ -76,14 +40,13 @@ export default async function SettingsPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* ── Left column: forms ─────────────────────────── */}
         <div className="flex flex-col gap-6">
           <Section id="profile" icon={User2} eyebrow="Identity" title="Profile">
             <ProfileForm
               initial={{
-                full_name: profile?.full_name ?? "",
-                company_name: profile?.company_name ?? "",
-                phone: profile?.phone ?? "",
+                full_name: data.profile?.full_name ?? "",
+                company_name: data.profile?.company_name ?? "",
+                phone: data.profile?.phone ?? "",
               }}
             />
           </Section>
@@ -103,10 +66,9 @@ export default async function SettingsPage() {
             eyebrow="CI/CD integration"
             title="API Keys"
           >
-            <ApiKeysSection initialKeys={apiKeys} />
+            <ApiKeysSection initialKeys={data.apiKeys} />
           </Section>
 
-          {/* ── Sovereign Identity ───────────────────────── */}
           <Section
             id="domain"
             icon={Globe}
@@ -114,8 +76,8 @@ export default async function SettingsPage() {
             title="Domain Verification"
           >
             <DomainVerifier
-              existingDomain={(profile?.company_domain as string | null) ?? null}
-              domainVerified={domainVerified}
+              existingDomain={(data.profile?.company_domain as string | null) ?? null}
+              domainVerified={data.domainVerified}
             />
           </Section>
 
@@ -126,7 +88,7 @@ export default async function SettingsPage() {
             title="Digital Signature"
           >
             <SignaturePad
-              existingSignature={(profile?.signature_data as string | null) ?? null}
+              existingSignature={(data.profile?.signature_data as string | null) ?? null}
             />
           </Section>
 
@@ -138,13 +100,13 @@ export default async function SettingsPage() {
           >
             <div className="flex flex-col gap-8">
               <PhoneVerification
-                initialPhone={profile?.phone ?? ""}
-                phoneVerified={phoneVerified}
+                initialPhone={data.profile?.phone ?? ""}
+                phoneVerified={data.phoneVerified}
               />
               <IdentityAuditor
-                documentPath={docPath}
-                auditStatus={profile?.identity_audit_status ?? "none"}
-                auditScore={auditScore}
+                documentPath={data.docPath}
+                auditStatus={data.profile?.identity_audit_status ?? "none"}
+                auditScore={data.auditScore}
               />
             </div>
           </Section>
@@ -155,28 +117,26 @@ export default async function SettingsPage() {
             eyebrow="Enterprise missions"
             title="Identity Proofing"
           >
-            <WebcamIdentity verified={identityProofed} />
+            <WebcamIdentity verified={data.identityProofed} />
           </Section>
         </div>
 
-        {/* ── Right sidebar ──────────────────────────────── */}
         <aside className="space-y-4">
           <div className="rounded-sm border-hairline border-white/[0.06] bg-surface p-5">
             <p className="text-eyebrow text-foreground-subtle mb-3">Stealth</p>
             <GhostProtocolToggle compact />
           </div>
 
-          {/* Verification progress widget */}
           <ClearanceProgress
-            emailVerified={emailVerified}
-            phoneVerified={phoneVerified}
-            domainVerified={domainVerified}
-            hasSignature={hasSignature}
-            identityDocUploaded={!!docPath}
-            identityVerified={identityVerified}
-            clearanceTier={clearanceTier}
-            auditScore={auditScore}
-            sovereignPending={sovereignPending}
+            emailVerified={data.emailVerified}
+            phoneVerified={data.phoneVerified}
+            domainVerified={data.domainVerified}
+            hasSignature={data.hasSignature}
+            identityDocUploaded={!!data.docPath}
+            identityVerified={data.identityVerified}
+            clearanceTier={data.clearanceTier}
+            auditScore={data.auditScore}
+            sovereignPending={data.sovereignPending}
           />
 
           <div className="rounded-sm border-hairline border-white/[0.06] bg-surface p-5">
@@ -184,7 +144,6 @@ export default async function SettingsPage() {
             <OperatorLeaderboard limit={6} />
           </div>
 
-          {/* Account info card */}
           <div className="rounded-sm border-hairline border-white/[0.06] bg-surface p-5">
             <p className="text-eyebrow text-foreground-subtle">Account</p>
             <dl className="mt-3 space-y-3 text-xs">
@@ -194,19 +153,19 @@ export default async function SettingsPage() {
                 </span>
               </Row>
               <Row label="Role">
-                <Badge tone={profile?.role === "admin" ? "admin" : "neutral"}>
-                  {profile?.role === "admin" ? "Admin" : "Operator"}
+                <Badge tone={data.profile?.role === "admin" ? "admin" : "neutral"}>
+                  {data.profile?.role === "admin" ? "Admin" : "Operator"}
                 </Badge>
               </Row>
               <Row label="Verified">
-                <Badge tone={profile?.is_verified ? "secure" : "warn"}>
-                  {profile?.is_verified ? "Yes" : "Pending"}
+                <Badge tone={data.profile?.is_verified ? "secure" : "warn"}>
+                  {data.profile?.is_verified ? "Yes" : "Pending"}
                 </Badge>
               </Row>
               <Row label="Last sign-in">
                 <span className="font-mono text-foreground-muted">
-                  {lastSignIn
-                    ? new Date(lastSignIn).toLocaleString()
+                  {data.lastSignIn
+                    ? new Date(data.lastSignIn).toLocaleString()
                     : "—"}
                 </span>
               </Row>
@@ -230,8 +189,6 @@ export default async function SettingsPage() {
     </>
   );
 }
-
-/* ── Layout helpers ─────────────────────────────────────────────────────── */
 
 function Section({
   id,

@@ -49,24 +49,13 @@ export interface DashboardShellPayload {
   canSwitchIdentity: boolean;
 }
 
-export type DashboardShellLoadResult =
-  | {
-      ok: true;
-      pathAllowed: true;
-      payload: DashboardShellPayload;
-    }
-  | {
-      ok: true;
-      pathAllowed: false;
-      redirectTo: string;
-      payload: DashboardShellPayload;
-    }
-  | {
-      ok: false;
-      fallbackEmail: string;
-      errorMessage: string;
-      payload: DashboardShellPayload;
-    };
+export type DashboardShellLoadResult = {
+  degraded: boolean;
+  errorMessage?: string;
+  pathAllowed: boolean;
+  redirectTo?: string;
+  payload: DashboardShellPayload;
+};
 
 function coerceAccessLevel(value: unknown): number {
   const n = Number(value);
@@ -132,65 +121,80 @@ export async function loadDashboardShell(input: {
 }): Promise<DashboardShellLoadResult> {
   const email = input.email ?? "";
   const fallback = buildFallbackPayload(email, input.userId);
+  const errors: string[] = [];
+
+  let userType: UserType = "hacker";
+  let accessLevel = 1;
+  let viewMode: ViewMode = "hacker";
+  let persona: SovereignRole = "hacker";
+  let rank = 1;
+  let canDev = false;
+  let canSwitchIdentity = false;
 
   try {
-    const profile = input.profile;
-    const userType = coerceUserType(profile.user_type);
-    const accessLevel = coerceAccessLevel(profile.access_level);
-    const viewMode = resolveViewMode(
-      coerceString(profile.active_view_mode),
+    userType = coerceUserType(input.profile.user_type);
+    accessLevel = coerceAccessLevel(input.profile.access_level);
+    viewMode = resolveViewMode(
+      coerceString(input.profile.active_view_mode),
       userType,
     );
-    const persona: SovereignRole = resolvePersona(
-      coerceString(profile.current_persona),
-      coerceString(profile.active_view_mode),
+    persona = resolvePersona(
+      coerceString(input.profile.current_persona),
+      coerceString(input.profile.active_view_mode),
       userType,
     );
-    const rank = resolveAccessRank(accessLevel, coerceString(profile.role));
-    const canDev = canAccessDevMode(
-      coerceString(profile.clearance_tier),
-      coerceString(profile.role),
+    rank = resolveAccessRank(accessLevel, coerceString(input.profile.role));
+    canDev = canAccessDevMode(
+      coerceString(input.profile.clearance_tier),
+      coerceString(input.profile.role),
       input.email,
     );
-    const canSwitchIdentity = canShowPersonaSwitcher(
+    canSwitchIdentity = canShowPersonaSwitcher(
       userType,
-      coerceString(profile.clearance_tier),
+      coerceString(input.profile.clearance_tier),
       input.email,
     );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "nav segment failed";
+    console.error("[dashboard:shell] nav:", msg, err);
+    errors.push(`nav: ${msg}`);
+  }
 
-    if (
-      !isPathAllowedForView(input.pathname, viewMode, rank, userType)
-    ) {
-      const payload = buildShellPayload({
-        profile,
-        userId: input.userId,
-        email,
-        userMetadata: input.userMetadata,
-        viewMode,
-        persona,
-        userType,
-        accessLevel,
-        canDev,
-        canSwitchIdentity,
-        walletBalance: 0,
-        walletFrozen: false,
-        subscriptionPlan: null,
-      });
-      return {
-        ok: true,
-        pathAllowed: false,
-        redirectTo: redirectForViewBlocked(input.pathname, viewMode),
-        payload,
-      };
-    }
+  if (!isPathAllowedForView(input.pathname, viewMode, rank, userType)) {
+    const payload = safeBuildShellPayload({
+      profile: input.profile,
+      userId: input.userId,
+      email,
+      userMetadata: input.userMetadata,
+      viewMode,
+      persona,
+      userType,
+      accessLevel,
+      canDev,
+      canSwitchIdentity,
+      walletBalance: 0,
+      walletFrozen: false,
+      subscriptionPlan: null,
+      fallback,
+      errors,
+    });
+    return {
+      degraded: errors.length > 0,
+      errorMessage: errors.join("; ") || undefined,
+      pathAllowed: false,
+      redirectTo: redirectForViewBlocked(input.pathname, viewMode),
+      payload,
+    };
+  }
 
-    let walletBalance = 0;
-    let walletFrozen = false;
-    let subscriptionPlan: string | null = null;
+  let walletBalance = 0;
+  let walletFrozen = false;
+  let subscriptionPlan: string | null = null;
 
-    try {
-      const supabase = await createServerSupabase();
-      const [{ data: wallet }, { data: subscription }] = await Promise.all([
+  try {
+    const supabase = await createServerSupabase();
+    const [{ data: wallet, error: walletErr }, { data: subscription, error: subErr }] =
+      await Promise.all([
         supabase
           .from("user_wallets")
           .select("balance_usd, is_frozen")
@@ -205,43 +209,94 @@ export async function loadDashboardShell(input: {
           .limit(1)
           .maybeSingle(),
       ]);
+
+    if (walletErr) {
+      console.error("[dashboard:shell] wallet:", walletErr.message);
+      errors.push(`wallet: ${walletErr.message}`);
+    } else {
       walletBalance = Number(wallet?.balance_usd ?? 0);
       walletFrozen = wallet?.is_frozen ?? false;
+    }
+
+    if (subErr) {
+      console.error("[dashboard:shell] subscription:", subErr.message);
+      errors.push(`subscription: ${subErr.message}`);
+    } else {
       subscriptionPlan =
         subscription?.status === "active" ||
         subscription?.status === "trialing" ||
         subscription?.status === "past_due"
           ? subscription.plan
           : null;
-    } catch (walletErr) {
-      console.error("[dashboard:shell] wallet/subscription:", walletErr);
     }
+  } catch (walletErr) {
+    const msg =
+      walletErr instanceof Error ? walletErr.message : "wallet segment failed";
+    console.error("[dashboard:shell] wallet/subscription:", msg, walletErr);
+    errors.push(`wallet: ${msg}`);
+  }
 
-    const payload = buildShellPayload({
-      profile,
-      userId: input.userId,
-      email,
-      userMetadata: input.userMetadata,
-      viewMode,
-      persona,
-      userType,
-      accessLevel,
-      canDev,
-      canSwitchIdentity,
-      walletBalance,
-      walletFrozen,
-      subscriptionPlan,
-    });
+  const payload = safeBuildShellPayload({
+    profile: input.profile,
+    userId: input.userId,
+    email,
+    userMetadata: input.userMetadata,
+    viewMode,
+    persona,
+    userType,
+    accessLevel,
+    canDev,
+    canSwitchIdentity,
+    walletBalance,
+    walletFrozen,
+    subscriptionPlan,
+    fallback,
+    errors,
+  });
 
-    return { ok: true, pathAllowed: true, payload };
+  return {
+    degraded: errors.length > 0,
+    errorMessage: errors.length > 0 ? errors.join("; ") : undefined,
+    pathAllowed: true,
+    payload,
+  };
+}
+
+function safeBuildShellPayload(args: {
+  profile: ProfileRow;
+  userId: string;
+  email: string;
+  userMetadata?: Record<string, unknown> | null;
+  viewMode: ViewMode;
+  persona: SovereignRole;
+  userType: UserType;
+  accessLevel: number;
+  canDev: boolean;
+  canSwitchIdentity: boolean;
+  walletBalance: number;
+  walletFrozen: boolean;
+  subscriptionPlan: string | null;
+  fallback: DashboardShellPayload;
+  errors: string[];
+}): DashboardShellPayload {
+  try {
+    return buildShellPayload(args);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown shell error";
-    console.error("[dashboard:shell] load failed:", message, err);
+    const msg = err instanceof Error ? err.message : "sovereign segment failed";
+    console.error("[dashboard:shell] sovereign:", msg, err);
+    args.errors.push(`sovereign: ${msg}`);
     return {
-      ok: false,
-      fallbackEmail: email,
-      errorMessage: message,
-      payload: fallback,
+      ...args.fallback,
+      user: {
+        ...args.fallback.user,
+        email: args.email,
+        fullName:
+          coerceString(args.profile.full_name) ??
+          coerceString(args.userMetadata?.full_name) ??
+          null,
+        walletBalance: args.walletBalance,
+        walletFrozen: args.walletFrozen,
+      },
     };
   }
 }
@@ -273,12 +328,23 @@ function buildShellPayload(args: {
     coerceString(args.profile.current_plan),
     args.subscriptionPlan,
   );
-  const { primary, secondary } = buildSovereignNav(
-    args.viewMode,
-    args.accessLevel,
-    args.userType,
-    coerceString(args.profile.role),
-  );
+
+  let primary = MINIMAL_PRIMARY;
+  let secondary = MINIMAL_SECONDARY;
+  try {
+    const nav = buildSovereignNav(
+      args.viewMode,
+      args.accessLevel,
+      args.userType,
+      coerceString(args.profile.role),
+    );
+    primary = nav.primary;
+    secondary = nav.secondary;
+  } catch (err) {
+    console.error("[dashboard:shell] buildSovereignNav:", err);
+    throw err;
+  }
+
   const fullName =
     coerceString(args.profile.full_name) ??
     coerceString(args.userMetadata?.full_name) ??

@@ -113,6 +113,17 @@ export function PhoneVerification({
       {error && (
         <p className="font-mono text-[10px] text-red-400/90">{error}</p>
       )}
+
+      {!verified && error?.includes("SMS provider not configured") && (
+        <p className="font-mono text-[10px] leading-relaxed text-white/35">
+          Production SMS requires{" "}
+          <code className="text-white/50">TWILIO_ACCOUNT_SID</code>,{" "}
+          <code className="text-white/50">TWILIO_AUTH_TOKEN</code>, and{" "}
+          <code className="text-white/50">TWILIO_PHONE_NUMBER</code> on Vercel,
+          plus <code className="text-white/50">SUPABASE_SERVICE_ROLE_KEY</code> for
+          OTP storage.
+        </p>
+      )}
     </div>
   );
 }

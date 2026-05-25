@@ -85,9 +85,35 @@ Add to **Vercel / `.env.local`**:
 | `SOVEREIGN_OPERATOR_EMAIL` | Admin + Dev persona gate | Default `ksk805763@gmail.com` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Aegis attack_logs middleware writes | Server-only — never `NEXT_PUBLIC_` |
 | `OPENROUTER_API_KEY` | AI Verification Triage (`/admin/verification`) | DeepSeek-R1 via OpenRouter. Without it, heuristic fallback runs (lower confidence). |
-| `TWILIO_ACCOUNT_SID` | User OTP flow (Stronghold) | Optional for admin triage |
-| `TWILIO_AUTH_TOKEN` | User OTP flow | Optional for admin triage |
-| `TWILIO_PHONE_NUMBER` | User OTP flow | Optional for admin triage |
+| `TWILIO_ACCOUNT_SID` | User OTP flow (Stronghold) | **Required in production** for SMS codes |
+| `TWILIO_AUTH_TOKEN` | User OTP flow | **Required in production** |
+| `TWILIO_PHONE_NUMBER` | User OTP flow | E.164 format, e.g. `+15551234567` |
+
+**Verification go-live checklist:**
+
+1. **Schema** — Run in Supabase SQL Editor:
+   ```sql
+   SELECT table_name, column_name FROM information_schema.columns WHERE column_name = 'ale_usd';
+   SELECT id FROM storage.buckets WHERE id = 'verification-docs';
+   SELECT to_regclass('public.verification_otps'), to_regclass('public.otp_logs');
+   ```
+   Expected: `ale_usd` on `scan_reports` (not required on `scans`); `verification-docs` bucket exists.
+
+2. **Security migrations** — Apply in order:
+   - `supabase/migrations/20260529_rpc_service_role_only.sql`
+   - `supabase/migrations/20260530_security_advisor_repair.sql`
+
+3. **Twilio (phone OTP)** — Supabase Auth does **not** send SMS. ForgeGuard uses Twilio via server actions:
+   - Set all three `TWILIO_*` vars on Vercel
+   - Set `SUPABASE_SERVICE_ROLE_KEY` (OTP rows insert via admin client)
+   - Redeploy, then test **Settings → Phone verification → Verify via SMS**
+
+4. **ID / webcam upload** — Uploads go to private bucket `verification-docs/{userId}/...` via service role:
+   - Confirm `SUPABASE_SERVICE_ROLE_KEY` on Vercel
+   - User uploads in **Settings → Identity proofing**
+   - Admin reviews at **`/admin/verification`** (needs `profiles.sovereign_pending = true`)
+
+5. **Auth hardening (manual)** — Supabase Dashboard → **Authentication → Settings** → enable **Leaked password protection**.
 
 **OpenRouter setup:**
 1. Create key at [openrouter.ai/keys](https://openrouter.ai/keys)

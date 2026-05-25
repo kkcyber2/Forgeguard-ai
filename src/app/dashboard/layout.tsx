@@ -2,32 +2,23 @@ import * as React from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ActivePath } from "@/components/dashboard/active-path";
+import { StrongholdRecovering } from "@/components/dashboard/stronghold-recovering";
 import {
-  buildSovereignNav,
-  canAccessDevMode,
-  canShowPersonaSwitcher,
-  isPathAllowedForView,
-  personaToViewMode,
-  redirectForViewBlocked,
   resolvePersona,
-  resolveViewMode,
-  type ViewMode,
 } from "@/lib/access/parallel-sovereignty";
-import { canEnableGhostMode, normalizeSubscriptionTier } from "@/lib/access/ghost-mode";
-import { resolveAccessRank, type UserType } from "@/lib/access/ranks";
-import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
+import { loadDashboardShell } from "@/lib/dashboard/load-shell";
 import {
   getSessionUser,
   getCurrentProfile,
-  createServerSupabase,
 } from "@/lib/supabase/server";
-import { forceLogout } from "@/lib/auth/force-logout";
+import { safeForceLogout } from "@/lib/auth/force-logout";
 import { SOVEREIGN_VIOLATION_LOGIN } from "@/lib/auth/sovereign-violation";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 
 /**
  * Authenticated dashboard shell — Parallel Sovereignty.
- * current_persona + active_view_mode drive nav, accent, and route guards.
+ * Shell loading is defensive: layout always renders Top Nav even when
+ * telemetry subsystems fail.
  */
 
 export default async function DashboardLayout({
@@ -56,125 +47,49 @@ export default async function DashboardLayout({
 
   if (persona === "dev") {
     if (!isSovereignOperator(user.email)) {
-      await forceLogout();
+      await safeForceLogout();
       redirect(SOVEREIGN_VIOLATION_LOGIN);
     }
     redirect("/admin");
   }
 
-  const viewMode: ViewMode = resolveViewMode(
-    profile.active_view_mode,
-    profile.user_type,
-  );
-
-  const accessLevel = profile.access_level ?? 1;
-  const rank = resolveAccessRank(accessLevel, profile.role ?? null);
-  const userType = (profile.user_type ?? "hacker") as UserType;
-  const canDev = canAccessDevMode(profile.clearance_tier, profile.role, user.email);
-  const canSwitchIdentity = canShowPersonaSwitcher(
-    profile.user_type,
-    profile.clearance_tier,
-    user.email,
-  );
-
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "/dashboard";
 
-  if (!isPathAllowedForView(pathname, viewMode, rank, userType)) {
-    redirect(redirectForViewBlocked(pathname, viewMode));
+  const shellResult = await loadDashboardShell({
+    userId: user.id,
+    email: user.email ?? null,
+    userMetadata: user.user_metadata as Record<string, unknown> | undefined,
+    profile,
+    pathname,
+  });
+
+  if (shellResult.ok && !shellResult.pathAllowed) {
+    redirect(shellResult.redirectTo);
   }
 
-  const supabase = await createServerSupabase();
-  let walletBalance = 0;
-  let walletFrozen = false;
-  let subscriptionPlan: string | null = null;
-
-  try {
-    const [{ data: wallet }, { data: subscription }] = await Promise.all([
-      supabase
-        .from("user_wallets")
-        .select("balance_usd, is_frozen")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("subscriptions")
-        .select("plan, status")
-        .eq("user_id", user.id)
-        .in("status", ["active", "trialing", "past_due"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
-    walletBalance = Number(wallet?.balance_usd ?? 0);
-    walletFrozen = wallet?.is_frozen ?? false;
-    subscriptionPlan =
-      subscription?.status === "active" ||
-      subscription?.status === "trialing" ||
-      subscription?.status === "past_due"
-        ? subscription.plan
-        : null;
-  } catch (err) {
-    console.error("[dashboard/layout] wallet/subscription:", err);
-  }
-
-  const subscriptionTier = normalizeSubscriptionTier(
-    profile.subscription_tier,
-    profile.current_plan,
-    subscriptionPlan,
+  const { payload } = shellResult;
+  const content = shellResult.ok ? (
+    children
+  ) : (
+    <StrongholdRecovering
+      message="Dashboard telemetry could not load. Top navigation remains active — reload to retry."
+    />
   );
-
-  const canGhost = canEnableGhostMode(
-    profile.hacker_rank,
-    subscriptionTier,
-    profile.access_level,
-    profile.current_plan,
-    subscriptionPlan,
-  );
-
-  const { primary, secondary } = buildSovereignNav(
-    viewMode,
-    accessLevel,
-    userType,
-    profile.role ?? null,
-  );
-
-  const shellUser = {
-    email: user.email ?? "",
-    fullName:
-      profile.full_name ??
-      (user.user_metadata?.full_name as string | undefined) ??
-      null,
-    role: profile.role ?? "user",
-    hackerRank: profile.hacker_rank ?? null,
-    walletBalance,
-    walletFrozen,
-    identityVerified: profile.identity_verified ?? false,
-    companyTag: profile.company_tag ?? null,
-    domainVerified: profile.domain_verified ?? false,
-    trustScore: resolveTrustLevelFromHackerRank(profile.hacker_rank),
-  };
 
   return (
     <ActivePath
-      primaryNav={primary}
-      secondaryNav={secondary}
-      nav={[...primary, ...secondary]}
-      user={shellUser}
+      primaryNav={payload.primaryNav}
+      secondaryNav={payload.secondaryNav}
+      nav={payload.nav}
+      user={payload.user}
       scope="user"
-      viewMode={personaToViewMode(persona)}
-      sovereign={{
-        activeRole: persona,
-        clearanceTier: profile.clearance_tier ?? null,
-        canDev,
-        canSwitch: canSwitchIdentity,
-        isGhostMode: profile.is_ghost_active ?? false,
-        canGhost,
-        operatorId: user.id.replace(/-/g, "").slice(0, 8).toUpperCase(),
-      }}
-      identityChosen={Boolean(profile.user_type)}
-      canSwitchIdentity={canSwitchIdentity}
+      viewMode={payload.viewMode}
+      sovereign={payload.sovereign}
+      identityChosen={payload.identityChosen}
+      canSwitchIdentity={payload.canSwitchIdentity}
     >
-      {children}
+      {content}
     </ActivePath>
   );
 }

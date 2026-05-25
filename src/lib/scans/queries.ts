@@ -3,7 +3,7 @@ import type { Database } from "@/types/supabase";
 
 type ServerSupabase = SupabaseClient<Database>;
 
-/** Sum ALE ($) for a user — prefers scan_reports, falls back to scans.ale_usd. */
+/** Sum ALE ($) for a user from scan_reports only (live schema). */
 export async function fetchTotalAleRisk(
   supabase: ServerSupabase,
   userId: string,
@@ -27,28 +27,12 @@ export async function fetchTotalAleRisk(
       .select("ale_usd")
       .in("scan_id", scanIds);
 
-    if (!reportErr && reports && reports.length > 0) {
-      return reports.reduce(
-        (sum, row) => sum + Number(row.ale_usd ?? 0),
-        0,
-      );
-    }
-
     if (reportErr) {
       console.warn("[scans/queries] scan_reports ale_usd:", reportErr.message);
-    }
-
-    const { data: scansAle, error: scansErr } = await supabase
-      .from("scans")
-      .select("ale_usd")
-      .eq("user_id", userId);
-
-    if (scansErr) {
-      console.error("[scans/queries] scans ale_usd:", scansErr.message);
       return 0;
     }
 
-    return (scansAle ?? []).reduce(
+    return (reports ?? []).reduce(
       (sum, row) => sum + Number(row.ale_usd ?? 0),
       0,
     );
@@ -76,6 +60,7 @@ export type ScanRow = Pick<
 
 export async function fetchRecentScans(
   supabase: ServerSupabase,
+  userId: string,
   limit = 8,
 ): Promise<ScanRow[]> {
   try {
@@ -84,6 +69,7 @@ export async function fetchRecentScans(
       .select(
         "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, created_at",
       )
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(limit);
 

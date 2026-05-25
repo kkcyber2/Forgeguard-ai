@@ -135,7 +135,7 @@ export async function fetchDashboardOverview(
     );
 
     const totalAleRisk = await fetchTotalAleRisk(supabase, userId);
-    const scanRows = await fetchRecentScans(supabase, 8);
+    const scanRows = await fetchRecentScans(supabase, userId, 8);
 
     let rawLogs: DashboardOverviewData["rawLogs"] = [];
     try {

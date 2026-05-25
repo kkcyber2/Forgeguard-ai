@@ -15,8 +15,11 @@ const HACKER_RANK_TRUST: Record<string, number> = {
 export function resolveTrustLevelFromHackerRank(
   hackerRank: string | null | undefined,
 ): number {
-  if (hackerRank == null || hackerRank.trim() === "") return 0;
-  return HACKER_RANK_TRUST[hackerRank.toUpperCase()] ?? 0;
+  if (hackerRank == null) return 0;
+  const normalized =
+    typeof hackerRank === "string" ? hackerRank : String(hackerRank);
+  if (normalized.trim() === "") return 0;
+  return HACKER_RANK_TRUST[normalized.toUpperCase()] ?? 0;
 }
 
 export function computeTrustScore(input: {

@@ -12,6 +12,15 @@ export async function forceLogout(): Promise<{ redirectTo: string }> {
   return { redirectTo: SOVEREIGN_VIOLATION_LOGIN };
 }
 
+/** Clears session without throwing — safe for Server Component guards. */
+export async function safeForceLogout(): Promise<void> {
+  try {
+    await forceLogout();
+  } catch (err) {
+    console.error("[auth:force-logout] signOut failed:", err);
+  }
+}
+
 /** Server Component guard — redirects after clearing session. */
 export async function enforceSovereignOrForceLogout(
   email: string | null | undefined,

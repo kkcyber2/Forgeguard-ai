@@ -1,22 +1,24 @@
 /**
  * POST /api/verify/ai-audit
- * Identity document triage via DeepSeek-R1 (OpenRouter).
+ * Identity document triage — loads from verification-docs, vision + DeepSeek-R1.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { runIdentityAudit } from "@/lib/verify/ai-audit";
+import { executeIdentityAuditForUser } from "@/lib/verify/identity-audit-pipeline";
 
 export const runtime = "nodejs";
 
-const BodySchema = z.object({
-  document_text: z.string().min(20).max(50000),
-  document_path: z.string().optional(),
-});
-
-const PASS_THRESHOLD = 80;
+const BodySchema = z
+  .object({
+    document_path: z.string().min(3).max(512),
+    document_text: z.string().max(50000).optional(),
+  })
+  .refine(
+    (d) => d.document_path.length > 0,
+    { message: "document_path is required" },
+  );
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabase();
@@ -56,41 +58,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await runIdentityAudit({
-    documentText: parsed.data.document_text,
-    profileFullName: profile.full_name,
-    profileEmail: profile.email,
-  });
+  const documentPath =
+    parsed.data.document_path ?? profile.identity_document_path ?? "";
+  if (!documentPath) {
+    return NextResponse.json(
+      { ok: false, error: "Upload identity documentation first." },
+      { status: 400 },
+    );
+  }
 
-  const passed = result.name_match && result.confidence_score >= PASS_THRESHOLD;
-  const status = passed ? "passed" : result.confidence_score >= 60 ? "review" : "failed";
+  const outcome = await executeIdentityAuditForUser(
+    user.id,
+    documentPath,
+    profile,
+    parsed.data.document_text,
+  );
 
-  const admin = createAdminSupabase();
-  await admin
-    .from("profiles")
-    .update({
-      identity_audit_score: result.confidence_score,
-      identity_audit_status: status,
-      identity_audit_notes: result.audit_notes,
-      sovereign_pending: status === "review" || status === "passed",
-      identity_document_path:
-        parsed.data.document_path ?? profile.identity_document_path,
-      ...(passed
-        ? {
-            identity_verified: true,
-            clearance_tier: "sovereign",
-            sovereign_pending: false,
-            access_level: 5,
-          }
-        : {}),
-    })
-    .eq("id", user.id);
+  if (outcome.error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: outcome.error,
+        failure_reason: outcome.failure_reason,
+      },
+      { status: 400 },
+    );
+  }
 
   return NextResponse.json({
     ok: true,
-    result,
-    status,
-    passed,
-    sovereign_pending: status === "review" && !passed,
+    result: outcome.result,
+    status: outcome.status,
+    passed: outcome.passed,
+    failure_reason: outcome.failure_reason,
+    sovereign_pending: outcome.status === "review" && !outcome.passed,
   });
 }

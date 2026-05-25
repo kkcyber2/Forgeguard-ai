@@ -4,6 +4,66 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import { executeIdentityAuditForUser } from "@/lib/verify/identity-audit-pipeline";
+import type { IdentityAuditResult } from "@/lib/verify/ai-audit";
+
+export interface RunAiAuditResponse {
+  ok?: boolean;
+  error?: string;
+  failure_reason?: string;
+  result?: IdentityAuditResult;
+  passed?: boolean;
+  status?: string;
+}
+
+export async function runAiAudit(
+  documentPath: string,
+): Promise<RunAiAuditResponse> {
+  const user = await getSessionUser();
+  if (!user) return { error: "Not authenticated." };
+
+  if (!documentPath?.trim()) {
+    return { error: "No identity document on file. Upload or capture first." };
+  }
+
+  const supabase = await createServerSupabase();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, email, identity_document_path")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.full_name) {
+    return {
+      error: "Set your full name in Profile before auditing.",
+      failure_reason: "Profile name required for ID cross-check.",
+    };
+  }
+
+  const outcome = await executeIdentityAuditForUser(
+    user.id,
+    documentPath.trim(),
+    profile,
+  );
+
+  if (outcome.error) {
+    return {
+      error: outcome.error,
+      failure_reason: outcome.failure_reason ?? outcome.error,
+    };
+  }
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    result: outcome.result,
+    passed: outcome.passed,
+    status: outcome.status,
+    failure_reason: outcome.failure_reason,
+  };
+}
 
 export async function saveSignature(
   dataUrl: string,

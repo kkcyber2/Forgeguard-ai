@@ -3,7 +3,9 @@
 import { useRef, useState, useTransition, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, FileSearch, Loader2, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { uploadIdentityDocument } from "./verification-actions";
+import { runAiAudit } from "./identity-actions";
 import { SCHEMA_SYNC_MSG } from "@/lib/verify/messages";
 import { useSovereignStore } from "@/stores/use-sovereign-store";
 import {
@@ -14,6 +16,58 @@ import {
 
 function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
+}
+
+async function compressImageFile(
+  file: File,
+  maxWidth = 1280,
+  quality = 0.72,
+): Promise<File> {
+  if (!file.type.startsWith("image/") || file.size < 400_000) return file;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round(height * (maxWidth / width));
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          resolve(
+            new File(
+              [blob],
+              file.name.replace(/\.\w+$/i, "") + ".jpg",
+              { type: "image/jpeg" },
+            ),
+          );
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
 }
 
 export function IdentityAuditor({
@@ -37,14 +91,17 @@ export function IdentityAuditor({
   const [camError, setCamError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncToast, setSyncToast] = useState<string | null>(null);
+  const [auditing, setAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<{
     score: number;
     passed: boolean;
     mode: string;
     notes: string;
+    failureReason?: string;
   } | null>(null);
   const [pending, startTransition] = useTransition();
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
+  const busy = pending || auditing;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -117,10 +174,18 @@ export function IdentityAuditor({
     if (!videoRef.current || !canvasRef.current) return null;
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return null;
-    canvasRef.current.width = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    ctx.drawImage(videoRef.current, 0, 0);
-    const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.9);
+
+    const vw = videoRef.current.videoWidth;
+    const vh = videoRef.current.videoHeight;
+    const maxW = 1280;
+    const scale = vw > maxW ? maxW / vw : 1;
+    const w = Math.round(vw * scale);
+    const h = Math.round(vh * scale);
+
+    canvasRef.current.width = w;
+    canvasRef.current.height = h;
+    ctx.drawImage(videoRef.current, 0, 0, w, h);
+    const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.72);
     stopCamera();
     setCamState("idle");
     const bin = atob(dataUrl.split(",")[1] ?? "");
@@ -129,14 +194,41 @@ export function IdentityAuditor({
     return new File([arr], "webcam-id.jpg", { type: "image/jpeg" });
   }
 
-  async function extractText(file: File): Promise<string> {
-    if (file.type.startsWith("image/")) {
-      return `[IMAGE_UPLOAD] filename=${file.name} type=${file.type} size=${file.size}. OCR text not available — auditor uses filename metadata and profile name correlation.`;
+  async function handleAudit(uploadedPath: string) {
+    setError(null);
+    setAuditResult(null);
+    setAuditing(true);
+
+    try {
+      const audit = await runAiAudit(uploadedPath);
+
+      if (audit.error || !audit.ok) {
+        const reason =
+          audit.failure_reason ?? audit.error ?? "AI audit failed.";
+        setError(reason);
+        return;
+      }
+
+      const passed = !!audit.passed;
+      setAuditResult({
+        score: audit.result?.confidence_score ?? 0,
+        passed,
+        mode: audit.result?.mode ?? "unknown",
+        notes: audit.result?.audit_notes ?? "",
+        failureReason: passed ? undefined : audit.failure_reason,
+      });
+
+      if (!passed && audit.failure_reason) {
+        setError(audit.failure_reason);
+      }
+
+      if (passed) router.refresh();
+    } catch (err) {
+      console.error("[verify:auditor] runAiAudit:", err);
+      setError(err instanceof Error ? err.message : "AI audit failed unexpectedly.");
+    } finally {
+      setAuditing(false);
     }
-    if (file.type === "application/pdf") {
-      return `[PDF_UPLOAD] filename=${file.name} size=${file.size}. PDF binary submitted for sovereign review pipeline.`;
-    }
-    return await file.text().catch(() => `[BINARY] ${file.name}`);
   }
 
   function handleUploadAndAudit() {
@@ -155,8 +247,9 @@ export function IdentityAuditor({
 
     setError(null);
     startTransition(async () => {
+      const compressed = await compressImageFile(file!);
       const formData = new FormData();
-      formData.append("document", file);
+      formData.append("document", compressed);
 
       const up = await uploadIdentityDocument(formData);
       if (up.error) {
@@ -167,36 +260,12 @@ export function IdentityAuditor({
         return;
       }
 
-      const text = await extractText(file);
-      const res = await fetch("/api/verify/ai-audit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          document_text: text,
-          document_path: up.path,
-        }),
-      });
-
-      const json = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        result?: { confidence_score: number; audit_notes: string; mode: string };
-        passed?: boolean;
-        status?: string;
-      };
-
-      if (!json.ok) {
-        setError(json.error ?? "AI audit failed.");
+      if (!up.path) {
+        setError("Upload succeeded but document path missing.");
         return;
       }
 
-      setAuditResult({
-        score: json.result?.confidence_score ?? 0,
-        passed: !!json.passed,
-        mode: json.result?.mode ?? "unknown",
-        notes: json.result?.audit_notes ?? "",
-      });
-      if (json.passed) router.refresh();
+      await handleAudit(up.path);
     });
   }
 
@@ -239,13 +308,20 @@ export function IdentityAuditor({
       </div>
 
       <p className="font-mono text-[10px] leading-relaxed text-white/55">
-        Upload government ID or capture via webcam. DeepSeek-R1 extracts your legal
-        name and cross-checks profile data.
+        Upload government ID or capture via webcam. Deep Perception reads your
+        document from secure storage, then DeepSeek-R1 cross-checks your profile name.
       </p>
 
       {syncToast && (
         <div className="rounded-[3px] border border-amber-400/40 bg-amber-400/10 px-3 py-2 font-mono text-[10px] text-amber-200">
           {syncToast}
+        </div>
+      )}
+
+      {auditing && (
+        <div className="flex items-center gap-2 rounded-[3px] border border-violet-400/30 bg-violet-500/10 px-3 py-2 font-mono text-[10px] text-violet-200">
+          <Loader2 size={12} className="shrink-0 animate-spin" />
+          Processing… AI is analyzing your ID — do not close this tab or camera.
         </div>
       )}
 
@@ -261,7 +337,8 @@ export function IdentityAuditor({
                 setCamState("idle");
               }
             }}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[3px] border py-2 font-mono text-[10px] uppercase tracking-widest"
+            disabled={busy}
+            className="flex flex-1 items-center justify-center gap-2 rounded-[3px] border py-2 font-mono text-[10px] uppercase tracking-widest disabled:opacity-40"
             style={{
               borderColor: captureMode === mode ? "rgba(209,255,0,0.35)" : "rgba(255,255,255,0.1)",
               color: captureMode === mode ? "#D1FF00" : "rgba(255,255,255,0.45)",
@@ -302,7 +379,7 @@ export function IdentityAuditor({
               <button
                 type="button"
                 onClick={() => void startWebcam()}
-                disabled={camState === "requesting" || pending}
+                disabled={camState === "requesting" || busy}
                 className="flex-1 rounded-[3px] bg-violet-500/90 py-2 font-mono text-[10px] uppercase tracking-widest text-white disabled:opacity-40"
               >
                 Start camera
@@ -311,7 +388,7 @@ export function IdentityAuditor({
               <button
                 type="button"
                 onClick={() => captureWebcamFrame()}
-                disabled={pending}
+                disabled={busy}
                 className="flex-1 rounded-[3px] bg-[#D1FF00]/15 py-2 font-mono text-[10px] uppercase tracking-widest text-[#D1FF00] disabled:opacity-40"
               >
                 Capture frame
@@ -345,15 +422,19 @@ export function IdentityAuditor({
         </p>
       )}
 
-      <button
+      <Button
         type="button"
-        onClick={handleUploadAndAudit}
-        disabled={pending || camState === "requesting"}
-        className="flex w-full items-center justify-center gap-2 rounded-[3px] border-[0.5px] border-[#D1FF00]/35 bg-[#D1FF00]/10 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#D1FF00] disabled:opacity-40"
+        variant="ghost"
+        disabled={busy || camState === "requesting"}
+        onClick={(e) => {
+          e.preventDefault();
+          handleUploadAndAudit();
+        }}
+        className="flex w-full items-center justify-center gap-2 rounded-[3px] border-[0.5px] border-[#D1FF00]/35 bg-[#D1FF00]/10 py-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[#D1FF00] hover:bg-[#D1FF00]/15 disabled:opacity-40"
       >
-        {pending ? <Loader2 size={12} className="animate-spin" /> : <FileSearch size={12} />}
+        {busy ? <Loader2 size={12} className="animate-spin" /> : <FileSearch size={12} />}
         Run AI audit
-      </button>
+      </Button>
 
       {auditScore != null && !auditResult && (
         <p className="font-mono text-[10px] text-zinc-400">
@@ -376,10 +457,18 @@ export function IdentityAuditor({
             {auditResult.passed ? "MATCH" : "REVIEW"}
           </p>
           <p className="mt-1 text-zinc-500">{auditResult.notes}</p>
+          {auditResult.failureReason && (
+            <p className="mt-1 text-red-400/90">{auditResult.failureReason}</p>
+          )}
         </div>
       )}
 
-      {error && <p className="font-mono text-[10px] text-red-400/90">{error}</p>}
+      {error && !auditResult?.failureReason && (
+        <p className="font-mono text-[10px] text-red-400/90">{error}</p>
+      )}
+      {error && auditResult?.failureReason && error !== auditResult.failureReason && (
+        <p className="font-mono text-[10px] text-red-400/90">{error}</p>
+      )}
     </form>
   );
 }

@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminProfile } from "@/lib/supabase/server";
-import { extractIdentityDocumentText } from "@/lib/admin/document-text";
-import { runIdentityAudit, type IdentityAuditResult } from "@/lib/verify/ai-audit";
+import { executeIdentityAuditForUser } from "@/lib/verify/identity-audit-pipeline";
+import type { IdentityAuditResult } from "@/lib/verify/ai-audit";
 
 export interface AdminAuditResponse {
   error?: string;
@@ -32,31 +32,22 @@ export async function runAdminIdentityAudit(
     return { error: "Operator has no full_name on file." };
   }
 
-  const documentText = await extractIdentityDocumentText(
+  if (!profile.identity_document_path) {
+    return { error: "No identity document path on file." };
+  }
+
+  const outcome = await executeIdentityAuditForUser(
+    userId,
     profile.identity_document_path,
-    profile.full_name,
-    profile.email ?? "",
+    profile,
   );
 
-  const result = await runIdentityAudit({
-    documentText,
-    profileFullName: profile.full_name,
-    profileEmail: profile.email ?? "",
-  });
+  if (outcome.error || !outcome.result) {
+    return { error: outcome.error ?? "Audit failed." };
+  }
 
-  const passed = result.name_match && result.confidence_score >= 80;
-  const status = passed ? "passed" : result.confidence_score >= 60 ? "review" : "failed";
-
-  await db
-    .from("profiles")
-    .update({
-      identity_audit_score: result.confidence_score,
-      identity_audit_status: status,
-      identity_audit_notes: result.audit_notes,
-      sovereign_pending: status === "review" || status === "passed",
-      ...(passed ? { identity_verified: true } : {}),
-    })
-    .eq("id", userId);
+  const result = outcome.result;
+  const passed = !!outcome.passed;
 
   revalidatePath("/admin/verification");
 
@@ -65,7 +56,7 @@ export async function runAdminIdentityAudit(
       ...result,
       profile_full_name: profile.full_name,
       document_path: profile.identity_document_path,
-      mismatch: !result.name_match || result.confidence_score < 80,
+      mismatch: !passed,
     },
   };
 }

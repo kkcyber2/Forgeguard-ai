@@ -1,6 +1,7 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/shell";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { getSessionUser } from "@/lib/supabase/server";
 import { NewScanForm } from "./form";
 
@@ -18,6 +19,8 @@ export default async function NewScanPage() {
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard/scans/new");
 
+  const isSovereign = isSovereignOperator(user.email);
+
   return (
     <>
       <PageHeader
@@ -26,7 +29,7 @@ export default async function NewScanPage() {
         description="Paste the endpoint you want hardened and the API key ForgeGuard should use while probing. Credentials are sealed with AES-256-GCM before they touch the database."
       />
       <div className="mx-auto max-w-2xl">
-        <NewScanForm />
+        <NewScanForm isSovereign={isSovereign} />
       </div>
     </>
   );

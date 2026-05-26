@@ -5,6 +5,7 @@ import {
   resolveEngineBaseUrl,
   engineAuthHeaders,
 } from "@/lib/agathon-config";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { openCredential } from "@/lib/crypto/credentials";
 import type { Database } from "@/types/supabase";
@@ -58,7 +59,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   const { data: scan, error: scanErr } = (await admin
     .from("scans")
     .select(
-      "id, user_id, target_model, target_url, target_credential_encrypted, intensity",
+      "id, user_id, target_model, target_url, target_credential_encrypted, intensity, surface_kind",
     )
     .eq("id", scanId)
     .maybeSingle()) as {
@@ -69,6 +70,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       target_url: string;
       target_credential_encrypted: string | null;
       intensity: string | null;
+      surface_kind: string | null;
     } | null;
     error: { message: string } | null;
   };
@@ -81,6 +83,13 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     console.error("[runner] user/scan mismatch — refusing to run");
     return;
   }
+
+  const { data: profile } = (await admin
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle()) as { data: { email: string | null } | null };
+  const sovereign = isSovereignOperator(profile?.email);
 
   // 2. Decrypt the target API key -----------------------------------------
   let apiKey: string;
@@ -157,7 +166,9 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
         target_model: scan.target_model,
         target_url: normalizedUrl,
         intensity: scan.intensity ?? "standard",
+        surface_kind: scan.surface_kind ?? "llm",
         api_key: apiKey,
+        ownership_verified: sovereign,
       }),
       // Don't hold the connection open — Railway acknowledges fast.
       signal: AbortSignal.timeout(15_000),

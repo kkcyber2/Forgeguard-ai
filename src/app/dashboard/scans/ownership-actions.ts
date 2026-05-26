@@ -1,5 +1,6 @@
 "use server";
 
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/supabase/server";
 import {
@@ -13,6 +14,11 @@ export async function issueScanOwnershipToken(
 ): Promise<{ error?: string; token?: string; host?: string }> {
   const user = await getSessionUser();
   if (!user) return { error: "Not authenticated." };
+
+  if (isSovereignOperator(user.email)) {
+    const host = extractTargetHost(targetUrl) ?? "target";
+    return { token: generateOwnershipToken(), host };
+  }
 
   const host = extractTargetHost(targetUrl);
   if (!host) return { error: "Enter a valid target URL first." };
@@ -41,6 +47,10 @@ export async function verifyScanOwnership(
 ): Promise<{ verified: boolean; detail: string }> {
   const user = await getSessionUser();
   if (!user) return { verified: false, detail: "Not authenticated." };
+
+  if (isSovereignOperator(user.email)) {
+    return { verified: true, detail: "Sovereign operator — ownership bypassed." };
+  }
 
   const result = await probeOwnershipFile(targetUrl, token);
   if (!result.verified) return result;

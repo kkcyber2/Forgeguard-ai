@@ -7,6 +7,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { sealCredential } from "@/lib/crypto/credentials";
 import { headers } from "next/headers";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { verifyScanOwnership } from "./ownership-actions";
 
 /**
@@ -76,6 +77,8 @@ export async function createScan(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
+  const sovereign = isSovereignOperator(user.email);
+
   const rawIntensity = String(formData.get("intensity") ?? "standard");
   const intensityMap: Record<string, "recon" | "standard" | "aggressive" | "greasy"> = {
     recon: "recon",
@@ -88,7 +91,7 @@ export async function createScan(
   const intensity = intensityMap[rawIntensity] ?? "standard";
 
   const legalAuthId = String(formData.get("legal_auth_id") ?? "").trim();
-  if (intensity === "aggressive" || intensity === "greasy") {
+  if (!sovereign && (intensity === "aggressive" || intensity === "greasy")) {
     if (!legalAuthId) {
       return { ok: false, error: "Legal authorization required for High/Nuclear scans." };
     }
@@ -105,7 +108,11 @@ export async function createScan(
   }
 
   const ownershipToken = String(formData.get("ownership_token") ?? "").trim();
-  if (intensity !== "standard" && intensity !== "recon") {
+  if (
+    !sovereign &&
+    intensity !== "standard" &&
+    intensity !== "recon"
+  ) {
     if (!ownershipToken) {
       return {
         ok: false,

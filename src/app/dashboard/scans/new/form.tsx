@@ -124,7 +124,7 @@ const INTENSITY_OPTIONS: {
   },
 ];
 
-export function NewScanForm() {
+export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) {
   const [state, formAction, pending] = useActionState(createScan, initial);
   const [showKey,    setShowKey]    = React.useState(false);
   const [preset,     setPreset]     = React.useState<string>("OpenAI");
@@ -148,10 +148,11 @@ export function NewScanForm() {
   }, [preset]);
 
   React.useEffect(() => {
+    if (isSovereign) return;
     setOwnershipVerified(false);
     setOwnershipToken(null);
     setOwnershipMsg(null);
-  }, [targetUrl, intensity]);
+  }, [targetUrl, intensity, isSovereign]);
 
   const selectedTarget = TARGET_TYPES.find((t) => t.value === surfaceKind)!;
   const needsOwnership = intensity !== "standard";
@@ -184,6 +185,7 @@ export function NewScanForm() {
   }
 
   function handleLaunch(e: React.FormEvent) {
+    if (isSovereign) return;
     const selected = INTENSITY_OPTIONS.find((o) => o.value === intensity);
     if (selected?.needsLegal && !authId) {
       e.preventDefault();
@@ -206,7 +208,7 @@ export function NewScanForm() {
 
   return (
     <>
-    {showLegal && intensity !== "standard" && (
+    {showLegal && !isSovereign && intensity !== "standard" && (
       <LegalVerificationModal
         intensity={intensity as LegalIntensity}
         onAuthorized={handleAuthorized}
@@ -434,7 +436,7 @@ export function NewScanForm() {
                     </span>
                   </div>
                   <span className="text-[10px] text-white/30">{opt.sublabel}</span>
-                  {opt.needsLegal && (
+                  {opt.needsLegal && !isSovereign && (
                     <span
                       className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.1em]"
                       style={{ color: opt.color, opacity: 0.7 }}
@@ -442,7 +444,7 @@ export function NewScanForm() {
                       Legal gate
                     </span>
                   )}
-                  {opt.needsLegal && authId && intensity === opt.value && (
+                  {opt.needsLegal && !isSovereign && authId && intensity === opt.value && (
                     <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-green-400">
                       ✓ Authorized
                     </span>
@@ -453,7 +455,7 @@ export function NewScanForm() {
           </div>
         </div>
 
-        {needsOwnership && (
+        {needsOwnership && !isSovereign && (
           <div className="rounded-sm border border-amber-400/25 bg-amber-400/5 p-4">
             <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-amber-300">
               Proof of ownership

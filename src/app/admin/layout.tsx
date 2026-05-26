@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { ActivePath } from "@/components/dashboard/active-path";
 import {
   buildDevNav,
+  buildSovereignMasterNav,
   canAccessDevMode,
 } from "@/lib/access/parallel-sovereignty";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import {
   getSessionUser,
   requireAdminProfile,
@@ -27,7 +29,10 @@ export default async function AdminLayout({
 
   const canDev = canAccessDevMode(profile.clearance_tier, profile.role, user.email);
   const canSwitchIdentity = false;
-  const { primary, secondary } = buildDevNav();
+  const sovereign = isSovereignOperator(user.email);
+  const { primary, secondary } = sovereign
+    ? buildSovereignMasterNav()
+    : buildDevNav();
 
   const shellUser = {
     email: user.email ?? "",

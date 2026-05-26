@@ -68,3 +68,47 @@ export function resolveScanTargets(
 ): PopNodeId[] {
   return scans.slice(0, 5).map((s, i) => resolveScanNode(s.target_url, i));
 }
+
+/** WGS84 centroids for PoP nodes (Mercator projection input). */
+export const POP_GEO_COORDS: Record<PopNodeId, { lat: number; lng: number }> = {
+  sea: { lat: 47.6, lng: -122.3 },
+  sfo: { lat: 37.8, lng: -122.4 },
+  lax: { lat: 34.0, lng: -118.2 },
+  chi: { lat: 41.9, lng: -87.6 },
+  iad: { lat: 39.0, lng: -77.5 },
+  nyc: { lat: 40.7, lng: -74.0 },
+  yyz: { lat: 43.7, lng: -79.4 },
+  gru: { lat: -23.5, lng: -46.6 },
+  bog: { lat: 4.7, lng: -74.1 },
+  lhr: { lat: 51.5, lng: -0.1 },
+  dub: { lat: 53.3, lng: -6.3 },
+  ams: { lat: 52.4, lng: 4.9 },
+  fra: { lat: 50.1, lng: 8.7 },
+  par: { lat: 48.9, lng: 2.3 },
+  mad: { lat: 40.4, lng: -3.7 },
+  mil: { lat: 45.5, lng: 9.2 },
+  sto: { lat: 59.3, lng: 18.1 },
+  war: { lat: 52.2, lng: 21.0 },
+  jnb: { lat: -26.2, lng: 28.0 },
+  nbo: { lat: -1.3, lng: 36.8 },
+  dxb: { lat: 25.2, lng: 55.3 },
+  del: { lat: 28.6, lng: 77.2 },
+  bom: { lat: 19.1, lng: 72.9 },
+  sin: { lat: 1.3, lng: 103.8 },
+  hkg: { lat: 22.3, lng: 114.2 },
+  sha: { lat: 31.2, lng: 121.5 },
+  sel: { lat: 37.6, lng: 127.0 },
+  nrt: { lat: 35.8, lng: 140.4 },
+  syd: { lat: -33.9, lng: 151.2 },
+};
+
+export function nodeToGeo(nodeId: PopNodeId): { lat: number; lng: number } {
+  return POP_GEO_COORDS[nodeId] ?? { lat: 0, lng: 0 };
+}
+
+export function resolveScanGeo(
+  targetUrl: string,
+  fallbackIndex: number,
+): { lat: number; lng: number } {
+  return nodeToGeo(resolveScanNode(targetUrl, fallbackIndex));
+}

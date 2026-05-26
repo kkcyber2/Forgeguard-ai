@@ -14,6 +14,17 @@ export interface ScanInspectResult {
     company_name: string | null;
     company_domain: string | null;
   };
+  activityLogs?: Record<string, unknown>[];
+  attackLogs?: Record<string, unknown>[];
+  pointers?: {
+    scan_id: string;
+    user_id: string;
+    target_url: string | null;
+    status: string | null;
+    finding_count: number | null;
+    high_severity_count: number | null;
+    report_id: string | null;
+  };
 }
 
 export async function inspectScan(scanId: string): Promise<ScanInspectResult> {
@@ -34,7 +45,15 @@ export async function inspectScan(scanId: string): Promise<ScanInspectResult> {
     return { error: scanErr?.message ?? "Scan not found." };
   }
 
-  const [{ data: logs }, { data: report }, { data: profile }] = await Promise.all([
+  const userId = scan.user_id as string;
+
+  const [
+    { data: logs },
+    { data: report },
+    { data: profile },
+    { data: activityLogs },
+    { data: attackLogs },
+  ] = await Promise.all([
     db
       .from("scan_logs")
       .select("*")
@@ -44,15 +63,28 @@ export async function inspectScan(scanId: string): Promise<ScanInspectResult> {
     db.from("scan_reports").select("*").eq("scan_id", scanId).maybeSingle(),
     db
       .from("profiles")
-      .select("email, full_name, company_name, company_domain")
-      .eq("id", scan.user_id)
+      .select("email, full_name, company_name, company_domain, id")
+      .eq("id", userId)
       .maybeSingle(),
+    db
+      .from("activity_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    db
+      .from("attack_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
+
+  const reportRow = report as Record<string, unknown> | null;
 
   return {
     scan: scan as Record<string, unknown>,
     logs: (logs ?? []) as Record<string, unknown>[],
-    report: (report as Record<string, unknown> | null) ?? null,
+    report: reportRow,
     operator: profile
       ? {
           email: profile.email,
@@ -61,5 +93,16 @@ export async function inspectScan(scanId: string): Promise<ScanInspectResult> {
           company_domain: profile.company_domain,
         }
       : undefined,
+    activityLogs: (activityLogs ?? []) as Record<string, unknown>[],
+    attackLogs: (attackLogs ?? []) as Record<string, unknown>[],
+    pointers: {
+      scan_id: scanId,
+      user_id: userId,
+      target_url: (scan.target_url as string | null) ?? null,
+      status: (scan.status as string | null) ?? null,
+      finding_count: (scan.finding_count as number | null) ?? null,
+      high_severity_count: (scan.high_severity_count as number | null) ?? null,
+      report_id: reportRow?.id != null ? String(reportRow.id) : null,
+    },
   };
 }

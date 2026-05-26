@@ -1,17 +1,18 @@
 import type { NavItem, ShellUser } from "@/components/dashboard/shell";
 import type { SovereignHydratePayload } from "@/stores/use-sovereign-store";
 import {
-  buildSovereignNav,
   canAccessDevMode,
   canShowPersonaSwitcher,
   isPathAllowedForView,
   personaToViewMode,
   redirectForViewBlocked,
+  resolveNavForOperator,
   resolvePersona,
   resolveViewMode,
   type SovereignRole,
   type ViewMode,
 } from "@/lib/access/parallel-sovereignty";
+import { hasSovereignBypass } from "@/lib/access/sovereign-bypass";
 import { canEnableGhostMode, normalizeSubscriptionTier } from "@/lib/access/ghost-mode";
 import { resolveAccessRank, type UserType } from "@/lib/access/ranks";
 import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
@@ -334,7 +335,8 @@ function buildShellPayload(args: {
   let primary = MINIMAL_PRIMARY;
   let secondary = MINIMAL_SECONDARY;
   try {
-    const nav = buildSovereignNav(
+    const nav = resolveNavForOperator(
+      args.email,
       args.viewMode,
       args.accessLevel,
       args.userType,

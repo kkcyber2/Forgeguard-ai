@@ -129,7 +129,13 @@ export function isPathAllowed(
   pathname: string,
   rank: number,
   userType: UserType = "hacker",
+  sovereignBypass = false,
 ): boolean {
+  if (sovereignBypass) {
+    if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
+      return true;
+    }
+  }
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/scans")) {
     return rank >= 1;
   }

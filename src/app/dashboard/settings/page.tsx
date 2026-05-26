@@ -19,6 +19,7 @@ import { PhoneVerification } from "@/components/settings/phone-verification";
 import { IdentityAuditor } from "@/components/settings/identity-auditor";
 import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
 import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 
 /**
  * /dashboard/settings — operator profile management.
@@ -38,6 +39,7 @@ export default async function SettingsPage() {
   }
 
   const data = await fetchSettingsPageData(user, profile);
+  const sovereignBypass = isSovereignOperator(user.email);
 
   return (
     <>
@@ -117,6 +119,7 @@ export default async function SettingsPage() {
                 auditStatus={data.profile?.identity_audit_status ?? "none"}
                 auditScore={data.auditScore}
                 profileFullName={data.profile?.full_name ?? ""}
+                sovereignBypass={sovereignBypass}
               />
             </div>
           </Section>

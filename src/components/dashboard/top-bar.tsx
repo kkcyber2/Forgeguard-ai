@@ -532,7 +532,7 @@ export function TopBar({
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const Icon = NAV_ICONS[item.icon];
 
-            if (item.locked) {
+            if (item.locked && !isSovereignOperator(user.email)) {
               return (
                 <button
                   key={item.href}
@@ -579,8 +579,8 @@ export function TopBar({
             );
           })}
 
-          {/* Overflow → "More" (user scope only — sovereign admin is single-page) */}
-          {scope !== "admin" && overflowNav.length > 0 && (
+          {/* Overflow → "More" */}
+          {overflowNav.length > 0 && (
             <OverflowMenu
               items={overflowNav}
               scope={scope}

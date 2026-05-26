@@ -76,11 +76,13 @@ export function IdentityAuditor({
   auditStatus,
   auditScore,
   profileFullName,
+  sovereignBypass = false,
 }: {
   documentPath: string | null;
   auditStatus: string;
   auditScore: number | null;
   profileFullName?: string;
+  sovereignBypass?: boolean;
 }) {
   const router = useRouter();
   const { markDocumentUploaded } = useClearanceUpload();
@@ -294,7 +296,7 @@ export function IdentityAuditor({
       id="clearance-audit"
       className="relative flex flex-col gap-4 scroll-mt-24"
     >
-      {isGhostMode && (
+      {isGhostMode && !sovereignBypass && (
         <div
           className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[4px]"
           style={{

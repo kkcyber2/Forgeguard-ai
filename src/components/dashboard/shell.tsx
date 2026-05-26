@@ -1,9 +1,12 @@
 import * as React from "react";
 import { TopBar } from "@/components/dashboard/top-bar";
+import { SovereignMasterSidebar } from "@/components/dashboard/sovereign-master-sidebar";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { CommandBar } from "@/components/dashboard/command-bar";
 import { EngineStatus } from "@/components/dashboard/engine-status";
 import { DashboardHolographicMonolith } from "@/components/dashboard/holographic-monolith";
 import type { SovereignRole, ViewMode } from "@/lib/access/parallel-sovereignty";
+import { cn } from "@/lib/utils";
 import {
   Activity,
   CalendarClock,
@@ -137,6 +140,8 @@ export function DashboardShell({
   /** Wider content area for admin command center. */
   wideContent?: boolean;
 }) {
+  const sovereignNav = isSovereignOperator(user.email);
+
   return (
     <div
       className="relative min-h-screen bg-[#050505] text-white transition-colors duration-300"
@@ -146,6 +151,8 @@ export function DashboardShell({
       {scope === "user" && <DashboardHolographicMonolith viewMode={viewMode} />}
 
       <CommandBar viewMode={viewMode} />
+
+      {sovereignNav && <SovereignMasterSidebar email={user.email} />}
 
       <TopBar
         nav={nav}
@@ -161,7 +168,7 @@ export function DashboardShell({
       />
 
       <main
-        className="relative z-10 pt-14"
+        className={cn("relative z-10 pt-14", sovereignNav && "lg:pl-[220px]")}
         style={systemDegraded ? { paddingTop: "calc(56px + 28px)" } : undefined}
       >
         <div

@@ -69,6 +69,21 @@ export function ScanInspectorDrawer({
           {error && (
             <p className="font-mono text-[10px] text-red-400/90">{error}</p>
           )}
+          {data?.pointers && (
+            <section>
+              <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-[#D1FF00]/70">
+                System pointers
+              </p>
+              <dl className="space-y-1.5 rounded border border-[#D1FF00]/20 bg-[#D1FF00]/[0.04] p-3 font-mono text-[9px] text-white/70">
+                {Object.entries(data.pointers).map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-2">
+                    <dt className="uppercase text-white/35">{k}</dt>
+                    <dd className="truncate text-right text-white/85">{String(v ?? "—")}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
           {data?.operator && (
             <section>
               <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-white/35">
@@ -96,6 +111,26 @@ export function ScanInspectorDrawer({
               </p>
               <pre className="max-h-64 overflow-auto rounded border border-white/[0.06] bg-black/40 p-3 font-mono text-[10px] text-white/70">
                 {JSON.stringify(data.report, null, 2)}
+              </pre>
+            </section>
+          )}
+          {data?.activityLogs && data.activityLogs.length > 0 && (
+            <section>
+              <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-white/35">
+                Activity logs ({data.activityLogs.length})
+              </p>
+              <pre className="max-h-48 overflow-auto rounded border border-white/[0.06] bg-black/40 p-3 font-mono text-[9px] text-white/65">
+                {JSON.stringify(data.activityLogs, null, 2)}
+              </pre>
+            </section>
+          )}
+          {data?.attackLogs && data.attackLogs.length > 0 && (
+            <section>
+              <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-white/35">
+                Attack logs ({data.attackLogs.length})
+              </p>
+              <pre className="max-h-48 overflow-auto rounded border border-white/[0.06] bg-black/40 p-3 font-mono text-[9px] text-white/65">
+                {JSON.stringify(data.attackLogs, null, 2)}
               </pre>
             </section>
           )}

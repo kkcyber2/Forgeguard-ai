@@ -15,6 +15,7 @@ import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { buttonStyles } from "@/components/ui/button";
+import { TacticalWorldMap } from "@/components/dashboard/tactical-world-map";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { severityWeight } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
@@ -93,8 +94,14 @@ export default async function ThreatsPage() {
 
   const { data: scans } = await supabase
     .from("scans")
-    .select("id, user_id, target_url")
-    .limit(500) as { data: Pick<ScanRow, "id" | "user_id" | "target_url">[] | null };
+    .select("id, user_id, target_url, status")
+    .limit(500) as {
+    data: (Pick<ScanRow, "id" | "user_id" | "target_url"> & { status?: string })[] | null;
+  };
+
+  const activeScans = (scans ?? []).filter(
+    (s) => s.status === "queued" || s.status === "probing",
+  ).length;
 
   const logs = (rawLogs ?? []) as ScanLogRow[];
   const scanIndex = new Map((scans ?? []).map((s) => [s.id, { user: s.user_id, target: s.target_url ?? "" }]));
@@ -122,6 +129,15 @@ export default async function ThreatsPage() {
           </Link>
         }
       />
+
+      <div className="mb-6 overflow-hidden rounded-sm border border-white/[0.06] bg-[#050505]">
+        <div className="border-b border-white/[0.06] px-4 py-2">
+          <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-[#D1FF00]/80">
+            Tactical world map · live telemetry
+          </p>
+        </div>
+        <TacticalWorldMap activeScans={activeScans} attackPulses dense />
+      </div>
 
       <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StaggerItem>

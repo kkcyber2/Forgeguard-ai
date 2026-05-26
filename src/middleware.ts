@@ -258,63 +258,8 @@ async function enforceAdminSovereignGate(
   return null;
 }
 
-async function getMiddlewareUser(
-  request: NextRequest,
-): Promise<{ user: { email?: string | null } | null; response: NextResponse }> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return { user: null, response: NextResponse.next() };
-  }
-
-  let response = NextResponse.next();
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-        cookiesToSet.forEach(({ name, value }) => {
-          request.cookies.set(name, value);
-        });
-        response = NextResponse.next();
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { user, response };
-}
-
-async function enforceSovereignDashboardRedirect(
-  request: NextRequest,
-): Promise<NextResponse | null> {
-  const { pathname } = request.nextUrl;
-  if (pathname !== "/dashboard" && !pathname.startsWith("/dashboard/")) {
-    return null;
-  }
-
-  const { user } = await getMiddlewareUser(request);
-  if (isSovereignOperator(user?.email)) {
-    return NextResponse.redirect(new URL("/admin", request.url));
-  }
-  return null;
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  if (pathname.startsWith("/admin/")) {
-    return NextResponse.redirect(new URL("/admin", request.url));
-  }
-
-  const sovereignDashboard = await enforceSovereignDashboardRedirect(request);
-  if (sovereignDashboard) return sovereignDashboard;
 
   if (pathname.startsWith("/dashboard/") && !isKnownDashboardRoute(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));

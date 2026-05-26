@@ -5,7 +5,11 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { listPublishedScripts, normalizeScript } from "@/lib/bazaar/list-scripts";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
+import type { Database } from "@/types/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,14 +28,18 @@ export async function GET(req: NextRequest) {
   const freeOnly = url.searchParams.get("free") === "true";
   const certifiedOnly = url.searchParams.get("certified") === "1";
 
-  const result = await listPublishedScripts(supabase, {
-    page,
-    limit,
-    tag,
-    lang,
-    freeOnly,
-    certifiedOnly,
-  });
+  const filters = { page, limit, tag, lang, freeOnly, certifiedOnly };
+
+  let result = await listPublishedScripts(supabase, filters);
+
+  if (result.error && user && isSovereignOperator(user.email)) {
+    try {
+      const adminDb = createAdminSupabase() as SupabaseClient<Database>;
+      result = await listPublishedScripts(adminDb, filters);
+    } catch (e) {
+      console.error("[bazaar:list] admin fallback:", e);
+    }
+  }
 
   if (result.error) {
     return NextResponse.json(

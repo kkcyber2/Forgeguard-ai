@@ -5,6 +5,7 @@
 
 import type { NavItem } from "@/components/dashboard/shell";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { hasSovereignBypass } from "@/lib/access/sovereign-bypass";
 import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
 import {
   type UserType,
@@ -66,19 +67,81 @@ const LEGEND_NAV: NavItem[] = [
   { href: "/admin", label: "Admin", icon: "shield-alert", section: "Legend" },
 ];
 
-/** Admin Command Center nav — single sovereign console (no sub-pages). */
+/** Admin nav — full sub-route tree (non-sovereign dev admins). */
 export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
+  const primary: NavItem[] = [
+    { href: "/admin", label: "Command Center", icon: "layout-dashboard", section: "Command" },
+    { href: "/admin/threats", label: "Live Map", icon: "globe", section: "Command" },
+    { href: "/admin/users", label: "User Management", icon: "users", section: "Command" },
+    { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "Command" },
+  ];
+  const secondary: NavItem[] = [
+    { href: "/admin/verification", label: "Verification", icon: "shield-check", section: "Ops" },
+    { href: "/admin/bounties", label: "Bounty Escrow", icon: "credit-card", section: "Ops" },
+    { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark", section: "Ops" },
+    { href: "/admin/system", label: "System health", icon: "activity", section: "Ops" },
+    { href: "/admin/promotions", label: "Promotions", icon: "shield-alert", section: "Ops" },
+    { href: "/admin/settings", label: "Settings", icon: "settings", section: "Account" },
+  ];
+  return { primary, secondary };
+}
+
+/** Unified nav for ksk805763@gmail.com — all System + Hacker + Client routes. */
+export function buildSovereignMasterNav(): {
+  primary: NavItem[];
+  secondary: NavItem[];
+  sections: Record<string, NavItem[]>;
+} {
+  const system: NavItem[] = [
+    { href: "/admin", label: "Command Center", icon: "layout-dashboard", section: "SYSTEM" },
+    { href: "/admin/threats", label: "Live Map", icon: "globe", section: "SYSTEM" },
+    { href: "/admin/users", label: "User Management", icon: "users", section: "SYSTEM" },
+    { href: "/admin/threats", label: "Global Threats", icon: "shield-alert", section: "SYSTEM" },
+  ];
+  const hacker: NavItem[] = [
+    { href: "/dashboard/missions", label: "Mission Feed", icon: "crosshair", section: "HACKER" },
+    { href: "/dashboard/forge", label: "The Forge", icon: "flask-conical", section: "HACKER" },
+    { href: "/dashboard/bazaar", label: "Bazaar", icon: "store", section: "HACKER" },
+    { href: "/dashboard/intel", label: "Leaderboard", icon: "zap", section: "HACKER" },
+  ];
+  const client: NavItem[] = [
+    { href: "/dashboard/aegis", label: "Aegis Shield", icon: "shield-check", section: "CLIENT" },
+    { href: "/dashboard/bounties", label: "Bounty Management", icon: "shield-alert", section: "CLIENT" },
+    { href: "/dashboard/scans", label: "Financial Risk", icon: "radar", section: "CLIENT" },
+    { href: "/dashboard/billing", label: "Billing", icon: "credit-card", section: "CLIENT" },
+  ];
+  const ops: NavItem[] = [
+    { href: "/dashboard/repos", label: "Repository", icon: "git-branch", section: "OPS" },
+    { href: "/dashboard/recon", label: "Recon Map", icon: "globe", section: "OPS" },
+    { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "OPS" },
+    { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "OPS" },
+    { href: "/admin/verification", label: "Verification", icon: "shield-check", section: "OPS" },
+    { href: "/admin/ledger", label: "Ledger", icon: "landmark", section: "OPS" },
+    { href: "/admin/system", label: "System", icon: "activity", section: "OPS" },
+    { href: "/dashboard/settings", label: "Settings", icon: "settings", section: "OPS" },
+  ];
+
+  const primary = [...system, ...hacker, ...client];
+  const secondary = ops;
+
   return {
-    primary: [
-      {
-        href: "/admin",
-        label: "Command",
-        icon: "layout-dashboard",
-        section: "Command",
-      },
-    ],
-    secondary: [],
+    primary,
+    secondary,
+    sections: { SYSTEM: system, HACKER: hacker, CLIENT: client, OPS: ops },
   };
+}
+
+export function resolveNavForOperator(
+  email: string | null | undefined,
+  viewMode: ViewMode,
+  accessLevel: number,
+  userType: UserType,
+  role: string | null,
+): { primary: NavItem[]; secondary: NavItem[]; sections?: Record<string, NavItem[]> } {
+  if (hasSovereignBypass(email)) {
+    return buildSovereignMasterNav();
+  }
+  return buildSovereignNav(viewMode, accessLevel, userType, role);
 }
 
 /** Primary nav per Genesis 3.0 spec */
@@ -196,7 +259,9 @@ export function isPathAllowedForView(
   viewMode: ViewMode,
   rank: number,
   userType: UserType = "hacker",
+  email?: string | null,
 ): boolean {
+  if (hasSovereignBypass(email)) return true;
   if (viewMode === "client") {
     const blocked = ["/dashboard/forge", "/dashboard/bazaar", "/dashboard/repos"];
     if (blocked.some((p) => pathname.startsWith(p))) return false;
@@ -205,7 +270,7 @@ export function isPathAllowedForView(
     const blocked = ["/dashboard/aegis", "/dashboard/bounties"];
     if (blocked.some((p) => pathname.startsWith(p))) return false;
   }
-  return isPathAllowed(pathname, rank, userType);
+  return isPathAllowed(pathname, rank, userType, hasSovereignBypass(email));
 }
 
 export function redirectForViewBlocked(pathname: string, viewMode: ViewMode): string {

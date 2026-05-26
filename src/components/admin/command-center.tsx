@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { Search } from "lucide-react";
-import { LiveWorldMap, type ScanTargetPulse } from "@/components/dashboard/live-world-map";
+import { TacticalWorldMap } from "@/components/dashboard/tactical-world-map";
+import type { ScanTargetPulse } from "@/components/dashboard/live-world-map";
 import type { PopNodeId } from "@/lib/admin/resolve-scan-node";
 import {
   AdminScanFeed,
@@ -90,7 +91,7 @@ export function CommandCenter({
                 </p>
               </div>
               <PanelErrorBoundary label="Live map">
-                <LiveWorldMap
+                <TacticalWorldMap
                   activeScans={activeScans}
                   scanTargets={scanTargets}
                   pulseNodeIds={pulseNodeIds}

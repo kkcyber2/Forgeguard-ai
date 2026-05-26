@@ -49,6 +49,11 @@ export function TacticalWorldMap({
   const [scanPings, setScanPings] = React.useState<Ping[]>([]);
   const [attackPings, setAttackPings] = React.useState<Ping[]>([]);
   const projectionRef = React.useRef<ReturnType<typeof geoMercator> | null>(null);
+  const sessionIdRef = React.useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `sess-${Date.now()}`,
+  );
 
   React.useEffect(() => {
     const { paths, projection } = loadLandFeatures();
@@ -94,7 +99,7 @@ export function TacticalWorldMap({
     const proj = projectionRef.current ?? loadLandFeatures().projection;
 
     const channel = supabase
-      .channel("tactical-map:events")
+      .channel(`tactical-map:events:${sessionIdRef.current}`)
       .on(
         "postgres_changes",
         {

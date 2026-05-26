@@ -113,32 +113,50 @@ export function ScanLiveLog({ scanId, initial, createdAt }: Props) {
   const reduce = useReducedMotion();
   const [entries, setEntries] = React.useState<ScanLogEntry[]>(initial);
   const [connected, setConnected] = React.useState(false);
+  const sessionIdRef = React.useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `sess-${Date.now()}`,
+  );
 
   React.useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`scan_logs:${scanId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "scan_logs",
-          filter: `scan_id=eq.${scanId}`,
-        },
-        (payload) => {
-          const row = payload.new as ScanLogEntry;
-          setEntries((prev) => {
-            if (prev.some((e) => e.id === row.id)) return prev;
-            return [row, ...prev].slice(0, 200);
-          });
-        },
-      )
-      .subscribe((status) => {
-        setConnected(status === "SUBSCRIBED");
-      });
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
+    const subscribe = () => {
+      const channelName = `scan_logs:${scanId}:${sessionIdRef.current}`;
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "scan_logs",
+            filter: `scan_id=eq.${scanId}`,
+          },
+          (payload) => {
+            const row = payload.new as ScanLogEntry;
+            setEntries((prev) => {
+              if (prev.some((e) => e.id === row.id)) return prev;
+              return [row, ...prev].slice(0, 200);
+            });
+          },
+        )
+        .subscribe((status) => {
+          setConnected(status === "SUBSCRIBED");
+          if (status === "CHANNEL_ERROR") {
+            setConnected(false);
+            void supabase.removeChannel(channel);
+            retryTimer = setTimeout(subscribe, 3000);
+          }
+        });
+      return channel;
+    };
+
+    const channel = subscribe();
     return () => {
+      if (retryTimer) clearTimeout(retryTimer);
       void supabase.removeChannel(channel);
     };
   }, [scanId]);

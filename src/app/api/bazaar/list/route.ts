@@ -42,8 +42,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (result.error) {
+    const schemaDrift =
+      /is_free|is_certified|is_removed|does not exist|42703/i.test(result.error);
     return NextResponse.json(
-      { ok: false, error: result.error },
+      {
+        ok: false,
+        error: result.error,
+        code: schemaDrift ? "SCHEMA_DRIFT" : "LIST_FAILED",
+      },
       { status: 500 },
     );
   }

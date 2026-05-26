@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import { StrongholdRecovering, strongholdLogFromError } from "@/components/dashboard/stronghold-recovering";
 
 export default function GlobalError({
@@ -17,10 +15,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html
-      lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} dark`}
-    >
+    <html lang="en" className="dark font-sans">
       <body className="min-h-screen bg-[#050505] text-white antialiased">
         <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-6">
           <StrongholdRecovering

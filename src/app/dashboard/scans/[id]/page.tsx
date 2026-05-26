@@ -7,11 +7,10 @@ import {
   Cpu,
   Globe2,
   Radar,
-  ShieldAlert,
   Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
-import { SeverityMeter } from "@/components/dashboard/severity-meter";
+import { FindingsBreakdown } from "./findings-breakdown";
 import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { buttonStyles } from "@/components/ui/button";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
@@ -132,10 +131,6 @@ export default async function ScanDetailPage({ params }: PageProps) {
     created_at: row.created_at,
   }));
 
-  // Severity breakdown derived from initial logs (the live child keeps
-  // its own running totals after that).
-  const sevCounts = aggregateSeverity((logs ?? []) as LogRow[]);
-
   return (
     <>
       <div className="mb-4">
@@ -224,14 +219,11 @@ export default async function ScanDetailPage({ params }: PageProps) {
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-1">
-          <CardHead icon={ShieldAlert} label="Findings breakdown" />
-          <p className="mb-2 text-2xl font-semibold tracking-tight text-foreground">
-            {scan.finding_count}
-            <span className="ml-1.5 text-xs font-normal text-foreground-subtle">
-              total
-            </span>
-          </p>
-          <SeverityMeter counts={sevCounts} showLegend />
+          <FindingsBreakdown
+            scanId={scan.id}
+            initialLogs={(logs ?? []) as import("./live-log").ScanLogEntry[]}
+            fallbackCount={scan.finding_count}
+          />
         </Card>
 
         <Card className="lg:col-span-2">
@@ -326,31 +318,3 @@ function DefRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
-/* -------------------------------------------------------------------------- */
-
-type LogRow = {
-  severity: "info" | "low" | "medium" | "high" | "critical";
-  type:
-    | "info"
-    | "attack"
-    | "error"
-    | "brain_decision"
-    | "cost_event"
-    | "tool_run"
-    | "tool_authored"
-    | "audit"
-    | "report"
-    | "attempt"
-    | "finding";
-};
-
-function aggregateSeverity(rows: LogRow[]) {
-  const out = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  for (const r of rows) {
-    if (r.type !== "finding") continue;
-    out[r.severity] = (out[r.severity] ?? 0) + 1;
-  }
-  return out;
-}

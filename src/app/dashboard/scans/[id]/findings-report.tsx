@@ -49,6 +49,7 @@ export interface Finding {
   proof_of_concept?: PoC;
   remediation_snippet_key?: string;
   observed_at?: string;
+  ale_usd?: number | null;
 }
 
 export interface OWASPBucket {
@@ -537,6 +538,14 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
             <p className="mt-1 truncate text-xs text-foreground-muted">
               {finding.summary}
             </p>
+          )}
+          {finding.ale_usd != null && finding.ale_usd > 0 && (
+            <div
+              className="mt-2 rounded-[3px] border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-red-400"
+              style={{ boxShadow: "0 0 24px rgba(239,68,68,0.25)" }}
+            >
+              Financial risk: ${finding.ale_usd.toLocaleString()} ALE
+            </div>
           )}
           {/* CWE chips — visible in collapsed state */}
           {(finding.cwe_references?.length ?? 0) > 0 && (

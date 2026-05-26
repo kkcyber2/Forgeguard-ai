@@ -169,6 +169,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
         surface_kind: scan.surface_kind ?? "llm",
         api_key: apiKey,
         ownership_verified: sovereign,
+        target_provider: /groq\.com/i.test(normalizedUrl) ? "groq" : "",
       }),
       // Don't hold the connection open — Railway acknowledges fast.
       signal: AbortSignal.timeout(15_000),

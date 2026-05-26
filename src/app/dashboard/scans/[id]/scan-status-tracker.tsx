@@ -55,6 +55,11 @@ export function ScanStatusTracker({
 }: Props) {
   const [status, setStatus] = React.useState<ScanStatus>(initialStatus);
   const [progress, setProgress] = React.useState<number>(initialProgress);
+  const sessionIdRef = React.useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `sess-${Date.now()}`,
+  );
 
   React.useEffect(() => {
     const supabase = createClient();
@@ -74,28 +79,41 @@ export function ScanStatusTracker({
       });
 
     // ── 2. Real-time subscription to scans UPDATE events ───────────────────
-    const channel = supabase
-      .channel(`scan_row:${scanId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "scans",
-          filter: `id=eq.${scanId}`,
-        },
-        (payload) => {
-          const row = payload.new as {
-            status: unknown;
-            progress_pct: number | null;
-          };
-          if (isScanStatus(row.status)) setStatus(row.status);
-          setProgress(row.progress_pct ?? 0);
-        },
-      )
-      .subscribe();
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
+    const subscribe = () => {
+      const channelName = `scan_row:${scanId}:${sessionIdRef.current}`;
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "scans",
+            filter: `id=eq.${scanId}`,
+          },
+          (payload) => {
+            const row = payload.new as {
+              status: unknown;
+              progress_pct: number | null;
+            };
+            if (isScanStatus(row.status)) setStatus(row.status);
+            setProgress(row.progress_pct ?? 0);
+          },
+        )
+        .subscribe((st) => {
+          if (st === "CHANNEL_ERROR") {
+            void supabase.removeChannel(channel);
+            retryTimer = setTimeout(subscribe, 3000);
+          }
+        });
+      return channel;
+    };
+
+    const channel = subscribe();
     return () => {
+      if (retryTimer) clearTimeout(retryTimer);
       void supabase.removeChannel(channel);
     };
   }, [scanId]);

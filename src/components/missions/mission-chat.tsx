@@ -43,6 +43,11 @@ export function MissionChat({
   const [senders, setSenders] = useState<Record<string, SenderMeta>>(initialSenders);
   const [input, setInput] = useState("");
   const [isPending, startTransition] = useTransition();
+  const sessionIdRef = useRef(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `sess-${Date.now()}`,
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const supabase = createClient();
@@ -76,42 +81,54 @@ export function MissionChat({
   );
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`mission-chat-${missionId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "mission_messages",
-          filter: `mission_id=eq.${missionId}`,
-        },
-        (payload) => {
-          const row = payload.new as {
-            id: string;
-            sender_id: string;
-            body: string;
-            created_at: string;
-          };
-          void loadSender(row.sender_id);
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === row.id)) return prev;
-            return [
-              ...prev,
-              {
-                id: row.id,
-                senderId: row.sender_id,
-                body: row.body,
-                createdAt: row.created_at,
-                isOwn: row.sender_id === currentUserId,
-              },
-            ];
-          });
-        },
-      )
-      .subscribe();
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
+    const subscribe = () => {
+      const channel = supabase
+        .channel(`mission-chat-${missionId}:${sessionIdRef.current}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "mission_messages",
+            filter: `mission_id=eq.${missionId}`,
+          },
+          (payload) => {
+            const row = payload.new as {
+              id: string;
+              sender_id: string;
+              body: string;
+              created_at: string;
+            };
+            void loadSender(row.sender_id);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === row.id)) return prev;
+              return [
+                ...prev,
+                {
+                  id: row.id,
+                  senderId: row.sender_id,
+                  body: row.body,
+                  createdAt: row.created_at,
+                  isOwn: row.sender_id === currentUserId,
+                },
+              ];
+            });
+          },
+        )
+        .subscribe((st) => {
+          if (st === "CHANNEL_ERROR") {
+            void supabase.removeChannel(channel);
+            retryTimer = setTimeout(subscribe, 3000);
+          }
+        });
+      return channel;
+    };
+
+    const channel = subscribe();
     return () => {
+      if (retryTimer) clearTimeout(retryTimer);
       void supabase.removeChannel(channel);
     };
   }, [missionId, currentUserId, loadSender, supabase]);

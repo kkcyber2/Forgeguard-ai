@@ -50,6 +50,7 @@ export interface Finding {
   remediation_snippet_key?: string;
   observed_at?: string;
   ale_usd?: number | null;
+  financial_liability_usd?: number | null;
 }
 
 export interface OWASPBucket {
@@ -539,14 +540,19 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
               {finding.summary}
             </p>
           )}
-          {finding.ale_usd != null && finding.ale_usd > 0 && (
-            <div
-              className="mt-2 rounded-[3px] border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-red-400"
-              style={{ boxShadow: "0 0 24px rgba(239,68,68,0.25)" }}
-            >
-              Financial risk: ${finding.ale_usd.toLocaleString()} ALE
-            </div>
-          )}
+          {(() => {
+            const liability =
+              finding.financial_liability_usd ?? finding.ale_usd ?? null;
+            if (liability == null || liability <= 0) return null;
+            return (
+              <div
+                className="mt-2 rounded-[3px] border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-red-400"
+                style={{ boxShadow: "0 0 24px rgba(239,68,68,0.25)" }}
+              >
+                Financial liability: ${liability.toLocaleString()}
+              </div>
+            );
+          })()}
           {/* CWE chips — visible in collapsed state */}
           {(finding.cwe_references?.length ?? 0) > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">

@@ -10,6 +10,62 @@ export interface LiveWalletState {
   loading: boolean;
 }
 
+type WalletChannelEntry = {
+  channel: ReturnType<ReturnType<typeof createClient>["channel"]>;
+  refCount: number;
+};
+
+const walletChannels = new Map<string, WalletChannelEntry>();
+
+function acquireWalletChannel(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  onChange: () => void,
+): WalletChannelEntry {
+  const existing = walletChannels.get(userId);
+  if (existing) {
+    existing.refCount += 1;
+    return existing;
+  }
+
+  const channel = supabase
+    .channel(`wallet:${userId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "user_wallets",
+        filter: `user_id=eq.${userId}`,
+      },
+      () => {
+        onChange();
+      },
+    )
+    .subscribe((status) => {
+      if (status === "CHANNEL_ERROR") {
+        console.error("[wallet:realtime] channel error for user", userId);
+      }
+    });
+
+  const entry: WalletChannelEntry = { channel, refCount: 1 };
+  walletChannels.set(userId, entry);
+  return entry;
+}
+
+function releaseWalletChannel(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): void {
+  const entry = walletChannels.get(userId);
+  if (!entry) return;
+  entry.refCount -= 1;
+  if (entry.refCount <= 0) {
+    void supabase.removeChannel(entry.channel);
+    walletChannels.delete(userId);
+  }
+}
+
 export function useLiveWallet(initialBalance = 0): LiveWalletState {
   const [wallet, setWallet] = React.useState<LiveWalletState>({
     balance_usd: initialBalance,
@@ -19,10 +75,8 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
   const [userId, setUserId] = React.useState<string | null>(null);
 
   const supabase = React.useMemo(() => createClient(), []);
-  const sessionIdRef = React.useRef(
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `sess-${Date.now()}`,
+  const fetchWalletRef = React.useRef<(() => Promise<string | null>) | null>(
+    null,
   );
 
   const fetchWallet = React.useCallback(async (): Promise<string | null> => {
@@ -54,7 +108,8 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
     return user.id;
   }, [supabase]);
 
-  // Poll + manual refresh events
+  fetchWalletRef.current = fetchWallet;
+
   React.useEffect(() => {
     const onRefresh = (e: Event) => {
       const detail = (e as CustomEvent<{ balance?: number }>).detail;
@@ -66,51 +121,31 @@ export function useLiveWallet(initialBalance = 0): LiveWalletState {
         }));
         return;
       }
-      void fetchWallet();
+      void fetchWalletRef.current?.();
     };
 
     window.addEventListener(WALLET_REFRESH_EVENT, onRefresh);
-    void fetchWallet();
-    const interval = setInterval(() => void fetchWallet(), 5_000);
+    void fetchWalletRef.current?.();
+    const interval = setInterval(() => void fetchWalletRef.current?.(), 15_000);
 
     return () => {
       window.removeEventListener(WALLET_REFRESH_EVENT, onRefresh);
       clearInterval(interval);
     };
-  }, [fetchWallet]);
+  }, []);
 
-  // Realtime — register .on() before .subscribe(); cleanup removes channel
   React.useEffect(() => {
     if (!userId) return;
 
-    const channelName = `wallet:${userId}:${sessionIdRef.current}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "user_wallets",
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          void fetchWallet();
-        },
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          console.log("[wallet:realtime] Sovereign Realtime Active");
-        }
-        if (status === "CHANNEL_ERROR") {
-          console.error("[wallet:realtime] channel error for user", userId);
-        }
-      });
+    const onChange = () => {
+      void fetchWalletRef.current?.();
+    };
+    acquireWalletChannel(supabase, userId, onChange);
 
     return () => {
-      void supabase.removeChannel(channel);
+      releaseWalletChannel(supabase, userId);
     };
-  }, [fetchWallet, supabase, userId]);
+  }, [supabase, userId]);
 
   return wallet;
 }

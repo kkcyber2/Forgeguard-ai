@@ -43,7 +43,11 @@ export type ScanLogType =
   | "brain_decision"
   | "tool_authored"
   | "tool_run"
-  | "report";
+  | "report"
+  | "thought"
+  | "strike"
+  | "breach"
+  | "finance";
 
 export type ScanLogEntry = {
   id: number;
@@ -100,6 +104,10 @@ const TYPE_ICON: Record<ScanLogType, IconComponent> = {
   tool_authored: Wrench,
   tool_run: Terminal,
   report: FileText,
+  thought: Brain,
+  strike: Zap,
+  breach: ShieldAlert,
+  finance: DollarSign,
 };
 
 // Defensive lookup — if a future log type slips through that we haven't
@@ -244,9 +252,17 @@ function formatType(t: ScanLogEntry["type"]): string {
     case "progress":
       return "Progress update";
     case "finding":
-      return "Finding";
+    case "breach":
+      return "Breach";
     case "attempt":
-      return "Probe attempted";
+    case "strike":
+      return "Kinetic strike";
+    case "thought":
+    case "brain_decision":
+      return "Strategist thought";
+    case "finance":
+    case "cost_event":
+      return "Financial event";
     case "audit":
       return "Audit checkpoint";
     case "error":

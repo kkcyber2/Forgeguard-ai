@@ -35,12 +35,12 @@ export function aggregateSeverityFromLogs(rows: ScanLogEntry[]): SeverityCounts 
   };
   for (const r of rows) {
     const sev = normalizeSeverity(r.severity);
-    if (r.type === "finding") {
+    if (r.type === "finding" || r.type === "breach") {
       out[sev] = (out[sev] ?? 0) + 1;
       continue;
     }
     if (
-      r.type === "attempt" &&
+      (r.type === "attempt" || r.type === "strike") &&
       (sev === "high" || sev === "critical") &&
       payloadSuccess(r.payload)
     ) {

@@ -178,10 +178,11 @@ export function LiveWorldMap({
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) return;
 
+    let mounted = true;
     const supabase = createBrowserClient(url, key);
 
     const channel = supabase
-      .channel("live-map:scan_logs")
+      .channel("live-map:events")
       .on(
         "postgres_changes",
         {
@@ -191,48 +192,40 @@ export function LiveWorldMap({
           filter: "type=eq.finding",
         },
         () => {
+          if (!mounted) return;
           setActiveIds((prev) => {
             const candidate = NODES[Math.floor(Math.random() * NODES.length)];
             if (!candidate || prev.includes(candidate.id as NodeId)) return prev;
             return [...prev.slice(-(dense ? 19 : 9)), candidate.id as NodeId];
           });
         },
-      )
-      .subscribe();
+      );
 
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [dense]);
-
-  React.useEffect(() => {
-    if (!attackPulses) return;
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return;
-
-    const supabase = createBrowserClient(url, key);
-    const channel = supabase
-      .channel("live-map:attack_logs")
-      .on(
+    if (attackPulses) {
+      channel.on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "attack_logs" },
         () => {
+          if (!mounted) return;
           const candidate = NODES[Math.floor(Math.random() * NODES.length)];
           if (!candidate) return;
           const id = candidate.id as PopNodeId;
           setAttackFlash((prev) => [...prev.slice(-4), id]);
           setTimeout(() => {
+            if (!mounted) return;
             setAttackFlash((prev) => prev.filter((x) => x !== id));
           }, 2400);
         },
-      )
-      .subscribe();
+      );
+    }
+
+    channel.subscribe();
 
     return () => {
+      mounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [attackPulses]);
+  }, [dense, attackPulses]);
 
   const activeNodes = NODES.filter((n) => activeIds.includes(n.id as NodeId));
   const attackNodes = NODES.filter((n) => attackFlash.includes(n.id as NodeId));

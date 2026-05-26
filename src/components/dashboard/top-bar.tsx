@@ -579,13 +579,15 @@ export function TopBar({
             );
           })}
 
-          {/* Overflow → "More" */}
-          <OverflowMenu
-            items={overflowNav}
-            scope={scope}
-            pathname={pathname}
-            accentHex={accentHex}
-          />
+          {/* Overflow → "More" (user scope only — sovereign admin is single-page) */}
+          {scope !== "admin" && overflowNav.length > 0 && (
+            <OverflowMenu
+              items={overflowNav}
+              scope={scope}
+              pathname={pathname}
+              accentHex={accentHex}
+            />
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 border-l-[0.5px] border-white/[0.06] px-3">

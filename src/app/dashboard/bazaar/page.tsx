@@ -715,13 +715,13 @@ export default function BazaarPage() {
           fetch(`/api/bazaar/list?${params.toString()}`),
           fetch(`/api/bazaar/list?${certParams.toString()}`),
         ]);
-        const data = await res.json() as { ok: boolean; scripts?: Script[] };
+        const data = await res.json() as { ok: boolean; scripts?: Script[]; error?: string };
         const certData = await certRes.json() as { ok: boolean; scripts?: Script[] };
         if (data.ok) {
           setScripts(data.scripts ?? []);
           setLoadError(null);
         } else {
-          setLoadError("Could not load marketplace scripts.");
+          setLoadError(data.error ?? "Could not load marketplace scripts.");
         }
         if (certData.ok) {
           setCertifiedScripts(certData.scripts ?? []);

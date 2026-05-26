@@ -69,6 +69,7 @@ export function UserDirectory({ operators, searchQuery }: UserDirectoryProps) {
     if (!q) return true;
     return (
       op.email.toLowerCase().includes(q) ||
+      op.id.toLowerCase().includes(q) ||
       (op.fullName ?? "").toLowerCase().includes(q) ||
       (op.company ?? "").toLowerCase().includes(q) ||
       (op.lastIp ?? "").includes(q)

@@ -131,12 +131,20 @@ export function PhoneVerification({
         <p className="font-mono text-[10px] text-red-400/90">{error}</p>
       )}
 
-      {!verified && error?.includes("Trial Account Restriction") && (
-        <p className="font-mono text-[10px] leading-relaxed text-amber-400/90">
-          Verify the destination number in your Twilio Console under Phone Numbers →
-          Verified Caller IDs before retrying SMS.
-        </p>
-      )}
+      {!verified &&
+        error &&
+        (error.includes("Trial Account Restriction") || error.includes("21608")) && (
+          <div className="rounded-[3px] border border-amber-400/30 bg-amber-500/[0.08] px-3 py-2.5">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+              Twilio trial restriction
+            </p>
+            <p className="mt-1 font-mono text-[10px] leading-relaxed text-amber-200/90">
+              SMS Error 21608 — trial accounts can only send to verified numbers.
+              Add this phone in Twilio Console → Phone Numbers → Verified Caller IDs,
+              then retry.
+            </p>
+          </div>
+        )}
 
       {!verified && error?.includes("SMS provider not configured") && (
         <p className="font-mono text-[10px] leading-relaxed text-white/35">

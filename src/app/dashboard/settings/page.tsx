@@ -11,7 +11,10 @@ import { ApiKeysSection } from "./api-keys-section";
 import { SignaturePad } from "@/components/settings/signature-pad";
 import { DomainVerifier } from "@/components/settings/domain-verifier";
 import { WebcamIdentity } from "@/components/settings/webcam-identity";
-import { ClearanceProgress } from "@/components/settings/clearance-progress";
+import {
+  SettingsClearanceAside,
+  SettingsClearanceProvider,
+} from "@/components/settings/settings-clearance-aside";
 import { PhoneVerification } from "@/components/settings/phone-verification";
 import { IdentityAuditor } from "@/components/settings/identity-auditor";
 import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
@@ -44,6 +47,7 @@ export default async function SettingsPage() {
         description="Account identity and credentials. Anything sensitive triggers a re-auth before it sticks."
       />
 
+      <SettingsClearanceProvider initialDocUploaded={!!data.docPath}>
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           <Section id="profile" icon={User2} eyebrow="Identity" title="Profile">
@@ -133,7 +137,7 @@ export default async function SettingsPage() {
             <GhostProtocolToggle compact />
           </div>
 
-          <ClearanceProgress
+          <SettingsClearanceAside
             emailVerified={data.emailVerified}
             phoneVerified={data.phoneVerified}
             domainVerified={data.domainVerified}
@@ -192,6 +196,7 @@ export default async function SettingsPage() {
           </div>
         </aside>
       </div>
+      </SettingsClearanceProvider>
     </>
   );
 }

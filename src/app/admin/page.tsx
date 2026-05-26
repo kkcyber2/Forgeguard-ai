@@ -1,10 +1,13 @@
-import { PageHeader } from "@/components/dashboard/shell";
 import { CommandCenter } from "@/components/admin/command-center";
 import type { AdminOperatorRow } from "@/components/admin/user-directory";
 import type { AdminScanRow } from "@/components/admin/scan-inspector-drawer";
+import type { PendingBazaarScript } from "@/components/admin/bazaar-triage-panel";
+import type { BountyEscrowRow } from "@/components/admin/mission-control-panel";
+import type { VerificationQueueRow } from "@/app/admin/verification/verification-row";
 import { resolveScanTargets, type PopNodeId } from "@/lib/admin/resolve-scan-node";
 import type { ScanTargetPulse } from "@/components/dashboard/live-world-map";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { Database } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +15,102 @@ export const revalidate = 0;
 export const runtime = "nodejs";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+async function fetchPendingScripts(): Promise<PendingBazaarScript[]> {
+  try {
+    const db = createAdminSupabase();
+    const { data, error } = await db
+      .from("bazaar_scripts")
+      .select(
+        "id, name, description, language, price_usd, audit_risk_score, audit_verdict, created_at",
+      )
+      .in("audit_verdict", ["pending", "pending_audit", "flagged"])
+      .eq("is_published", false)
+      .eq("is_removed", false)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) {
+      console.error("[admin] bazaar triage:", error.message);
+      return [];
+    }
+    return (data ?? []) as PendingBazaarScript[];
+  } catch (err) {
+    console.error("[admin] bazaar triage:", err);
+    return [];
+  }
+}
+
+async function fetchVerificationQueue(): Promise<VerificationQueueRow[]> {
+  try {
+    const db = createAdminSupabase();
+    const { data, error } = await db
+      .from("profiles")
+      .select(
+        "id, email, full_name, identity_audit_score, identity_audit_status, identity_audit_notes, identity_document_path",
+      )
+      .or(
+        "clearance_tier.eq.pending,sovereign_pending.eq.true,identity_audit_status.eq.review,identity_audit_status.eq.pending",
+      )
+      .order("identity_audit_score", { ascending: false, nullsFirst: false })
+      .limit(100);
+    if (error) {
+      console.error("[admin] verification queue:", error.message);
+      return [];
+    }
+    return (data ?? []) as VerificationQueueRow[];
+  } catch (err) {
+    console.error("[admin] verification queue:", err);
+    return [];
+  }
+}
+
+async function fetchBountyEscrows(): Promise<BountyEscrowRow[]> {
+  try {
+    const db = createAdminSupabase();
+    const { data: escrows, error } = await db
+      .from("bounty_escrow")
+      .select("id, user_id, amount_usd, held_at, mission_id")
+      .eq("status", "held")
+      .order("held_at", { ascending: false })
+      .limit(50);
+    if (error) {
+      console.error("[admin] bounty escrow:", error.message);
+      return [];
+    }
+    const rows = escrows ?? [];
+    const userIds = [...new Set(rows.map((r) => r.user_id))];
+    const missionIds = [
+      ...new Set(rows.map((r) => r.mission_id).filter(Boolean) as string[]),
+    ];
+
+    const { data: profiles } = userIds.length
+      ? await db.from("profiles").select("id, email, full_name").in("id", userIds)
+      : { data: [] };
+    const { data: missions } = missionIds.length
+      ? await db.from("missions").select("id, title").in("id", missionIds)
+      : { data: [] };
+
+    const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const missionMap = new Map((missions ?? []).map((m) => [m.id, m]));
+
+    return rows.map((row) => {
+      const profile = profileMap.get(row.user_id);
+      const mission = row.mission_id ? missionMap.get(row.mission_id) : null;
+      return {
+        id: row.id,
+        user_id: row.user_id,
+        amount_usd: Number(row.amount_usd ?? 0),
+        held_at: row.held_at,
+        missionTitle: mission?.title ?? null,
+        operatorEmail: profile?.email ?? null,
+        operatorName: profile?.full_name ?? null,
+      };
+    });
+  } catch (err) {
+    console.error("[admin] bounty escrow:", err);
+    return [];
+  }
+}
 
 export default async function AdminOverviewPage() {
   const supabase = await createServerSupabase();
@@ -21,6 +120,9 @@ export default async function AdminOverviewPage() {
     { data: scans, error: scansErr },
     { data: wallets },
     { data: activityLogs },
+    pendingScripts,
+    verificationQueue,
+    bountyEscrows,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -42,6 +144,9 @@ export default async function AdminOverviewPage() {
       .select("user_id, ip_address, created_at")
       .order("created_at", { ascending: false })
       .limit(2000),
+    fetchPendingScripts(),
+    fetchVerificationQueue(),
+    fetchBountyEscrows(),
   ]);
 
   if (profilesErr) console.error("[admin] profiles:", profilesErr.message);
@@ -109,19 +214,17 @@ export default async function AdminOverviewPage() {
   const pulseNodeIds: PopNodeId[] = resolveScanTargets(scanTargets);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Admin"
-        title="Unified command center"
-        description="Live threat surface, operator directory, and sovereign power tools."
-      />
-      <CommandCenter
-        activeScans={activeScans}
-        scanTargets={scanTargets}
-        pulseNodeIds={pulseNodeIds}
-        operators={operators}
-        scans={scanRows}
-      />
-    </>
+    <CommandCenter
+      activeScans={activeScans}
+      pendingTriage={pendingScripts.length}
+      applicantCount={verificationQueue.length}
+      scanTargets={scanTargets}
+      pulseNodeIds={pulseNodeIds}
+      operators={operators}
+      scans={scanRows}
+      pendingScripts={pendingScripts}
+      verificationQueue={verificationQueue}
+      bountyEscrows={bountyEscrows}
+    />
   );
 }

@@ -64,26 +64,21 @@ const SECONDARY_NAV: Array<NavItem & { minRank: number; viewModes?: ViewMode[] }
 
 const LEGEND_NAV: NavItem[] = [
   { href: "/admin", label: "Admin", icon: "shield-alert", section: "Legend" },
-  { href: "/admin/threats", label: "Global Map", icon: "globe", section: "Legend" },
 ];
 
-/** Admin Command Center nav — DEV persona */
+/** Admin Command Center nav — single sovereign console (no sub-pages). */
 export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
-  const primary: NavItem[] = [
-    { href: "/admin", label: "Overview", icon: "layout-dashboard", section: "Command" },
-    { href: "/admin/threats", label: "Global threats", icon: "shield-alert", section: "Command" },
-    { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "Command" },
-    { href: "/admin/bazaar/verified", label: "Verified Catalog", icon: "shield-check", section: "Command" },
-    { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark", section: "Command" },
-  ];
-  const secondary: NavItem[] = [
-    { href: "/admin/bounties", label: "Bounty Escrow", icon: "credit-card", section: "Ops" },
-    { href: "/admin/users", label: "Users", icon: "users", section: "Ops" },
-    { href: "/admin/verification", label: "Verification", icon: "shield-check", section: "Ops" },
-    { href: "/admin/system", label: "System health", icon: "activity", section: "Ops" },
-    { href: "/admin/settings", label: "Settings", icon: "settings", section: "Account" },
-  ];
-  return { primary, secondary };
+  return {
+    primary: [
+      {
+        href: "/admin",
+        label: "Command",
+        icon: "layout-dashboard",
+        section: "Command",
+      },
+    ],
+    secondary: [],
+  };
 }
 
 /** Primary nav per Genesis 3.0 spec */

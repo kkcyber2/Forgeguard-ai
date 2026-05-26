@@ -26,6 +26,10 @@ export default async function DashboardLayout({
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard");
 
+  if (isSovereignOperator(user.email)) {
+    redirect("/admin");
+  }
+
   let profile = await getCurrentProfile();
   if (!profile) {
     await new Promise((resolve) => setTimeout(resolve, 400));

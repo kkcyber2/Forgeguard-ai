@@ -6,6 +6,7 @@ import { Camera, FileSearch, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { uploadIdentityDocument } from "./verification-actions";
 import { runAiAudit } from "./identity-actions";
+import { useClearanceUpload } from "./settings-clearance-aside";
 import { SCHEMA_SYNC_MSG } from "@/lib/verify/messages";
 import { useSovereignStore } from "@/stores/use-sovereign-store";
 import {
@@ -82,6 +83,7 @@ export function IdentityAuditor({
   profileFullName?: string;
 }) {
   const router = useRouter();
+  const { markDocumentUploaded } = useClearanceUpload();
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -280,6 +282,7 @@ export function IdentityAuditor({
         return;
       }
 
+      markDocumentUploaded();
       router.refresh();
 
       await handleAudit(up.path);

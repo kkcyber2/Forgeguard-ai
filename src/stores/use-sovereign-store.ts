@@ -22,7 +22,9 @@ interface SovereignState extends SovereignHydratePayload {
   setGhostMode: (active: boolean) => void;
 }
 
-export const useSovereignStore = create<SovereignState>((set) => ({
+const PERSONA_STORAGE_KEY = "forgeguard-persona";
+
+export const useSovereignStore = create<SovereignState>((set, get) => ({
   activeRole: "hacker",
   clearanceTier: null,
   canDev: false,
@@ -31,12 +33,26 @@ export const useSovereignStore = create<SovereignState>((set) => ({
   canGhost: false,
   operatorId: "",
   hydrated: false,
-  hydrate: (payload) =>
+  hydrate: (payload) => {
+    let role = payload.activeRole;
+    if (typeof window !== "undefined" && payload.canSwitch) {
+      const stored = localStorage.getItem(PERSONA_STORAGE_KEY);
+      if (stored === "client" || stored === "hacker") {
+        role = stored;
+      }
+    }
     set({
       ...payload,
+      activeRole: role,
       hydrated: true,
-    }),
-  setActiveRole: (role) => set({ activeRole: role }),
+    });
+  },
+  setActiveRole: (role) => {
+    if (typeof window !== "undefined" && get().canSwitch) {
+      localStorage.setItem(PERSONA_STORAGE_KEY, role);
+    }
+    set({ activeRole: role });
+  },
   setGhostMode: (active) => set({ isGhostMode: active }),
 }));
 

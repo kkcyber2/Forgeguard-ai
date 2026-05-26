@@ -4,6 +4,7 @@
  */
 
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { resolveAppUrl } from "@/lib/app-url";
 
 export interface IdentityAuditInput {
   documentText: string;
@@ -283,7 +284,7 @@ Respond ONLY with valid JSON:
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://forgeguard.ai",
+        "HTTP-Referer": resolveAppUrl(),
         "X-Title": "ForgeGuard AI — Identity Perception",
       },
       body: JSON.stringify({
@@ -438,7 +439,7 @@ export async function runIdentityAudit(
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://forgeguard.ai",
+        "HTTP-Referer": resolveAppUrl(),
         "X-Title": "ForgeGuard AI — Identity Auditor",
       },
       body: JSON.stringify({

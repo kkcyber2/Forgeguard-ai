@@ -328,6 +328,7 @@ export async function saveWebcamCapture(
 
   if (uploadErr) {
     console.error("[verify:webcam] storage:", uploadErr.message, uploadErr);
+    return { error: uploadErr.message || "Storage upload failed." };
   }
 
   const profileResult = await adminUpdateProfile(
@@ -389,7 +390,8 @@ export async function uploadIdentityDocument(
     .upload(path, buffer, { contentType: file.type, upsert: true });
 
   if (uploadErr) {
-    console.warn("[verify:upload] storage:", uploadErr.message);
+    console.error("[verify:upload] storage:", uploadErr.message);
+    return { error: uploadErr.message || "Storage upload failed." };
   }
 
   const profileResult = await adminUpdateProfile(

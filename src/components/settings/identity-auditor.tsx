@@ -237,7 +237,7 @@ export function IdentityAuditor({
         setError(audit.failure_reason);
       }
 
-      if (passed) router.refresh();
+      router.refresh();
     } catch (err) {
       console.error("[verify:auditor] runAiAudit:", err);
       setError(err instanceof Error ? err.message : "AI audit failed unexpectedly.");
@@ -279,6 +279,8 @@ export function IdentityAuditor({
         setError("Upload succeeded but document path missing.");
         return;
       }
+
+      router.refresh();
 
       await handleAudit(up.path);
     });

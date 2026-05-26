@@ -30,6 +30,29 @@
     scroll-behavior: smooth;
   }
 
+  html[data-persona="client"] body {
+    background-color: #050505;
+    background-image: radial-gradient(
+      ellipse 120% 80% at 50% -20%,
+      rgba(160, 32, 240, 0.08),
+      transparent 55%
+    );
+  }
+
+  html[data-persona="hacker"] body {
+    background-color: #050505;
+    background-image: radial-gradient(
+      ellipse 120% 80% at 50% -20%,
+      rgba(173, 255, 47, 0.06),
+      transparent 55%
+    );
+  }
+
+  html[data-persona="client"] a:focus-visible,
+  html[data-persona="hacker"] a:focus-visible {
+    outline-color: var(--sovereign-accent, #d1ff00);
+  }
+
   /* ── Layer 1: Deep Obsidian base ── */
   body {
     min-height: 100vh;

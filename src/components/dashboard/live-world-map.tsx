@@ -26,10 +26,14 @@ import { resolveScanNode } from "@/lib/admin/resolve-scan-node";
 export interface LiveWorldMapProps {
   /** Count of currently queued/probing scans from the server render. */
   activeScans: number;
-  /** Last 5 active scan targets — mapped to PoP nodes when provided. */
+  /** Active scan targets — mapped to PoP nodes when provided. */
   scanTargets?: ScanTargetPulse[];
   /** Pre-resolved node ids from server (optional). */
   pulseNodeIds?: readonly PopNodeId[];
+  /** Taller map for admin command center. */
+  dense?: boolean;
+  /** Enable red attack-log pulse subscription. */
+  attackPulses?: boolean;
 }
 
 export interface ScanTargetPulse {
@@ -143,36 +147,35 @@ export function LiveWorldMap({
   activeScans,
   scanTargets = [],
   pulseNodeIds,
+  dense = false,
+  attackPulses = false,
 }: LiveWorldMapProps) {
+  const [attackFlash, setAttackFlash] = React.useState<PopNodeId[]>([]);
+
+  const mapScanTargets = (targets: ScanTargetPulse[]) =>
+    targets.slice(0, dense ? 20 : 5).map((s, i) => resolveScanNode(s.target_url, i));
+
   const [activeIds, setActiveIds] = React.useState<PopNodeId[]>(() => {
     if (pulseNodeIds && pulseNodeIds.length > 0) return [...pulseNodeIds];
-    if (scanTargets.length > 0) {
-      return scanTargets
-        .slice(0, 5)
-        .map((s, i) => resolveScanNode(s.target_url, i));
-    }
+    if (scanTargets.length > 0) return mapScanTargets(scanTargets);
     return pickActiveIds(activeScans, 0xf06e42);
   });
 
-  // Re-pick when server-supplied scan targets change
   React.useEffect(() => {
     if (pulseNodeIds && pulseNodeIds.length > 0) {
       setActiveIds([...pulseNodeIds]);
       return;
     }
     if (scanTargets.length > 0) {
-      setActiveIds(
-        scanTargets.slice(0, 5).map((s, i) => resolveScanNode(s.target_url, i)),
-      );
+      setActiveIds(mapScanTargets(scanTargets));
       return;
     }
     setActiveIds(pickActiveIds(activeScans, Date.now() % 99991));
-  }, [activeScans, scanTargets, pulseNodeIds]);
+  }, [activeScans, scanTargets, pulseNodeIds, dense]);
 
-  // Supabase Realtime — add a random node flash on each new finding
   React.useEffect(() => {
-    const url  = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) return;
 
     const supabase = createBrowserClient(url, key);
@@ -191,20 +194,53 @@ export function LiveWorldMap({
           setActiveIds((prev) => {
             const candidate = NODES[Math.floor(Math.random() * NODES.length)];
             if (!candidate || prev.includes(candidate.id as NodeId)) return prev;
-            // Cap at 10 simultaneous pulses
-            return [...prev.slice(-9), candidate.id as NodeId];
+            return [...prev.slice(-(dense ? 19 : 9)), candidate.id as NodeId];
           });
         },
       )
       .subscribe();
 
-    return () => { void supabase.removeChannel(channel); };
-  }, []);
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [dense]);
+
+  React.useEffect(() => {
+    if (!attackPulses) return;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+
+    const supabase = createBrowserClient(url, key);
+    const channel = supabase
+      .channel("live-map:attack_logs")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "attack_logs" },
+        () => {
+          const candidate = NODES[Math.floor(Math.random() * NODES.length)];
+          if (!candidate) return;
+          const id = candidate.id as PopNodeId;
+          setAttackFlash((prev) => [...prev.slice(-4), id]);
+          setTimeout(() => {
+            setAttackFlash((prev) => prev.filter((x) => x !== id));
+          }, 2400);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [attackPulses]);
 
   const activeNodes = NODES.filter((n) => activeIds.includes(n.id as NodeId));
+  const attackNodes = NODES.filter((n) => attackFlash.includes(n.id as NodeId));
 
   return (
-    <div className="relative h-[220px] w-full overflow-hidden rounded-xs">
+    <div
+      className={`relative w-full overflow-hidden rounded-xs ${dense ? "h-[360px]" : "h-[220px]"}`}
+    >
       {/* Subtle CRT scanline texture */}
       <div
         aria-hidden
@@ -345,6 +381,16 @@ export function LiveWorldMap({
             </g>
           );
         })}
+
+        {attackNodes.map((n) => (
+          <g key={`atk-${n.id}`}>
+            <circle cx={n.x} cy={n.y} r="4" fill="none" stroke="#ef4444" strokeWidth="1">
+              <animate attributeName="r" values="4;18" dur="1.2s" repeatCount="2" />
+              <animate attributeName="stroke-opacity" values="0.9;0" dur="1.2s" repeatCount="2" />
+            </circle>
+            <circle cx={n.x} cy={n.y} r="2.5" fill="#ef4444" fillOpacity="0.85" />
+          </g>
+        ))}
       </svg>
 
       {/* ── Status badge ──────────────────────────────────────────────────── */}

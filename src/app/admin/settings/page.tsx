@@ -45,6 +45,10 @@ export default async function AdminSettingsPage() {
     groqProxy: !!process.env.GROQ_API_KEY || !!process.env.GROQ_PROXY_URL,
     scanSecret: !!process.env.SCAN_CREDENTIAL_SECRET,
     deepseek: !!process.env.DEEPSEEK_API_KEY,
+    internalScanToken:
+      !!process.env.INTERNAL_SCAN_TOKEN || !!process.env.AGATHON_INTERNAL_SECRET,
+    pythonEngineUrl:
+      !!process.env.PYTHON_ENGINE_URL || !!process.env.AGATHON_ORCHESTRATOR_URL,
   };
 
   return (
@@ -111,6 +115,16 @@ export default async function AdminSettingsPage() {
           <Row label="DeepSeek API">
             <Badge tone={serverEnvStatus.deepseek ? "secure" : "neutral"}>
               {serverEnvStatus.deepseek ? "Configured" : "Not set (optional)"}
+            </Badge>
+          </Row>
+          <Row label="INTERNAL_SCAN_TOKEN">
+            <Badge tone={serverEnvStatus.internalScanToken ? "secure" : "warn"}>
+              {serverEnvStatus.internalScanToken ? "Configured" : "Missing — engine handshake will fail"}
+            </Badge>
+          </Row>
+          <Row label="PYTHON_ENGINE_URL">
+            <Badge tone={serverEnvStatus.pythonEngineUrl ? "secure" : "warn"}>
+              {serverEnvStatus.pythonEngineUrl ? "Configured" : "Missing"}
             </Badge>
           </Row>
         </ConfigCard>

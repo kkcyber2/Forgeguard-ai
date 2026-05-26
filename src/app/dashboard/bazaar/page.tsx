@@ -539,7 +539,7 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
               </div>
               <div>
                 <p className="font-mono text-[11px] uppercase tracking-widest" style={{ color: verdictColor }}>
-                  AI Customs — {result.verdict.toUpperCase()}
+                  AI Customs — {String(result.verdict ?? "pending").toUpperCase()}
                 </p>
                 <p className="font-mono text-[13px] font-semibold text-white">
                   Risk Score: {result.risk_score}/100

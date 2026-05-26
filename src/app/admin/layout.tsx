@@ -4,7 +4,6 @@ import { ActivePath } from "@/components/dashboard/active-path";
 import {
   buildDevNav,
   canAccessDevMode,
-  canShowPersonaSwitcher,
 } from "@/lib/access/parallel-sovereignty";
 import {
   getSessionUser,
@@ -27,11 +26,7 @@ export default async function AdminLayout({
   if (!profile) redirect("/dashboard");
 
   const canDev = canAccessDevMode(profile.clearance_tier, profile.role, user.email);
-  const canSwitchIdentity = canShowPersonaSwitcher(
-    profile.user_type,
-    profile.clearance_tier,
-    user.email,
-  );
+  const canSwitchIdentity = false;
   const { primary, secondary } = buildDevNav();
 
   const shellUser = {

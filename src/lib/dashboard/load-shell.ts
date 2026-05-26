@@ -153,6 +153,8 @@ export async function loadDashboardShell(input: {
       userType,
       coerceString(input.profile.clearance_tier),
       input.email,
+      input.profile.hacker_rank,
+      accessLevel,
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "nav segment failed";

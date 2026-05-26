@@ -31,6 +31,7 @@ import {
 import { Logo } from "@/components/ui/logo";
 import { Badge } from "@/components/ui/badge";
 import { cn, getInitials } from "@/lib/utils";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { IdentityBadge } from "@/components/dashboard/identity-badge";
 import { IdentitySwitcher } from "@/components/dashboard/identity-switcher";
 import { WalletCredits } from "@/components/dashboard/wallet-credits";
@@ -471,6 +472,8 @@ export function TopBar({
   );
   const accountNav = nav.filter((item) => ACCOUNT_HREFS.has(item.href));
   const liveWallet = useLiveWallet(user.walletBalance ?? 0);
+  const showPersonaSwitcher =
+    canSwitchIdentity && scope === "user" && !isSovereignOperator(user.email);
 
   return (
     <>
@@ -508,7 +511,7 @@ export function TopBar({
               activePath={pathname}
               viewMode={dashboardViewMode}
               sovereignRole={activeRole}
-              canSwitchIdentity={canSwitchIdentity}
+              canSwitchIdentity={showPersonaSwitcher}
             />
           </div>
           <Link href={scope === "admin" ? "/admin" : "/dashboard"} className="flex min-w-0 items-center hover:opacity-80 transition-opacity">
@@ -586,7 +589,7 @@ export function TopBar({
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 border-l-[0.5px] border-white/[0.06] px-3">
-          {canSwitchIdentity && (
+          {showPersonaSwitcher && (
             <IdentitySwitcher
               activeMode={activeRole}
               canSwitch={canSwitchIdentity}

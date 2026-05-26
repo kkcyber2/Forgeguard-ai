@@ -5,6 +5,7 @@
 
 import type { NavItem } from "@/components/dashboard/shell";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
 import {
   type UserType,
   resolveAccessRank,
@@ -186,9 +187,13 @@ export function canShowPersonaSwitcher(
   userType: string | null | undefined,
   clearanceTier: string | null | undefined,
   email?: string | null,
+  hackerRank?: string | number | null,
+  accessLevel?: number | null,
 ): boolean {
-  if (!isSovereignOperator(email)) return false;
-  return userType === "developer" || clearanceTier === "sovereign";
+  if (isSovereignOperator(email)) return false;
+  const trust = resolveTrustLevelFromHackerRank(hackerRank);
+  const level = accessLevel ?? 1;
+  return trust >= 2 || level >= 2;
 }
 
 export function isPathAllowedForView(

@@ -115,6 +115,7 @@ export function DashboardShell({
   identityChosen = true,
   canSwitchIdentity = false,
   systemDegraded = false,
+  wideContent = false,
 }: {
   children: React.ReactNode;
   nav: NavItem[];
@@ -133,6 +134,8 @@ export function DashboardShell({
   canSwitchIdentity?: boolean;
   /** Set to true when Railway reports infrastructure degradation. */
   systemDegraded?: boolean;
+  /** Wider content area for admin command center. */
+  wideContent?: boolean;
 }) {
   return (
     <div
@@ -161,7 +164,13 @@ export function DashboardShell({
         className="relative z-10 pt-14"
         style={systemDegraded ? { paddingTop: "calc(56px + 28px)" } : undefined}
       >
-        <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
+        <div
+          className={
+            wideContent
+              ? "mx-auto w-full max-w-[1600px] px-4 py-6 md:px-8 md:py-10"
+              : "mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10"
+          }
+        >
           <EngineStatus />
           <div className="mt-4 rounded-[6px] border-[0.5px] border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl md:p-6">
             {children}

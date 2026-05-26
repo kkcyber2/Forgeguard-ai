@@ -35,6 +35,7 @@ const TIERS: {
   color: string;
   minSteps: number;
 }[] = [
+  { id: "pending", label: "Pending review", color: "#A78BFA", minSteps: 0 },
   { id: "tactical", label: "Tactical", color: "#F59E0B", minSteps: 2 },
   { id: "professional", label: "Professional", color: "#38BDF8", minSteps: 4 },
   { id: "sovereign", label: "Sovereign", color: "#D1FF00", minSteps: 6 },

@@ -6,7 +6,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { engineAuthHeaders } from "@/lib/agathon-config";
+import { engineAuthHeaders, resolveEngineBaseUrl } from "@/lib/agathon-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   if (error)
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  const workerUrl = process.env.AGATHON_WORKER_URL ?? process.env.PYTHON_ENGINE_URL;
+  const workerUrl = resolveEngineBaseUrl();
   const authHeaders = engineAuthHeaders();
   if (workerUrl && authHeaders) {
     fetch(`${workerUrl.replace(/\/$/, "")}/recon/start`, {

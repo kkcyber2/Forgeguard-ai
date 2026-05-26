@@ -20,6 +20,7 @@ export function ActivePath({
   sovereign,
   identityChosen,
   canSwitchIdentity,
+  wideContent,
   children,
 }: {
   nav: NavItem[];
@@ -31,6 +32,7 @@ export function ActivePath({
   sovereign?: SovereignHydratePayload;
   identityChosen?: boolean;
   canSwitchIdentity?: boolean;
+  wideContent?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
@@ -49,6 +51,7 @@ export function ActivePath({
       sovereignRole={sovereign?.activeRole}
       identityChosen={identityChosen ?? true}
       canSwitchIdentity={canSwitchIdentity ?? sovereign?.canSwitch ?? false}
+      wideContent={wideContent ?? scope === "admin"}
     >
       {children}
     </DashboardShell>

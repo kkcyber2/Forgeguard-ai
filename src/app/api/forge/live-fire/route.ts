@@ -19,6 +19,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { normalizeHackerRankLabel } from "@/lib/access/ranks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -185,7 +186,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Accounts already flagged as TRAITOR are blocked from all Live Fire tools
-  if (profile?.hacker_rank === "TRAITOR") {
+  if (normalizeHackerRankLabel(profile?.hacker_rank) === "TRAITOR") {
     return NextResponse.json(
       { ok: false, error: "Account restricted. Contact support.", code: "ACCOUNT_RESTRICTED" },
       { status: 403 },

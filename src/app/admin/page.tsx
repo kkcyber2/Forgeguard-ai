@@ -1,113 +1,105 @@
-import Link from "next/link";
-import {
-  Activity,
-  Cpu,
-  Gift,
-  Globe2,
-  Radar,
-  ShieldAlert,
-  Skull,
-  Users,
-} from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
-import { SectionCard, SectionLink } from "@/components/dashboard/section-card";
-import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
-import { Sparkline } from "@/components/dashboard/sparkline";
-import { SeverityMeter } from "@/components/dashboard/severity-meter";
-import { ThreatsFeed, type ThreatRow } from "@/components/dashboard/threats-feed";
-import { UsersTable, type UserRow } from "@/components/dashboard/users-table";
-import {
-  SystemHealth,
-  type SystemHealthMetrics,
-} from "@/components/dashboard/system-health";
-import { EmptyState } from "@/components/dashboard/empty-state";
-import { LiveWorldMap, type ScanTargetPulse } from "@/components/dashboard/live-world-map";
+import { CommandCenter } from "@/components/admin/command-center";
+import type { AdminOperatorRow } from "@/components/admin/user-directory";
+import type { AdminScanRow } from "@/components/admin/scan-inspector-drawer";
 import { resolveScanTargets, type PopNodeId } from "@/lib/admin/resolve-scan-node";
-import { StatTile } from "@/components/ui/stat-tile";
-import { Badge } from "@/components/ui/badge";
-import { buttonStyles } from "@/components/ui/button";
+import type { ScanTargetPulse } from "@/components/dashboard/live-world-map";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
-import { severityWeight } from "@/lib/utils";
 
-/**
- * /admin — Operations Console.
- * ----------------------------
- * Cross-tenant view. The admin's RLS policies (`is_admin()` SECURITY
- * DEFINER) grant SELECT on every scan and log row, so the
- * request-scoped client is sufficient — we never instantiate the
- * service-role client from a render path.
- *
- * Real data only: if a panel has no rows, it shows an explicit empty
- * state instead of a fabricated number.
- */
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
 export default async function AdminOverviewPage() {
   const supabase = await createServerSupabase();
 
-  // -- Operators ----------------------------------------------------------
-  const { data: profiles, error: profilesErr } = await supabase
-    .from("profiles")
-    .select("id, email, full_name, company_name, role, is_verified, created_at")
-    .order("created_at", { ascending: false })
-    .limit(100) as { data: Database["public"]["Tables"]["profiles"]["Row"][] | null, error: any };
-  if (profilesErr) console.error("[admin] profiles:", profilesErr.message);
+  const [
+    { data: profiles, error: profilesErr },
+    { data: scans, error: scansErr },
+    { data: wallets },
+    { data: activityLogs },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "id, email, full_name, company_name, role, is_verified, created_at, hacker_rank, access_level",
+      )
+      .order("created_at", { ascending: false })
+      .limit(500),
+    supabase
+      .from("scans")
+      .select(
+        "id, user_id, target_model, target_url, status, finding_count, high_severity_count, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase.from("user_wallets").select("user_id, balance_usd"),
+    supabase
+      .from("activity_logs")
+      .select("user_id, ip_address, created_at")
+      .order("created_at", { ascending: false })
+      .limit(2000),
+  ]);
 
-  // -- Scans --------------------------------------------------------------
-  const { data: scans, error: scansErr } = await supabase
-    .from("scans")
-    .select(
-      "id, user_id, target_model, target_url, status, finding_count, high_severity_count, created_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100) as { data: Database["public"]["Tables"]["scans"]["Row"][] | null, error: any };
+  if (profilesErr) console.error("[admin] profiles:", profilesErr.message);
   if (scansErr) console.error("[admin] scans:", scansErr.message);
 
-  // -- Scan logs (last 24h) ----------------------------------------------
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: rawLogs, error: logsErr } = await supabase
-    .from("scan_logs")
-    .select("id, scan_id, type, severity, attack_name, payload, created_at")
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(2000);
-  if (logsErr) console.error("[admin] scan_logs:", logsErr.message);
-
-  // -- Threat rollup ------------------------------------------------------
-  const scanIndex = new Map(
-    (scans ?? []).map((s) => [s.id, { user: s.user_id, target: s.target_url }]),
+  const walletMap = new Map(
+    (wallets ?? []).map((w) => [w.user_id, Number(w.balance_usd ?? 0)]),
   );
-  const threats = rollupThreats((rawLogs ?? []) as Parameters<typeof rollupThreats>[0], scanIndex);
 
-  // -- Users panel --------------------------------------------------------
-  // Supabase returns `role` as the broader `string | null` (the column has a
-  // CHECK constraint but the codegen doesn't reflect literal-union narrowing).
-  // Coerce unknown values to null so UserRow stays strict.
-  const users: UserRow[] = (profiles ?? []).map((p) => ({
-    id: p.id,
-    email: p.email,
-    fullName: p.full_name,
-    company: p.company_name,
-    role: p.role === "admin" || p.role === "client" ? p.role : null,
-    isVerified: p.is_verified,
-    createdAt: p.created_at,
-  }));
+  const ipByUser = new Map<string, string>();
+  for (const log of activityLogs ?? []) {
+    if (log.user_id && log.ip_address && !ipByUser.has(log.user_id)) {
+      ipByUser.set(log.user_id, log.ip_address);
+    }
+  }
 
-  const totalUsers = users.length;
-  const adminUsers = users.filter((u) => u.role === "admin").length;
-  const verifiedUsers = users.filter((u) => u.isVerified).length;
+  const profileById = new Map(
+    (profiles ?? []).map((p) => [p.id, p as ProfileRow & { account_status?: string }]),
+  );
 
-  const totalScans = scans?.length ?? 0;
+  const operators: AdminOperatorRow[] = (profiles ?? []).map((p) => {
+    const row = p as ProfileRow & { account_status?: string };
+    return {
+      id: row.id,
+      email: row.email,
+      fullName: row.full_name,
+      company: row.company_name,
+      role: row.role,
+      hackerRank: row.hacker_rank,
+      accessLevel: row.access_level,
+      accountStatus: row.account_status ?? "active",
+      walletBalance: walletMap.get(row.id) ?? 0,
+      lastIp: ipByUser.get(row.id) ?? null,
+      isVerified: row.is_verified ?? false,
+    };
+  });
+
+  const scanRows: AdminScanRow[] = (scans ?? []).map((s) => {
+    const op = profileById.get(s.user_id);
+    return {
+      id: s.id,
+      user_id: s.user_id,
+      target_url: s.target_url,
+      target_model: s.target_model,
+      status: s.status,
+      finding_count: s.finding_count,
+      created_at: s.created_at,
+      operatorEmail: op?.email,
+      companyName: op?.company_name,
+    };
+  });
+
   const activeScans = (scans ?? []).filter(
     (s) => s.status === "queued" || s.status === "probing",
   ).length;
 
   const scanTargets: ScanTargetPulse[] = (scans ?? [])
     .filter((s) => s.status === "queued" || s.status === "probing")
-    .slice(0, 5)
     .map((s) => ({
       id: s.id,
       target_url: s.target_url,
@@ -116,330 +108,20 @@ export default async function AdminOverviewPage() {
 
   const pulseNodeIds: PopNodeId[] = resolveScanTargets(scanTargets);
 
-  // Severity breakdown across the rolled-up threats.
-  const sevSummary: Record<ThreatRow["severity"], number> = {
-    critical: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-    info: 0,
-  };
-  for (const t of threats) sevSummary[t.severity] += t.count;
-
-  const totalProbes = (rawLogs ?? []).length;
-  const criticalProbes = sevSummary.critical + sevSummary.high;
-
-  // System health — real values pulled from the same DB session pool.
-  // Uptime + queue depth come from the queue/runner table when wired;
-  // for now we honestly derive from `scans` so it isn't fabricated.
-  const queued = (scans ?? []).filter((s) => s.status === "queued").length;
-  const probing = (scans ?? []).filter((s) => s.status === "probing").length;
-  const failed24h = (scans ?? []).filter(
-    (s) => s.status === "failed" && new Date(s.created_at) >= new Date(since),
-  ).length;
-  const sealed24h = (scans ?? []).filter(
-    (s) => s.status === "sealed" && new Date(s.created_at) >= new Date(since),
-  ).length;
-  const runs24h = sealed24h + failed24h;
-  const uptime = runs24h === 0 ? 1 : Math.max(0, 1 - failed24h / runs24h);
-
-  const health: SystemHealthMetrics = {
-    apiLatencyP95Ms: estimateP95Latency(rawLogs ?? []),
-    scanWorkers: { active: probing, total: Math.max(probing, 4) },
-    groqProxy: {
-      status: failed24h > sealed24h ? "degraded" : "healthy",
-      rps: round1((rawLogs ?? []).length / (24 * 60 * 60)),
-      sample: hourlyBuckets(rawLogs ?? [], 12),
-    },
-    queueDepth: queued,
-    uptime24h: uptime,
-  };
-
   return (
     <>
       <PageHeader
         eyebrow="Admin"
-        title="Operations console"
-        description="Cross-tenant view of the threat surface, the operator base, and the platform itself."
-        actions={
-          <>
-            <Link
-              href="/admin/threats"
-              className={buttonStyles({ variant: "secondary", size: "sm" })}
-            >
-              <ShieldAlert size={14} strokeWidth={1.5} />
-              Threat board
-            </Link>
-            <Link
-              href="/admin/system"
-              className={buttonStyles({ variant: "primary", size: "sm" })}
-            >
-              <Cpu size={14} strokeWidth={1.5} />
-              System health
-            </Link>
-          </>
-        }
+        title="Unified command center"
+        description="Live threat surface, operator directory, and sovereign power tools."
       />
-
-      {/* KPI strip */}
-      <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StaggerItem>
-          <StatTile
-            label="Operators"
-            value={totalUsers}
-            tone="admin"
-            icon={Users}
-            footer={
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                {verifiedUsers} verified · {adminUsers} admin
-              </span>
-            }
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatTile
-            label="Scans (all-time)"
-            value={totalScans}
-            tone="neutral"
-            icon={Globe2}
-            footer={
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                {activeScans} active now
-              </span>
-            }
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatTile
-            label="Probes / 24h"
-            value={totalProbes}
-            tone="secure"
-            icon={Activity}
-            footer={
-              <Sparkline
-                data={hourlyBuckets(rawLogs ?? [], 12)}
-                stroke="acid"
-              />
-            }
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatTile
-            label="Critical incidents"
-            value={criticalProbes}
-            tone="threat"
-            icon={Skull}
-            footer={
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                {sevSummary.critical} critical · {sevSummary.high} high
-              </span>
-            }
-          />
-        </StaggerItem>
-      </Stagger>
-
-      {/* Live scan surface map */}
-      <div className="mt-6">
-        <SectionCard
-          eyebrow="Surface"
-          title="Global scan activity"
-          description="Live PoP nodes light up as findings are emitted. Pulses are seeded from active scan locations."
-          density="flush"
-        >
-          <LiveWorldMap
-            activeScans={activeScans}
-            scanTargets={scanTargets}
-            pulseNodeIds={pulseNodeIds}
-          />
-        </SectionCard>
-      </div>
-
-      {/* Body grid */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <SectionCard
-          className="lg:col-span-2"
-          eyebrow="Global"
-          title="Threat board"
-          description="Aggregated probes across every operator. Sorted by recency, weighted by severity."
-          action={<SectionLink href="/admin/threats">Open board</SectionLink>}
-          density="flush"
-        >
-          {threats.length === 0 ? (
-            <EmptyState
-              icon={Radar}
-              title="No probe events in window"
-              description="Once operators start scans, every finding rolls up here in real time."
-            />
-          ) : (
-            <>
-              <div className="border-b-[0.5px] border-white/[0.05] px-5 pb-3 pt-2">
-                <SeverityMeter counts={sevSummary} showLegend />
-              </div>
-              <ThreatsFeed rows={threats.slice(0, 8)} />
-            </>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          eyebrow="Platform"
-          title="System health"
-          description="Edge → Proxy → Workers."
-          action={<SectionLink href="/admin/system">Diagnostics</SectionLink>}
-        >
-          <SystemHealth m={health} />
-          <div className="mt-4 flex items-center gap-2 border-t-[0.5px] border-white/[0.05] pt-3">
-            <Badge tone={health.groqProxy.status === "healthy" ? "secure" : "warn"}>
-              {health.groqProxy.status === "healthy" ? "Healthy" : "Degraded"}
-            </Badge>
-            <span className="text-xs text-foreground-subtle">
-              {sealed24h} sealed · {failed24h} failed in last 24h
-            </span>
-          </div>
-        </SectionCard>
-      </div>
-
-      {/* User management + Promotions */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <SectionCard
-          className="lg:col-span-2"
-          eyebrow="Identity"
-          title="User management"
-          description="Active operators on this tenant. Click an action to mutate role / status."
-          action={<SectionLink href="/admin/users">Full directory</SectionLink>}
-          density="flush"
-        >
-          {users.length === 0 ? (
-            <EmptyState
-              icon={Users}
-              title="No operators yet"
-              description="Once users sign up, they'll appear here. Promote to admin from the row actions."
-            />
-          ) : (
-            <UsersTable rows={users.slice(0, 8)} />
-          )}
-        </SectionCard>
-
-        <SectionCard
-          eyebrow="Growth"
-          title="Promotions"
-          description="Promo codes and plan access grants."
-          action={<SectionLink href="/admin/promotions">Manage codes</SectionLink>}
-        >
-          <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
-            <Gift size={24} className="text-acid/40" />
-            <p className="text-xs text-foreground-muted">
-              Create single-use or multi-use codes that grant instant plan access.
-            </p>
-            <Link
-              href="/admin/promotions"
-              className="mt-2 inline-flex items-center gap-1.5 rounded-sm border border-acid/40 bg-acid/10 px-3 py-1.5 font-mono text-[10px] text-acid transition-colors hover:bg-acid/20"
-            >
-              <Gift size={10} />
-              Open promotions
-            </Link>
-          </div>
-        </SectionCard>
-      </div>
+      <CommandCenter
+        activeScans={activeScans}
+        scanTargets={scanTargets}
+        pulseNodeIds={pulseNodeIds}
+        operators={operators}
+        scans={scanRows}
+      />
     </>
   );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
-/* -------------------------------------------------------------------------- */
-
-function rollupThreats(
-  rows: Array<{
-    id: number;
-    scan_id: string;
-    type: "progress" | "finding" | "attempt" | "audit" | "error" | "info";
-    severity: "info" | "low" | "medium" | "high" | "critical";
-    attack_name: string | null;
-    payload: unknown;
-    created_at: string;
-  }>,
-  scanIndex: Map<string, { user: string; target: string }>,
-): ThreatRow[] {
-  const findings = rows.filter((r) => r.type === "finding");
-  const groups = new Map<string, ThreatRow>();
-
-  for (const r of findings) {
-    const meta = scanIndex.get(r.scan_id);
-    const surface = meta?.target ? prettyHost(meta.target) : `scan-${r.scan_id.slice(0, 8)}`;
-    const origin = meta?.user ? `op:${meta.user.slice(0, 8)}` : "unknown";
-    const technique = r.attack_name ?? extractTechnique(r.payload) ?? "unknown";
-
-    const key = `${technique}|${surface}|${r.severity}`;
-    const existing = groups.get(key);
-    if (existing) {
-      existing.count += 1;
-      if (new Date(r.created_at) > new Date(existing.at)) existing.at = r.created_at;
-    } else {
-      groups.set(key, {
-        id: String(r.id),
-        technique,
-        surface,
-        origin,
-        severity: r.severity,
-        count: 1,
-        at: r.created_at,
-      });
-    }
-  }
-
-  return Array.from(groups.values()).sort((a, b) => {
-    const w = severityWeight(b.severity) - severityWeight(a.severity);
-    if (w !== 0) return w;
-    return new Date(b.at).getTime() - new Date(a.at).getTime();
-  });
-}
-
-function extractTechnique(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") return null;
-  const r = payload as Record<string, unknown>;
-  if (typeof r.attack === "string") return r.attack;
-  if (typeof r.probe === "string") return r.probe;
-  if (typeof r.technique === "string") return r.technique;
-  return null;
-}
-
-function prettyHost(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url.slice(0, 36);
-  }
-}
-
-function hourlyBuckets(
-  rows: Array<{ created_at: string }>,
-  hours: number,
-): number[] {
-  const buckets = new Array(hours).fill(0) as number[];
-  const now = Date.now();
-  for (const r of rows) {
-    const idx = Math.floor((now - new Date(r.created_at).getTime()) / (60 * 60 * 1000));
-    if (idx >= 0 && idx < hours) buckets[hours - 1 - idx] += 1;
-  }
-  return buckets;
-}
-
-function estimateP95Latency(
-  rows: Array<{ payload: unknown; type: string }>,
-): number {
-  const samples: number[] = [];
-  for (const r of rows) {
-    if (r.type !== "attempt" && r.type !== "audit") continue;
-    if (!r.payload || typeof r.payload !== "object") continue;
-    const v = (r.payload as Record<string, unknown>).latency_ms;
-    if (typeof v === "number" && v >= 0) samples.push(v);
-  }
-  if (samples.length === 0) return 0;
-  samples.sort((a, b) => a - b);
-  const idx = Math.floor(0.95 * (samples.length - 1));
-  return Math.round(samples[idx]);
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
 }

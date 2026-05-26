@@ -80,8 +80,10 @@ export function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) + "…" : text;
 }
 
-export function getInitials(name: string): string {
-  return name
+export function getInitials(name: string | null | undefined): string {
+  const safe = String(name ?? "Operator").trim();
+  if (!safe) return "OP";
+  return safe
     .split(/\s+/)
     .map((p) => p[0])
     .filter(Boolean)

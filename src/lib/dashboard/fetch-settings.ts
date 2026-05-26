@@ -18,7 +18,7 @@ export interface SettingsPageData {
   hasSignature: boolean;
   identityProofed: boolean;
   identityVerified: boolean;
-  clearanceTier: "tactical" | "professional" | "sovereign";
+  clearanceTier: "pending" | "tactical" | "professional" | "sovereign";
   auditScore: number | null;
   sovereignPending: boolean;
   docPath: string | null;
@@ -93,7 +93,9 @@ export async function fetchSettingsPageData(
     const emailVerified = !!user.email_confirmed_at;
     const clearanceRaw = profile?.clearance_tier ?? "tactical";
     const clearanceTier =
-      clearanceRaw === "professional" || clearanceRaw === "sovereign"
+      clearanceRaw === "professional" ||
+      clearanceRaw === "sovereign" ||
+      clearanceRaw === "pending"
         ? clearanceRaw
         : "tactical";
 

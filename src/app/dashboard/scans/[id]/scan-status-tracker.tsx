@@ -60,29 +60,29 @@ export function ScanStatusTracker({
       ? crypto.randomUUID()
       : `sess-${Date.now()}`,
   );
+  const channelRef = React.useRef<ReturnType<
+    ReturnType<typeof createClient>["channel"]
+  > | null>(null);
 
   React.useEffect(() => {
     const supabase = createClient();
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
-    // ── 1. Immediate poll on mount ──────────────────────────────────────────
-    // Catches any updates that happened before the WS connected (e.g. a scan
-    // that completed while the browser tab was closed or the WS was dropped).
     supabase
       .from("scans")
       .select("status, progress_pct")
       .eq("id", scanId)
       .single()
       .then(({ data }) => {
-        if (!data) return;
+        if (!data || cancelled) return;
         if (isScanStatus(data.status)) setStatus(data.status);
         setProgress(data.progress_pct ?? 0);
       });
 
-    // ── 2. Real-time subscription to scans UPDATE events ───────────────────
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
     const subscribe = () => {
-      const channelName = `scan_row:${scanId}:${sessionIdRef.current}`;
+      if (cancelled) return null;
+      const channelName = `status:${scanId}:${sessionIdRef.current}`;
       const channel = supabase
         .channel(channelName)
         .on(
@@ -103,18 +103,26 @@ export function ScanStatusTracker({
           },
         )
         .subscribe((st) => {
-          if (st === "CHANNEL_ERROR") {
+          if (st === "CHANNEL_ERROR" && !cancelled) {
             void supabase.removeChannel(channel);
+            channelRef.current = null;
             retryTimer = setTimeout(subscribe, 3000);
           }
         });
+      channelRef.current = channel;
       return channel;
     };
 
-    const channel = subscribe();
+    subscribe();
+
     return () => {
+      cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
-      void supabase.removeChannel(channel);
+      const ch = channelRef.current;
+      channelRef.current = null;
+      if (ch) {
+        void supabase.removeChannel(ch);
+      }
     };
   }, [scanId]);
 

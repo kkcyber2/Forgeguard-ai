@@ -169,7 +169,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
         surface_kind: scan.surface_kind ?? "llm",
         api_key: apiKey,
         ownership_verified: sovereign,
-        target_provider: /groq\.com/i.test(normalizedUrl) ? "groq" : "",
+        target_provider: inferTargetProvider(normalizedUrl),
       }),
       // Don't hold the connection open — Railway acknowledges fast.
       signal: AbortSignal.timeout(15_000),
@@ -223,6 +223,14 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
 /* -------------------------------------------------------------------------- */
 /* URL normalization                                                          */
 /* -------------------------------------------------------------------------- */
+
+function inferTargetProvider(normalizedUrl: string): string {
+  const u = normalizedUrl.toLowerCase();
+  if (u.includes("groq.com")) return "groq";
+  if (u.includes("openai.com") || u.includes("api.openai")) return "openai";
+  if (u.includes("anthropic.com")) return "anthropic";
+  return "openai_compat";
+}
 
 function normalizeTargetUrl(raw: string): string {
   let url = raw.trim();

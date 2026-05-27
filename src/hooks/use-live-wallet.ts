@@ -22,7 +22,8 @@ function acquireWalletChannel(
   userId: string,
   onChange: () => void,
 ): WalletChannelEntry {
-  const existing = walletChannels.get(userId);
+  const mapKey = userId;
+  const existing = walletChannels.get(mapKey);
   if (existing) {
     existing.refCount += 1;
     return existing;
@@ -49,7 +50,7 @@ function acquireWalletChannel(
     });
 
   const entry: WalletChannelEntry = { channel, refCount: 1 };
-  walletChannels.set(userId, entry);
+  walletChannels.set(mapKey, entry);
   return entry;
 }
 
@@ -57,12 +58,13 @@ function releaseWalletChannel(
   supabase: ReturnType<typeof createClient>,
   userId: string,
 ): void {
-  const entry = walletChannels.get(userId);
+  const mapKey = userId;
+  const entry = walletChannels.get(mapKey);
   if (!entry) return;
   entry.refCount -= 1;
   if (entry.refCount <= 0) {
     void supabase.removeChannel(entry.channel);
-    walletChannels.delete(userId);
+    walletChannels.delete(mapKey);
   }
 }
 

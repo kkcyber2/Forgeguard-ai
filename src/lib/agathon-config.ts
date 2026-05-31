@@ -3,7 +3,8 @@
  * Prefer PYTHON_ENGINE_URL / INTERNAL_SCAN_TOKEN; fall back to legacy names.
  *
  * Engine repo: https://github.com/valosd453-bit/AI-red-team
- * HF Spaces: Docker SDK, port 7860. Railway: uses platform $PORT.
+ * HF Spaces: Docker SDK, port 7860. Railway bunker: uses platform $PORT.
+ * Vercel: set PYTHON_ENGINE_URL to your Railway public URL (no trailing slash).
  */
 
 export function resolveEngineBaseUrl(): string | undefined {

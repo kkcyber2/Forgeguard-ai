@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { Badge } from "@/components/ui/badge";
+import { subscribeEngineHealth } from "@/services/engine-health.service";
 
 const columns: Array<{ title: string; items: { label: string; href: string }[] }> = [
   {
@@ -30,47 +31,28 @@ const columns: Array<{ title: string; items: { label: string; href: string }[] }
       { label: "About", href: "/about" },
       { label: "Careers", href: "/careers" },
       { label: "Contact", href: "/contact" },
-      { label: "Legal", href: "/legal/terms" },
+      { label: "Legal", href: "/terms" },
     ],
   },
 ];
 
-/* ── Footer status badge — polls /api/health/engine every 30 s ─────────── */
+/* ── Footer status — shared engine health subscriber ───────────────────── */
 function FooterStatus() {
   const [lockdown, setLockdown] = React.useState(false);
 
-  React.useEffect(() => {
-    let cancelled = false;
-
-    async function probe() {
-      try {
-        const res = await fetch("/api/health/engine", { cache: "no-store" });
-        if (cancelled) return;
-        if (!res.ok) {
-          // 503 → lockdown
-          setLockdown(true);
-          return;
-        }
-        const data = await res.json();
-        setLockdown(data.status === "lockdown");
-      } catch {
-        if (!cancelled) setLockdown(true);
-      }
-    }
-
-    probe();
-    const id = setInterval(probe, 30_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
+  React.useEffect(
+    () =>
+      subscribeEngineHealth((h) => {
+        setLockdown(!h.ok && h.status !== "unconfigured");
+      }),
+    [],
+  );
 
   if (lockdown) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-sm border border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.06)] px-2.5 py-1 font-mono text-xs text-[rgb(239,68,68)]">
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[rgb(239,68,68)]" />
-        Status · engine lockdown
+        Status · bunker offline
       </span>
     );
   }
@@ -123,9 +105,9 @@ export function MarketingFooter() {
             © {new Date().getFullYear()} ForgeGuard AI · All attacks reserved
           </p>
           <div className="flex items-center gap-4 text-xs text-foreground-subtle">
-            <Link href="/legal/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <span>·</span>
-            <Link href="/legal/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
             <span>·</span>
             <Link href="/contact" className="hover:text-foreground">Disclosure</Link>
           </div>

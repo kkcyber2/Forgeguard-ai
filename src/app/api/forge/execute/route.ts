@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
         send({
           type: "info",
           message:
-            "Set AGATHON_ORCHESTRATOR_URL to route to the Railway Python engine.",
+            "Set PYTHON_ENGINE_URL to route to the Railway bunker (Agathon engine).",
         });
         send({ type: "stdout", line: "" });
 

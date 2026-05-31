@@ -1,5 +1,10 @@
 import * as React from "react";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 import { redirect } from "next/navigation";
 import { ActivePath } from "@/components/dashboard/active-path";
 import { ShellDegradedBanner } from "@/components/dashboard/shell-degraded-banner";

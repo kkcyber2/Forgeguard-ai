@@ -44,6 +44,13 @@ const nextConfig = {
     return config;
   },
 
+  async redirects() {
+    return [
+      { source: "/legal/privacy", destination: "/privacy", permanent: true },
+      { source: "/legal/terms", destination: "/terms", permanent: true },
+    ];
+  },
+
   async headers() {
     const hardwarePolicy =
       "camera=(self), microphone=(self), geolocation=(self)";

@@ -1430,8 +1430,11 @@ export type Database = {
           company_name: string | null
           company_tag: string | null
           company_domain: string | null
+          cookie_consent_at: string | null
+          cookie_consent_version: string | null
           created_at: string | null
           current_plan: string
+          deletion_requested_at: string | null
           domain_token: string | null
           domain_verified: boolean | null
           email: string
@@ -1478,8 +1481,11 @@ export type Database = {
           company_name?: string | null
           company_tag?: string | null
           company_domain?: string | null
+          cookie_consent_at?: string | null
+          cookie_consent_version?: string | null
           created_at?: string | null
           current_plan?: string
+          deletion_requested_at?: string | null
           domain_token?: string | null
           domain_verified?: boolean | null
           email: string
@@ -1526,8 +1532,11 @@ export type Database = {
           company_name?: string | null
           company_tag?: string | null
           company_domain?: string | null
+          cookie_consent_at?: string | null
+          cookie_consent_version?: string | null
           created_at?: string | null
           current_plan?: string
+          deletion_requested_at?: string | null
           domain_token?: string | null
           domain_verified?: boolean | null
           email?: string

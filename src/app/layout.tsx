@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { assertPublicEnv } from "@/lib/env";
+import { CookieConsentGate } from "@/components/legal/cookie-consent-gate";
 import "./globals.css";
 
 /**
@@ -45,14 +46,12 @@ export const metadata: Metadata = {
     description:
       "Continuous red-teaming and runtime guardrails for production LLM deployments.",
     url: "https://www.forgeguard-ai.com",
-    images: ["/og.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: "ForgeGuard AI | #1 Adversarial Intelligence Platform",
     description:
       "Adversarial red-teaming and runtime guardrails for production LLM deployments.",
-    images: ["/og.png"],
   },
   robots: {
     index: true,
@@ -88,6 +87,7 @@ export default function RootLayout({
           }}
         />
         <div className="relative z-10">{children}</div>
+        <CookieConsentGate />
       </body>
     </html>
   );

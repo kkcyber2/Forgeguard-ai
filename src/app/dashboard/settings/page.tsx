@@ -20,6 +20,7 @@ import { IdentityAuditor } from "@/components/settings/identity-auditor";
 import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
 import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { DeleteAccountButton } from "@/components/settings/delete-account-button";
 
 /**
  * /dashboard/settings — operator profile management.
@@ -196,6 +197,9 @@ export default async function SettingsPage() {
                 Sign out
               </button>
             </form>
+            <DeleteAccountButton
+              deletionRequestedAt={data.profile?.deletion_requested_at ?? null}
+            />
           </div>
         </aside>
       </div>

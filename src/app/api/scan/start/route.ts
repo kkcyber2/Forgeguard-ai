@@ -7,6 +7,10 @@ import {
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { runScan } from "@/lib/runner/runner";
+import {
+  getEngineHealthSnapshot,
+  isEngineLockdown,
+} from "@/lib/engine/probe-engine-health";
 
 /**
  * POST /api/scan/start
@@ -148,6 +152,18 @@ export async function POST(req: NextRequest) {
   // server-side on Railway: we just decrypt the credential, validate env,
   // transition the scan to "probing", and POST to /scan/start which
   // Railway acknowledges in <500ms before running the scan asynchronously.
+  const health = await getEngineHealthSnapshot();
+  if (isEngineLockdown(health)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: health.reason ?? "Engine bunker unreachable",
+        code: "ENGINE_LOCKDOWN",
+      },
+      { status: 503 },
+    );
+  }
+
   const engineUrl = resolveEngineBaseUrl();
   const engineToken = resolveEngineAuthToken();
   if (!engineUrl) {

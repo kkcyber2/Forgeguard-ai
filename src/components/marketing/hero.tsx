@@ -339,10 +339,7 @@ export function HeroSection({
           </Badge>
         </motion.div>
 
-        <motion.h1
-          variants={ITEM}
-          className="font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-5xl md:text-6xl"
-        >
+        <h1 className="font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-5xl md:text-6xl">
           Offensive security.{" "}
           <span
             className="text-transparent"
@@ -352,15 +349,12 @@ export function HeroSection({
           >
             Surgical precision.
           </span>
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          variants={ITEM}
-          className="max-w-lg text-base leading-relaxed text-white/40"
-        >
+        <p className="max-w-lg text-base leading-relaxed text-white/40">
           AI-powered red teaming, vulnerability scoring, and adversarial
           automation — built for operators who move faster than threats.
-        </motion.p>
+        </p>
 
         <motion.div variants={ITEM} className="flex flex-wrap items-center gap-3">
           <Link

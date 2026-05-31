@@ -1,10 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { geoMercator, geoPath } from "d3-geo";
-import { feature } from "topojson-client";
-import type { FeatureCollection, Geometry } from "geojson";
-import type { Topology } from "topojson-specification";
+import { geoMercator } from "d3-geo";
 import { createBrowserClient } from "@supabase/ssr";
 import type { PopNodeId } from "@/lib/admin/resolve-scan-node";
 import {
@@ -12,31 +9,40 @@ import {
   resolveScanGeo,
   resolveScanNode,
 } from "@/lib/admin/resolve-scan-node";
-import type { LiveWorldMapProps } from "@/components/dashboard/live-world-map";
+import worldMapData from "@/lib/geo/world-map-paths.json";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const countries110m = require("world-atlas/countries-110m.json") as Topology;
-
-const WIDTH = 960;
-const HEIGHT = 480;
+const WIDTH = worldMapData.width;
+const HEIGHT = worldMapData.height;
+const LAND_PATHS = worldMapData.paths as string[];
+const PROJ_META = worldMapData.projection as {
+  translate: [number, number];
+  scale: number;
+  center: [number, number];
+};
 const SCAN_COLOR = "#ADFF2F";
 const ATTACK_COLOR = "#A020F0";
 
-type Ping = { x: number; y: number; kind: "scan" | "attack"; id: string };
-
-function loadLandFeatures(): {
-  paths: string[];
-  projection: ReturnType<typeof geoMercator>;
-} {
-  const land = feature(
-    countries110m,
-    countries110m.objects.countries as Parameters<typeof feature>[1],
-  ) as unknown as FeatureCollection<Geometry>;
-  const projection = geoMercator().fitSize([WIDTH, HEIGHT], land);
-  const pathGen = geoPath(projection);
-  const paths = land.features.map((f) => pathGen(f) ?? "").filter(Boolean);
-  return { paths, projection };
+function buildProjection() {
+  return geoMercator()
+    .translate(PROJ_META.translate)
+    .scale(PROJ_META.scale)
+    .center(PROJ_META.center);
 }
+
+export interface ScanTargetPulse {
+  id: string;
+  target_url: string;
+}
+
+export interface LiveWorldMapProps {
+  activeScans: number;
+  scanTargets?: ScanTargetPulse[];
+  pulseNodeIds?: readonly PopNodeId[];
+  dense?: boolean;
+  attackPulses?: boolean;
+}
+
+type Ping = { x: number; y: number; kind: "scan" | "attack"; id: string };
 
 export function TacticalWorldMap({
   activeScans,
@@ -45,10 +51,10 @@ export function TacticalWorldMap({
   dense = false,
   attackPulses = false,
 }: LiveWorldMapProps) {
-  const [landPaths, setLandPaths] = React.useState<string[]>([]);
   const [scanPings, setScanPings] = React.useState<Ping[]>([]);
   const [attackPings, setAttackPings] = React.useState<Ping[]>([]);
-  const projectionRef = React.useRef<ReturnType<typeof geoMercator> | null>(null);
+  const [visible, setVisible] = React.useState(false);
+  const rootRef = React.useRef<HTMLDivElement>(null);
   const sessionIdRef = React.useRef(
     typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
@@ -56,13 +62,18 @@ export function TacticalWorldMap({
   );
 
   React.useEffect(() => {
-    const { paths, projection } = loadLandFeatures();
-    setLandPaths(paths);
-    projectionRef.current = projection;
+    const el = rootRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setVisible(entry?.isIntersecting ?? false),
+      { rootMargin: "80px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
   }, []);
 
   React.useEffect(() => {
-    const proj = projectionRef.current ?? loadLandFeatures().projection;
+    const proj = buildProjection();
     const pings: Ping[] = [];
 
     if (pulseNodeIds && pulseNodeIds.length > 0) {
@@ -90,13 +101,15 @@ export function TacticalWorldMap({
   }, [activeScans, scanTargets, pulseNodeIds]);
 
   React.useEffect(() => {
+    if (!visible) return;
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) return;
 
     let mounted = true;
     const supabase = createBrowserClient(url, key);
-    const proj = projectionRef.current ?? loadLandFeatures().projection;
+    const proj = buildProjection();
 
     const channel = supabase
       .channel(`tactical-map:events:${sessionIdRef.current}`)
@@ -144,12 +157,13 @@ export function TacticalWorldMap({
       mounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [attackPulses]);
+  }, [attackPulses, visible]);
 
   const heightClass = dense ? "h-[360px]" : "h-[220px]";
 
   return (
     <div
+      ref={rootRef}
       className={`relative w-full overflow-hidden rounded-xs bg-[#050505] ${heightClass}`}
     >
       <svg
@@ -160,7 +174,7 @@ export function TacticalWorldMap({
         aria-label="Tactical world map"
       >
         <rect width={WIDTH} height={HEIGHT} fill="#050505" />
-        {landPaths.map((d, i) => (
+        {LAND_PATHS.map((d, i) => (
           <path
             key={i}
             d={d}

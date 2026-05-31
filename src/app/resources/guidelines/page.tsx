@@ -162,7 +162,7 @@ export default async function GuidelinesPage() {
               These techniques are documented for defensive security research only.
               Use them exclusively against systems you own or have explicit written
               authorization to test. Unauthorized use violates our{" "}
-              <a href="/legal/terms" className="text-amber-400 hover:underline">
+              <a href="/terms" className="text-amber-400 hover:underline">
                 Terms of Service
               </a>{" "}
               and applicable law.

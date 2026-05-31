@@ -5,7 +5,7 @@ import type { PendingBazaarScript } from "@/components/admin/bazaar-triage-panel
 import type { BountyEscrowRow } from "@/components/admin/mission-control-panel";
 import type { VerificationQueueRow } from "@/app/admin/verification/verification-row";
 import { resolveScanTargets, type PopNodeId } from "@/lib/admin/resolve-scan-node";
-import type { ScanTargetPulse } from "@/components/dashboard/live-world-map";
+import type { ScanTargetPulse } from "@/components/dashboard/tactical-world-map";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { Database } from "@/types/supabase";

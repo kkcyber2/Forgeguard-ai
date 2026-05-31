@@ -7,7 +7,7 @@ import { Guardrails } from "@/components/marketing/guardrails";
 import { PricingSection } from "@/components/marketing/pricing";
 import { CtaBanner } from "@/components/marketing/cta";
 import { MarketingFooter } from "@/components/marketing/footer";
-import { getSessionUser, getCurrentProfile } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/server";
 
 /**
  * Landing page. Server Component.
@@ -20,12 +20,7 @@ export default async function HomePage() {
   const user = await getSessionUser();
   const isAuthenticated = !!user;
 
-  // Admins land on /admin; everyone else on /dashboard.
-  let destination = "/dashboard";
-  if (isAuthenticated) {
-    const profile = await getCurrentProfile();
-    if (profile?.role === "admin") destination = "/admin";
-  }
+  const destination = "/dashboard";
 
   const primaryCta = isAuthenticated
     ? { href: "/dashboard", label: "Enter Command Center" }

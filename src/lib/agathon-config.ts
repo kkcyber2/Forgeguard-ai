@@ -1,6 +1,9 @@
 /**
- * Vercel ↔ Railway env alignment.
+ * Vercel ↔ engine env alignment (Railway or Hugging Face Space).
  * Prefer PYTHON_ENGINE_URL / INTERNAL_SCAN_TOKEN; fall back to legacy names.
+ *
+ * Engine repo: https://github.com/valosd453-bit/AI-red-team
+ * HF Spaces: Docker SDK, port 7860. Railway: uses platform $PORT.
  */
 
 export function resolveEngineBaseUrl(): string | undefined {

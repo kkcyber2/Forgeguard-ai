@@ -7,6 +7,11 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isSovereignOperator, maskOperatorEmail } from "@/lib/access/sovereign-operator";
+import {
+  AEGIS_TRAP_SCRIPT,
+  isScraperRequest,
+  logBlacklistedEntity,
+} from "@/lib/defense/scraper-detect";
 
 interface RateLimitEntry {
   count: number;
@@ -258,8 +263,58 @@ async function enforceAdminSovereignGate(
   return null;
 }
 
+/**
+ * Sovereign operators skip the scraper trap (KK / allowlisted emails).
+ */
+async function isSovereignSession(request: NextRequest): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return false;
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll() {},
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return isSovereignOperator(user?.email);
+}
+
+/**
+ * Serve CPU trap script to detected scrapers; log IP to blacklisted_entities.
+ */
+async function scraperTrapResponse(
+  request: NextRequest,
+): Promise<NextResponse | null> {
+  if (request.nextUrl.pathname.startsWith("/api/")) return null;
+  if (request.nextUrl.pathname.startsWith("/_next/")) return null;
+  if (request.nextUrl.pathname === "/aegis-trap.js") return null;
+
+  if (!(await isSovereignSession(request)) && isScraperRequest(request)) {
+    logBlacklistedEntity(request, "scraper_trap_poisoned_js");
+    return new NextResponse(AEGIS_TRAP_SCRIPT, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Aegis-Trap": "active",
+      },
+    });
+  }
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const trap = await scraperTrapResponse(request);
+  if (trap) return trap;
 
   if (pathname.startsWith("/dashboard/") && !isKnownDashboardRoute(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));

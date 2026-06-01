@@ -56,9 +56,19 @@ export const useSovereignStore = create<SovereignState>((set, get) => ({
   setGhostMode: (active) => set({ isGhostMode: active }),
 }));
 
+/** True after SovereignProvider has hydrated client persona state. */
+export function useSovereignHydrated(): boolean {
+  return useSovereignStore((s) => s.hydrated);
+}
+
 export function useSovereignAccent() {
+  const hydrated = useSovereignStore((s) => s.hydrated);
   const activeRole = useSovereignStore((s) => s.activeRole);
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
+
+  if (!hydrated) {
+    return SOVEREIGN_ACCENTS.hacker;
+  }
 
   if (activeRole === "hacker" && isGhostMode) {
     return GHOST_MODE_ACCENT;
@@ -68,11 +78,17 @@ export function useSovereignAccent() {
 }
 
 export function useDashboardViewMode() {
+  const hydrated = useSovereignStore((s) => s.hydrated);
   const activeRole = useSovereignStore((s) => s.activeRole);
+  if (!hydrated) return "hacker";
   return activeRole === "client" ? "client" : "hacker";
 }
 
 export function useHackerPersonaAccent() {
+  const hydrated = useSovereignStore((s) => s.hydrated);
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
+  if (!hydrated) {
+    return SOVEREIGN_ACCENTS.hacker.primary;
+  }
   return isGhostMode ? GHOST_MODE_ACCENT.primary : SOVEREIGN_ACCENTS.hacker.primary;
 }

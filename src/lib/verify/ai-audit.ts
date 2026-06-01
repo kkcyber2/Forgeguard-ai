@@ -306,7 +306,12 @@ Respond ONLY with valid JSON:
     });
 
     if (!response.ok) {
-      console.error("[verify:ai-audit] vision HTTP", response.status);
+      const bodySnippet = (await response.text().catch(() => "")).slice(0, 500);
+      console.error(
+        "[verify:ai-audit] Vision HTTP",
+        response.status,
+        bodySnippet || "<empty body>",
+      );
       return {
         documentText:
           `[IMAGE] profile=${profileFullName}. Vision HTTP ${response.status} — fallback metadata.`,
@@ -452,7 +457,15 @@ export async function runIdentityAudit(
       signal: AbortSignal.timeout(60_000),
     });
 
-    if (!response.ok) return heuristicIdentityAudit(input);
+    if (!response.ok) {
+      const bodySnippet = (await response.text().catch(() => "")).slice(0, 500);
+      console.error(
+        "[verify:ai-audit] DeepSeek-R1 HTTP",
+        response.status,
+        bodySnippet || "<empty body>",
+      );
+      return heuristicIdentityAudit(input);
+    }
 
     const completion = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
@@ -502,7 +515,9 @@ export async function runIdentityAudit(
           : "DeepSeek-R1 identity audit complete."),
       mode: "deepseek-r1",
     };
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[verify:ai-audit] DeepSeek-R1 request failed:", msg);
     return heuristicIdentityAudit(input);
   }
 }

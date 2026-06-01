@@ -2,6 +2,7 @@
 export {
   useSovereignStore,
   useSovereignAccent,
+  useSovereignHydrated,
   useDashboardViewMode,
   useHackerPersonaAccent,
   type SovereignHydratePayload,

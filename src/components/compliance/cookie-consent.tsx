@@ -34,19 +34,19 @@ export function CookieConsent({ initialConsented = false }: CookieConsentProps) 
     }
   }, [initialConsented]);
 
-  if (!mounted) {
-    if (initialConsented) return null;
-  } else if (hasAccepted) {
-    return null;
+  if (hasAccepted) return null;
+  if (!mounted && initialConsented) return null;
+
+  function dismissOptimistic() {
+    setHasAccepted(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LS_KEY, COOKIE_CONSENT_VERSION);
+    }
   }
 
-  async function accept() {
-    setHasAccepted(true);
+  async function persistConsent() {
     setPending(true);
     try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(LS_KEY, COOKIE_CONSENT_VERSION);
-      }
       const res = await fetch("/api/compliance/cookie-consent", {
         method: "POST",
         credentials: "include",
@@ -59,6 +59,11 @@ export function CookieConsent({ initialConsented = false }: CookieConsentProps) 
     } finally {
       setPending(false);
     }
+  }
+
+  function handleAccept() {
+    dismissOptimistic();
+    void persistConsent();
   }
 
   return (
@@ -79,7 +84,7 @@ export function CookieConsent({ initialConsented = false }: CookieConsentProps) 
         <button
           type="button"
           disabled={pending}
-          onClick={() => void accept()}
+          onClick={handleAccept}
           className="shrink-0 rounded-sm border border-acid/40 bg-acid/10 px-5 py-2 font-mono text-xs uppercase tracking-[0.14em] text-acid transition-colors hover:bg-acid/20 disabled:opacity-50"
         >
           {pending ? "Saving…" : "Accept essential cookies"}

@@ -11,7 +11,11 @@ import {
   type SovereignRole,
 } from "@/lib/access/parallel-sovereignty";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
-import { useSovereignStore, useHackerPersonaAccent } from "@/stores/use-sovereign-store";
+import {
+  useSovereignStore,
+  useSovereignHydrated,
+  useHackerPersonaAccent,
+} from "@/stores/use-sovereign-store";
 
 const PERSONA_MODES: Array<{
   role: SovereignRole;
@@ -39,6 +43,7 @@ export function IdentitySwitcher({
   compact?: boolean;
 }) {
   const router = useRouter();
+  const hydrated = useSovereignHydrated();
   const storeRole = useSovereignStore((s) => s.activeRole);
   const canDev = useSovereignStore((s) => s.canDev);
   const canSwitchStore = useSovereignStore((s) => s.canSwitch);
@@ -47,7 +52,9 @@ export function IdentitySwitcher({
   const hackerAccent = useHackerPersonaAccent();
 
   const isSovereign = isSovereignOperator(operatorEmail);
-  const activeMode = activeModeProp ?? storeRole;
+  const activeMode =
+    activeModeProp ?? (hydrated ? storeRole : ("hacker" as SovereignRole));
+  const ghostTint = hydrated && isGhostMode;
   const canSwitch = canSwitchProp ?? canSwitchStore;
   const showDevChip = isSovereign && canDev;
 
@@ -87,7 +94,7 @@ export function IdentitySwitcher({
   }
 
   const accent =
-    activeMode === "hacker" && isGhostMode
+    activeMode === "hacker" && ghostTint
       ? hackerAccent
       : SOVEREIGN_ACCENTS[activeMode].primary;
   const visibleModes = PERSONA_MODES.filter((m) => m.role !== "dev" || showDevChip);
@@ -108,7 +115,7 @@ export function IdentitySwitcher({
           const isLoading = pending === role;
           const isDisabled = !canSwitch || !!pending || (role === "dev" && !showDevChip);
           const modeAccent =
-            role === "hacker" && isGhostMode
+            role === "hacker" && ghostTint
               ? hackerAccent
               : SOVEREIGN_ACCENTS[role].primary;
 

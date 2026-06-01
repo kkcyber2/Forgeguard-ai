@@ -1,4 +1,5 @@
 import {
+  buildEngineHealthUrl,
   engineAuthHeaders,
   logEngineHandshakeDiagnostics,
   logEngineProbeTarget,
@@ -46,6 +47,13 @@ async function probeOnce(healthUrl: string, headers: Record<string, string>): Pr
       return { ok: true, status: "healthy", latencyMs };
     }
 
+    const bodySnippet = (await resp.text().catch(() => "")).slice(0, 200);
+    console.error(
+      "ENGINE_PROBE_STATUS:",
+      resp.status,
+      bodySnippet || "<empty body>",
+    );
+
     return {
       ok: false,
       status: "lockdown",
@@ -89,7 +97,7 @@ async function fetchEngineHealth(): Promise<EngineHealthSnapshot> {
     return { ok: true, status: "unconfigured", latencyMs: 0, reason: "Auth unavailable" };
   }
 
-  const healthUrl = `${baseUrl}/health`;
+  const healthUrl = buildEngineHealthUrl(baseUrl);
   let snapshot = await probeOnce(healthUrl, authHeader);
 
   const shouldRetry =

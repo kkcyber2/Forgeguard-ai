@@ -62,6 +62,12 @@ export async function runAiAudit(
     );
 
     if (outcome.error) {
+      console.error("[verify:auditor] runAiAudit failed:", {
+        userId: user.id,
+        documentPath: documentPath.trim(),
+        error: outcome.error,
+        failure_reason: outcome.failure_reason ?? outcome.error,
+      });
       return {
         error: outcome.error,
         failure_reason: outcome.failure_reason ?? outcome.error,

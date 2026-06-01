@@ -2,15 +2,8 @@
 
 import * as React from "react";
 import { Search } from "lucide-react";
-import dynamic from "next/dynamic";
 import type { ScanTargetPulse } from "@/components/dashboard/tactical-world-map";
-import { TacticalWorldMapSkeleton } from "@/components/dashboard/tactical-world-map-skeleton";
-
-const TacticalWorldMap = dynamic(
-  () =>
-    import("@/components/dashboard/tactical-world-map").then((m) => m.TacticalWorldMap),
-  { ssr: false, loading: () => <TacticalWorldMapSkeleton dense /> },
-);
+import { TacticalMapClientWrapper } from "@/components/dashboard/tactical-map-client-wrapper";
 import type { PopNodeId } from "@/lib/admin/resolve-scan-node";
 import {
   AdminScanFeed,
@@ -98,7 +91,7 @@ export function CommandCenter({
                 </p>
               </div>
               <PanelErrorBoundary label="Live map">
-                <TacticalWorldMap
+                <TacticalMapClientWrapper
                   activeScans={activeScans}
                   scanTargets={scanTargets}
                   pulseNodeIds={pulseNodeIds}

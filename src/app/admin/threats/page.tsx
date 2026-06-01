@@ -15,14 +15,7 @@ import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { buttonStyles } from "@/components/ui/button";
-import nextDynamic from "next/dynamic";
-import { TacticalWorldMapSkeleton } from "@/components/dashboard/tactical-world-map-skeleton";
-
-const TacticalWorldMap = nextDynamic(
-  () =>
-    import("@/components/dashboard/tactical-world-map").then((m) => m.TacticalWorldMap),
-  { ssr: false, loading: () => <TacticalWorldMapSkeleton dense /> },
-);
+import { TacticalMapClientWrapper } from "@/components/dashboard/tactical-map-client-wrapper";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { severityWeight } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
@@ -143,7 +136,7 @@ export default async function ThreatsPage() {
             Tactical world map · live telemetry
           </p>
         </div>
-        <TacticalWorldMap activeScans={activeScans} attackPulses dense />
+        <TacticalMapClientWrapper activeScans={activeScans} attackPulses dense />
       </div>
 
       <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

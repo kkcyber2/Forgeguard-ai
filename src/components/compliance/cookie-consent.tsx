@@ -23,16 +23,22 @@ export type CookieConsentProps = {
  * Essential-only cookie consent — optimistic dismiss + localStorage backup.
  */
 export function CookieConsent({ initialConsented = false }: CookieConsentProps) {
+  const [mounted, setMounted] = React.useState(false);
   const [hasAccepted, setHasAccepted] = React.useState(initialConsented);
   const [pending, setPending] = React.useState(false);
 
   React.useEffect(() => {
+    setMounted(true);
     if (initialConsented || readLocalConsent()) {
       setHasAccepted(true);
     }
   }, [initialConsented]);
 
-  if (hasAccepted) return null;
+  if (!mounted) {
+    if (initialConsented) return null;
+  } else if (hasAccepted) {
+    return null;
+  }
 
   async function accept() {
     setHasAccepted(true);

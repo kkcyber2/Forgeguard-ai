@@ -43,7 +43,7 @@ export async function sendOtpSms(
         return {
           ok: false,
           error:
-            "SMS Error: Trial Account Restriction. Ensure number is verified in Twilio Console.",
+            "TWILIO TRIAL LOCK: Add +923123583827 to Verified Caller IDs in Twilio Console.",
         };
       }
       return { ok: false, error: "SMS delivery failed. Try again shortly." };

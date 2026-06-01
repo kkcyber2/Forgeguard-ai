@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { logEngineProbeTarget, resolveEngineBaseUrl } from "@/lib/agathon-config";
+import {
+  logEngineHandshakeDiagnostics,
+  logEngineProbeTarget,
+  resolveEngineBaseUrl,
+} from "@/lib/agathon-config";
 import {
   getEngineHealthSnapshot,
   isEngineLockdown,
@@ -26,6 +30,7 @@ export async function GET() {
   };
 
   if (isEngineLockdown(snapshot)) {
+    logEngineHandshakeDiagnostics();
     logEngineProbeTarget(resolveEngineBaseUrl());
     return NextResponse.json(body, {
       status: 503,

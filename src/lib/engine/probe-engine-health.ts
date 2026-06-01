@@ -1,5 +1,6 @@
 import {
   engineAuthHeaders,
+  logEngineHandshakeDiagnostics,
   logEngineProbeTarget,
   resolveEngineAuthToken,
   resolveEngineBaseUrl,
@@ -68,6 +69,7 @@ async function fetchEngineHealth(): Promise<EngineHealthSnapshot> {
   const baseUrl = resolveEngineBaseUrl();
   const token = resolveEngineAuthToken();
 
+  logEngineHandshakeDiagnostics();
   logEngineProbeTarget(baseUrl);
 
   if (!baseUrl) {

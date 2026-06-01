@@ -20,51 +20,70 @@ export interface RunAiAuditResponse {
 export async function runAiAudit(
   documentPath: string,
 ): Promise<RunAiAuditResponse> {
-  const user = await getSessionUser();
-  if (!user) return { error: "Not authenticated." };
+  try {
+    const user = await getSessionUser();
+    if (!user) return { error: "Not authenticated." };
 
-  if (!documentPath?.trim()) {
-    return { error: "No identity document on file. Upload or capture first." };
-  }
+    if (!documentPath?.trim()) {
+      return { error: "No identity document on file. Upload or capture first." };
+    }
 
-  const supabase = await createServerSupabase();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, email, identity_document_path")
-    .eq("id", user.id)
-    .single();
+    let admin: ReturnType<typeof createAdminSupabase>;
+    try {
+      admin = createAdminSupabase();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Admin client unavailable";
+      console.error("[verify:auditor] createAdminSupabase failed:", msg);
+      return { error: "Server misconfigured for identity audit." };
+    }
 
-  if (!profile?.full_name) {
+    const { data: profile, error: profileErr } = await admin
+      .from("profiles")
+      .select("full_name, email, identity_document_path")
+      .eq("id", user.id)
+      .single();
+
+    if (profileErr) {
+      console.error("[verify:auditor] profile read:", profileErr.message);
+      return { error: "Could not load profile for audit." };
+    }
+
+    if (!profile?.full_name) {
+      return {
+        error: "Set your full name in Profile before auditing.",
+        failure_reason: "Profile name required for ID cross-check.",
+      };
+    }
+
+    const outcome = await executeIdentityAuditForUser(
+      user.id,
+      documentPath.trim(),
+      profile,
+    );
+
+    if (outcome.error) {
+      return {
+        error: outcome.error,
+        failure_reason: outcome.failure_reason ?? outcome.error,
+      };
+    }
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard");
+
     return {
-      error: "Set your full name in Profile before auditing.",
-      failure_reason: "Profile name required for ID cross-check.",
+      ok: true,
+      result: outcome.result,
+      passed: outcome.passed,
+      status: outcome.status,
+      failure_reason: outcome.failure_reason,
+      profile_full_name: profile.full_name ?? undefined,
     };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Identity audit failed";
+    console.error("[verify:auditor] runAiAudit:", msg);
+    return { error: msg, failure_reason: msg };
   }
-
-  const outcome = await executeIdentityAuditForUser(
-    user.id,
-    documentPath.trim(),
-    profile,
-  );
-
-  if (outcome.error) {
-    return {
-      error: outcome.error,
-      failure_reason: outcome.failure_reason ?? outcome.error,
-    };
-  }
-
-  revalidatePath("/dashboard/settings");
-  revalidatePath("/dashboard");
-
-  return {
-    ok: true,
-    result: outcome.result,
-    passed: outcome.passed,
-    status: outcome.status,
-    failure_reason: outcome.failure_reason,
-    profile_full_name: profile.full_name ?? undefined,
-  };
 }
 
 export async function saveSignature(

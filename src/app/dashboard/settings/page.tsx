@@ -16,7 +16,7 @@ import {
   SettingsClearanceProvider,
 } from "@/components/settings/settings-clearance-aside";
 import { PhoneVerification } from "@/components/settings/phone-verification";
-import { IdentityAuditor } from "@/components/settings/identity-auditor";
+import { IdentityAuditorClientWrapper } from "@/components/settings/identity-auditor-client-wrapper";
 import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
 import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
@@ -115,7 +115,7 @@ export default async function SettingsPage() {
                 initialPhone={data.profile?.phone ?? ""}
                 phoneVerified={data.phoneVerified}
               />
-              <IdentityAuditor
+              <IdentityAuditorClientWrapper
                 documentPath={data.docPath}
                 auditStatus={data.profile?.identity_audit_status ?? "none"}
                 auditScore={data.auditScore}

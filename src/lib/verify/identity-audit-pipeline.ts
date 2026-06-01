@@ -58,7 +58,15 @@ export async function executeIdentityAuditForUser(
   const { passed, status } = resolveAuditOutcome(result);
   const failure_reason = deriveFailureReason(result, passed);
 
-  const admin = createAdminSupabase();
+  let admin: ReturnType<typeof createAdminSupabase>;
+  try {
+    admin = createAdminSupabase();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    console.error("[verify:ai-audit] createAdminSupabase:", msg);
+    return { error: "Server misconfigured for identity audit persistence." };
+  }
+
   const { error: updateErr } = await admin
     .from("profiles")
     .update({
@@ -79,8 +87,21 @@ export async function executeIdentityAuditForUser(
     .eq("id", userId);
 
   if (updateErr) {
-    console.error("[verify:ai-audit] profile update:", updateErr.message);
-    return { error: updateErr.message };
+    const msg = updateErr.message ?? "Profile update failed";
+    console.error("[verify:ai-audit] profile update:", msg, updateErr.code);
+    const lower = msg.toLowerCase();
+    if (
+      updateErr.code === "42703" ||
+      updateErr.code === "PGRST204" ||
+      lower.includes("identity_audit_status")
+    ) {
+      return {
+        error:
+          "Identity audit columns missing — apply sovereign verification migration in Supabase.",
+        failure_reason: msg,
+      };
+    }
+    return { error: msg, failure_reason: msg };
   }
 
   return { result, passed, status, failure_reason: passed ? undefined : failure_reason };

@@ -9,8 +9,10 @@
 
 export function resolveEngineBaseUrl(): string | undefined {
   const raw =
-    process.env.PYTHON_ENGINE_URL ?? process.env.AGATHON_ORCHESTRATOR_URL;
-  return raw?.replace(/\/$/, "");
+    process.env.PYTHON_ENGINE_URL?.trim() ??
+    process.env.AGATHON_ORCHESTRATOR_URL?.trim();
+  if (!raw) return undefined;
+  return raw.replace(/\/$/, "");
 }
 
 export function resolveEngineAuthToken(): string | undefined {
@@ -26,6 +28,15 @@ export function logEngineProbeTarget(baseUrl: string | undefined): void {
     return;
   }
   console.error("[engine] probe URL:", `${baseUrl.replace(/\/$/, "")}/health`);
+}
+
+/** Handshake diagnostics for engine health probes (no token values). */
+export function logEngineHandshakeDiagnostics(): void {
+  const baseUrl = resolveEngineBaseUrl();
+  const healthUrl = baseUrl ? `${baseUrl}/health` : "<unset — set PYTHON_ENGINE_URL>";
+  const token = resolveEngineAuthToken();
+  console.error(`ENGINE_URL_CALLED: ${healthUrl}`);
+  console.error(`TOKEN_SENT: ${token ? "TRUE" : "FALSE"}`);
 }
 
 /** @deprecated Use engineAuthHeaders */

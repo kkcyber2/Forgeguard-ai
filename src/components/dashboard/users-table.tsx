@@ -2,15 +2,12 @@ import * as React from "react";
 import { Mail, Shield, ShieldOff, MoreHorizontal } from "lucide-react";
 import { Table, THead, TBody, Tr, Th, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatRelativeTime, getInitials } from "@/lib/utils";
+import { formatRelativeTime, getInitials } from "@/lib/utils";
 
 /**
  * UsersTable — admin "User Management" surface.
  * ---------------------------------------------
- * Server-renderable. Action button is intentionally a non-interactive
- * placeholder here; wire it up to a Server Action in `/admin/users`
- * when role mutation lands. Keeping this component presentation-only
- * means the table can render in any context (overview / drilldown).
+ * Server-renderable presentation table. Role changes live under /admin/users.
  */
 
 export type UserRow = {
@@ -40,7 +37,6 @@ export function UsersTable({ rows }: { rows: UserRow[] }) {
           <Th>Role</Th>
           <Th>Status</Th>
           <Th>Joined</Th>
-          <Th className="text-right">Actions</Th>
         </Tr>
       </THead>
       <TBody>
@@ -81,40 +77,9 @@ export function UsersTable({ rows }: { rows: UserRow[] }) {
             <Td className="font-mono text-[11px] uppercase tracking-[0.12em] text-foreground-subtle">
               {u.createdAt ? formatRelativeTime(u.createdAt) : "—"}
             </Td>
-            <Td className="text-right">
-              <div className="inline-flex items-center gap-1">
-                <UserActionStub
-                  icon={u.role === "admin" ? ShieldOff : Shield}
-                  label={u.role === "admin" ? "Demote" : "Promote"}
-                />
-                <UserActionStub icon={MoreHorizontal} label="More" />
-              </div>
-            </Td>
           </Tr>
         ))}
       </TBody>
     </Table>
-  );
-}
-
-function UserActionStub({
-  icon: Icon,
-  label,
-}: {
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      className={cn(
-        "inline-flex h-7 w-7 items-center justify-center rounded-xs border-hairline border-white/[0.08]",
-        "text-foreground-subtle transition-colors hover:border-white/20 hover:text-foreground",
-      )}
-    >
-      <Icon size={12} strokeWidth={1.5} />
-    </button>
   );
 }

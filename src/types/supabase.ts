@@ -1446,6 +1446,7 @@ export type Database = {
           identity_audit_score: number | null
           identity_audit_status: string | null
           identity_failure_reason: string | null
+          identity_raw_ocr_data: Json | null
           identity_document_path: string | null
           identity_status: string | null
           identity_verified: boolean | null
@@ -1498,6 +1499,7 @@ export type Database = {
           identity_audit_score?: number | null
           identity_audit_status?: string | null
           identity_failure_reason?: string | null
+          identity_raw_ocr_data?: Json | null
           identity_document_path?: string | null
           identity_status?: string | null
           identity_verified?: boolean | null
@@ -1550,6 +1552,7 @@ export type Database = {
           identity_audit_score?: number | null
           identity_audit_status?: string | null
           identity_failure_reason?: string | null
+          identity_raw_ocr_data?: Json | null
           identity_document_path?: string | null
           identity_status?: string | null
           identity_verified?: boolean | null
@@ -1999,11 +2002,13 @@ export type Database = {
         Row: {
           aegis_zip_b64: string | null
           ale_usd: number | null
+          audit_report_md: string | null
           attacks_run: number | null
           attack_path: Json
           cvss_overall: number
           discovery_report: Json | null
           executive_summary_md: string
+          financial_liability_usd: number | null
           findings: Json
           generated_at: string
           generation_cost_usd: number | null
@@ -2020,10 +2025,12 @@ export type Database = {
         Insert: {
           aegis_zip_b64?: string | null
           ale_usd?: number | null
+          audit_report_md?: string | null
           attack_path?: Json
           cvss_overall: number
           discovery_report?: Json | null
           executive_summary_md: string
+          financial_liability_usd?: number | null
           findings?: Json
           generated_at?: string
           generation_cost_usd?: number | null
@@ -2041,9 +2048,11 @@ export type Database = {
           aegis_zip_b64?: string | null
           ale_usd?: number | null
           attack_path?: Json
+          audit_report_md?: string | null
           cvss_overall?: number
           discovery_report?: Json | null
           executive_summary_md?: string
+          financial_liability_usd?: number | null
           findings?: Json
           generated_at?: string
           generation_cost_usd?: number | null

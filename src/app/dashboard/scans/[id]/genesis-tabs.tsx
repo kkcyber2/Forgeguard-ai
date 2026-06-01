@@ -53,8 +53,10 @@ export interface GenesisTabs {
   scanId: string;
   targetUrl: string;
   scanIntensity?: "recon" | "standard" | "aggressive" | "greasy";
+  scanStatus?: string;
   discoveryReport: DiscoveryReport | null;
   aleUsd: number | null;
+  telemetryTrend?: number[];
   socialTemplates: SocialTemplate[] | null;
   aegisZipB64: string | null;
   agentMemories?: AgentMemoryRow[] | null;
@@ -91,7 +93,16 @@ function formatAleDisplay(usd: number): string {
 }
 
 export function GenesisTabs({
-  scanId, targetUrl, scanIntensity = "standard", discoveryReport, aleUsd, socialTemplates, aegisZipB64, agentMemories,
+  scanId,
+  targetUrl,
+  scanIntensity = "standard",
+  scanStatus,
+  discoveryReport,
+  aleUsd,
+  telemetryTrend,
+  socialTemplates,
+  aegisZipB64,
+  agentMemories,
 }: GenesisTabs) {
   const visibleKeys = tabsForIntensity(scanIntensity);
   const TABS = ALL_TABS.filter((t) => visibleKeys.includes(t.key));
@@ -158,7 +169,13 @@ export function GenesisTabs({
           className="mt-3 rounded-sm border-[0.5px] border-white/[0.06] bg-surface p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
         >
           {active === "recon"   && <ReconMap    report={discoveryReport} targetUrl={targetUrl} />}
-          {active === "finance" && <FinancialRisk aleUsd={aleUsd} />}
+          {active === "finance" && (
+            <FinancialRisk
+              aleUsd={aleUsd}
+              scanSealed={scanStatus === "sealed"}
+              telemetryTrend={telemetryTrend}
+            />
+          )}
           {active === "aegis"   && <AegisBundle scanId={scanId} zipB64={aegisZipB64} />}
           {active === "social"  && <SocialSwarm templates={socialTemplates} />}
           {active === "memories" && <AgentMemoriesPanel memories={agentMemories} />}
@@ -313,8 +330,45 @@ function ArcGauge({ value, max, danger }: { value: number; max: number; danger: 
   );
 }
 
-function FinancialRisk({ aleUsd }: { aleUsd: number | null }) {
+function SovereignTelemetrySparkline({ trend }: { trend: number[] }) {
+  const max = Math.max(...trend, 1);
+  const w = 120;
+  const h = 32;
+  const step = trend.length > 1 ? w / (trend.length - 1) : w;
+  const points = trend
+    .map((v, i) => `${i * step},${h - (v / max) * (h - 4) - 2}`)
+    .join(" ");
+
+  return (
+    <div className="rounded border border-white/[0.06] bg-black/30 px-4 py-3">
+      <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.14em] text-acid">
+        Sovereign Telemetry — platform scan activity (30d)
+      </p>
+      <svg width={w} height={h} className="text-acid" aria-hidden>
+        <polyline
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          points={points}
+        />
+      </svg>
+    </div>
+  );
+}
+
+function FinancialRisk({
+  aleUsd,
+  scanSealed = false,
+  telemetryTrend,
+}: {
+  aleUsd: number | null;
+  scanSealed?: boolean;
+  telemetryTrend?: number[];
+}) {
   if (aleUsd === null || aleUsd === undefined) {
+    if (scanSealed && telemetryTrend && telemetryTrend.some((n) => n > 0)) {
+      return <SovereignTelemetrySparkline trend={telemetryTrend} />;
+    }
     return <EmptyState label="Financial risk quantification not yet available." icon={DollarSign} />;
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 /**
@@ -130,27 +131,50 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", event.scanId);
 
-      if (technicalReport) {
+      if (technicalReport || aleUsd != null || p.findings) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (admin as any).from("scan_reports").upsert(
-          {
-            scan_id: event.scanId,
-            audit_report_md: technicalReport,
-            executive_summary_md:
-              typeof p.executive_summary === "string"
-                ? p.executive_summary
-                : technicalReport.slice(0, 4000),
-            cvss_overall: p.overall_cvss
-              ? Number.parseFloat(String(p.overall_cvss))
-              : 0,
-            risk_label: String(p.overall_severity ?? "NONE").toUpperCase(),
-            financial_liability_usd: aleUsd
-              ? Number.parseFloat(String(aleUsd))
-              : null,
-            ale_usd: aleUsd ? Number.parseFloat(String(aleUsd)) : null,
-          },
-          { onConflict: "scan_id" },
-        );
+        const { data: existing } = await (admin as any)
+          .from("scan_reports")
+          .select("findings, executive_summary_md, audit_report_md, ale_usd, financial_liability_usd")
+          .eq("scan_id", event.scanId)
+          .maybeSingle();
+
+        const parsedAle =
+          aleUsd != null ? Number.parseFloat(String(aleUsd)) : null;
+        const riskRaw = p.overall_severity ?? existing?.risk_label ?? "NONE";
+        const riskLabel =
+          typeof riskRaw === "string"
+            ? riskRaw.toUpperCase()
+            : String(riskRaw).toUpperCase();
+
+        const patch: Record<string, unknown> = {
+          scan_id: event.scanId,
+          cvss_overall: p.overall_cvss
+            ? Number.parseFloat(String(p.overall_cvss))
+            : undefined,
+          risk_label: riskLabel,
+        };
+
+        if (technicalReport) {
+          patch.audit_report_md = technicalReport;
+          patch.executive_summary_md =
+            typeof p.executive_summary === "string"
+              ? p.executive_summary
+              : existing?.executive_summary_md ??
+                technicalReport.slice(0, 4000);
+        }
+        if (parsedAle != null && !Number.isNaN(parsedAle)) {
+          patch.financial_liability_usd = parsedAle;
+          patch.ale_usd = parsedAle;
+        }
+        if (Array.isArray(p.findings)) {
+          patch.findings = stringifyPayloadNumerics(p.findings);
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin as any).from("scan_reports").upsert(patch, {
+          onConflict: "scan_id",
+        });
       }
     } catch (err) {
       console.warn("[webhook:agathon] scan.completed persist skipped:", err);

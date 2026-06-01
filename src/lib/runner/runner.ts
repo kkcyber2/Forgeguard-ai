@@ -4,7 +4,10 @@ import {
   resolveEngineAuthToken,
   resolveEngineBaseUrl,
   engineAuthHeaders,
+  resolveScanDispatchKey,
+  maskKeyPrefix,
 } from "@/lib/agathon-config";
+import { stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { openCredential } from "@/lib/crypto/credentials";
@@ -152,7 +155,26 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     },
   });
 
-  // 6. POST to /scan/start -------------------------------------------------
+  // 6. Validate target key + POST to /scan/start ---------------------------
+  let dispatchKey: ReturnType<typeof resolveScanDispatchKey>;
+  try {
+    dispatchKey = resolveScanDispatchKey({
+      userApiKey: apiKey,
+      targetUrl: normalizedUrl,
+      targetModel: scan.target_model,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await markFailure(admin, scanId, msg);
+    return;
+  }
+
+  console.error("[runner] dispatch key resolved:", {
+    scan_id: scanId,
+    target_provider: dispatchKey.targetProvider,
+    key_mask: maskKeyPrefix(dispatchKey.apiKey),
+  });
+
   try {
     const resp = await fetch(`${orchestratorUrl}/scan/start`, {
       method: "POST",
@@ -167,9 +189,9 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
         target_url: normalizedUrl,
         intensity: scan.intensity ?? "standard",
         surface_kind: scan.surface_kind ?? "llm",
-        api_key: apiKey,
+        api_key: dispatchKey.apiKey,
         ownership_verified: sovereign,
-        target_provider: inferTargetProvider(normalizedUrl, scan.target_model),
+        target_provider: dispatchKey.targetProvider,
       }),
       // Don't hold the connection open — Railway acknowledges fast.
       signal: AbortSignal.timeout(15_000),
@@ -224,35 +246,6 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
 /* URL normalization                                                          */
 /* -------------------------------------------------------------------------- */
 
-function inferTargetProvider(normalizedUrl: string, targetModel: string): string {
-  const model = (targetModel ?? "").toLowerCase();
-  if (
-    model.includes("gpt") ||
-    model.startsWith("o1") ||
-    model.startsWith("o3") ||
-    model.startsWith("o4")
-  ) {
-    return "openai";
-  }
-  if (
-    model.includes("llama") ||
-    model.includes("mixtral") ||
-    model.includes("gemma") ||
-    model.includes("groq")
-  ) {
-    return "groq";
-  }
-  if (model.includes("claude")) {
-    return "anthropic";
-  }
-
-  const u = normalizedUrl.toLowerCase();
-  if (u.includes("groq.com")) return "groq";
-  if (u.includes("openai.com") || u.includes("api.openai")) return "openai";
-  if (u.includes("anthropic.com")) return "anthropic";
-  return "openai_compat";
-}
-
 function normalizeTargetUrl(raw: string): string {
   let url = raw.trim();
   // Drop trailing slash.
@@ -281,7 +274,7 @@ async function emit(
     type: ev.type,
     severity: ev.severity ?? "info",
     attack_name: ev.attack_name ?? null,
-    payload: ev.payload ?? null,
+    payload: ev.payload != null ? stringifyPayloadNumerics(ev.payload) : null,
   });
   if (error) {
     console.error("[runner] log insert failed:", error.message);

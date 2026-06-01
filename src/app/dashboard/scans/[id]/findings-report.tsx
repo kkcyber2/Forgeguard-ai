@@ -70,11 +70,140 @@ export interface ScanReport {
   attacks_run?: number;
   wall_seconds?: number;
   generation_cost_usd?: number;
-  // Genesis Intelligence Pipeline columns (Elite 8)
   discovery_report?: Record<string, unknown> | null;
   ale_usd?: number | null;
+  financial_liability_usd?: number | null;
   social_templates?: Record<string, unknown>[] | null;
   aegis_zip_b64?: string | null;
+}
+
+function formatUsd(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toFixed(0);
+}
+
+/** Section B — Financial Liability ($ALE) */
+export function FinancialLiabilitySection({
+  aleUsd,
+  findings,
+}: {
+  aleUsd: number | null;
+  findings: Finding[];
+}) {
+  const perFinding = findings.filter(
+    (f) => (f.financial_liability_usd ?? f.ale_usd ?? 0) > 0,
+  );
+
+  if (aleUsd == null && perFinding.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-sm border border-[#D1FF00]/20 bg-[#D1FF00]/[0.03] p-5">
+      <SectionHead icon={ShieldAlert} label="Section B — Financial Liability ($ALE)" />
+      {aleUsd != null && aleUsd > 0 && (
+        <p className="mb-4 font-mono text-2xl font-bold tabular-nums text-[#D1FF00]">
+          ${formatUsd(aleUsd)}
+          <span className="ml-2 text-[10px] font-normal uppercase tracking-widest text-foreground-muted">
+            projected exposure
+          </span>
+        </p>
+      )}
+      {perFinding.length > 0 && (
+        <ul className="space-y-2 font-mono text-[11px] text-foreground-muted">
+          {perFinding.map((f) => {
+            const usd = f.financial_liability_usd ?? f.ale_usd ?? 0;
+            return (
+              <li key={f.id} className="flex justify-between gap-4 border-t border-white/[0.06] pt-2">
+                <span className="text-foreground">{f.attack}</span>
+                <span className="shrink-0 text-[#D1FF00]">${formatUsd(usd)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Section A — Executive Summary (CEO briefing) */
+export function ExecutiveSummarySection({ md }: { md: string }) {
+  return (
+    <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
+      <SectionHead icon={FileText} label="Section A — Executive Summary" />
+      <MarkdownBlock md={md} />
+    </div>
+  );
+}
+
+/** Section D — Remediation */
+export function RemediationSection({
+  roadmapMd,
+  findings,
+}: {
+  roadmapMd?: string;
+  findings: Finding[];
+}) {
+  const withRemediation = findings.filter((f) => f.remediation?.trim());
+  if (!roadmapMd && withRemediation.length === 0) return null;
+
+  return (
+    <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
+      <SectionHead icon={ShieldCheck} label="Section D — Remediation" />
+      {roadmapMd && <RemediationRoadmap md={roadmapMd} />}
+      {withRemediation.length > 0 && (
+        <ul className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
+          {withRemediation.map((f) => (
+            <li key={f.id}>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                {f.attack}
+              </p>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-foreground-muted">
+                {f.remediation}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Section C — Technical PoC */
+export function TechnicalPoCSection({
+  auditMd,
+  findings,
+}: {
+  auditMd?: string;
+  findings: Finding[];
+}) {
+  const withPoc = findings.filter(
+    (f) => f.proof_of_concept?.curl || f.proof_of_concept?.python,
+  );
+
+  if (!auditMd && withPoc.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      {withPoc.length > 0 && (
+        <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
+          <SectionHead icon={Terminal} label="Section C — Technical PoC" />
+          <div className="space-y-2">
+            {withPoc.map((f, i) => (
+              <FindingCard key={f.id} finding={f} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+      {auditMd && <AuditReportPanel md={auditMd} />}
+    </div>
+  );
+}
+
+/** Enterprise four-section report layout */
+export function EnterpriseReport(props: FindingsReportProps) {
+  return <FindingsReport {...props} />;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -946,7 +1075,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1
 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px">${statsRow}</div>
 
-${report.executive_summary_md ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Executive Summary</h2><div style="font-size:12px;line-height:1.65;color:#374151;white-space:pre-wrap">${escapeHTML(report.executive_summary_md.replace(/^#+\s*/gm, ""))}</div></div>` : ""}
+${report.executive_summary_md ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section A — Executive Summary</h2><div style="font-size:12px;line-height:1.65;color:#374151;white-space:pre-wrap">${escapeHTML(report.executive_summary_md.replace(/^#+\s*/gm, ""))}</div></div>` : ""}
+${(() => {
+  const ale = report.financial_liability_usd ?? report.ale_usd;
+  return ale != null && ale > 0
+    ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section B — Financial Liability ($ALE)</h2><p style="font-family:monospace;font-size:22px;font-weight:700;color:#15803d">$${escapeHTML(formatUsd(ale))}</p></div>`
+    : "";
+})()}
 
 ${findings.length > 0 ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Findings (${findings.length})</h2>${findingsHTML}</div>` : ""}
 
@@ -1100,6 +1235,8 @@ export function FindingsReport({
 
   const critCount = findings.filter((f) => f.severity === "critical").length;
   const highCount = findings.filter((f) => f.severity === "high").length;
+  const aleUsd =
+    report.financial_liability_usd ?? report.ale_usd ?? null;
 
   return (
     <div className="mt-4 space-y-4">
@@ -1133,19 +1270,21 @@ export function FindingsReport({
         </div>
       </div>
 
-      {/* ── Executive summary ── */}
       {report.executive_summary_md && (
-        <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-          <SectionHead icon={FileText} label="Executive Summary" />
-          <MarkdownBlock md={report.executive_summary_md} />
-        </div>
+        <ExecutiveSummarySection md={report.executive_summary_md} />
       )}
 
-      {/* ── Findings list ── */}
+      <FinancialLiabilitySection aleUsd={aleUsd} findings={findings} />
+
+      <TechnicalPoCSection
+        auditMd={report.audit_report_md}
+        findings={findings}
+      />
+
       {findings.length > 0 && (
         <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
           <div className="mb-4 flex items-center justify-between">
-            <SectionHead icon={Target} label="Findings" />
+            <SectionHead icon={Target} label="Attack Findings" />
             <div className="flex items-center gap-3 text-[10px]">
               {critCount > 0 && (
                 <span className="text-threat">{critCount} CRITICAL</span>
@@ -1164,30 +1303,21 @@ export function FindingsReport({
         </div>
       )}
 
-      {/* ── Remediation roadmap + OWASP side by side ── */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Roadmap */}
-        {report.optimization_suggestions_md && (
+      <RemediationSection
+        roadmapMd={report.optimization_suggestions_md}
+        findings={findings}
+      />
+
+      {report.owasp_coverage &&
+        Object.keys(report.owasp_coverage).length > 0 && (
           <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-            <SectionHead icon={ShieldCheck} label="Remediation Roadmap" />
-            <RemediationRoadmap md={report.optimization_suggestions_md} />
+            <SectionHead icon={Layers} label="OWASP LLM Coverage" />
+            <OWASPPanel coverage={report.owasp_coverage} />
           </div>
         )}
-
-        {/* OWASP coverage */}
-        {report.owasp_coverage &&
-          Object.keys(report.owasp_coverage).length > 0 && (
-            <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-              <SectionHead icon={Layers} label="OWASP LLM Coverage" />
-              <OWASPPanel coverage={report.owasp_coverage} />
-            </div>
-          )}
-      </div>
-
-      {/* ── Full Audit Report (markdown) ── */}
-      {report.audit_report_md && (
-        <AuditReportPanel md={report.audit_report_md} />
-      )}
     </div>
   );
 }
+
+/** @deprecated Alias for EnterpriseReport */
+export const ReportGenerator = EnterpriseReport;

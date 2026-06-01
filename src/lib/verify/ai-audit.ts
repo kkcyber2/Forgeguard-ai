@@ -227,6 +227,8 @@ async function documentBufferToText(
 
 interface VisionPerception {
   documentText: string;
+  rawOcrText?: string;
+  mimeType?: string;
   blocked?: boolean;
   failure_reason?: string;
   audit_notes?: string;
@@ -351,7 +353,12 @@ Respond ONLY with valid JSON:
         ? ocr
         : `[ID OCR] extracted_name="${extracted}" profile="${profileFullName}" notes=${parsed.audit_notes ?? ""}`;
 
-    return { documentText, audit_notes: parsed.audit_notes };
+    return {
+      documentText,
+      rawOcrText: ocr || documentText,
+      mimeType,
+      audit_notes: parsed.audit_notes,
+    };
   } catch (err) {
     console.error("[verify:ai-audit] vision error:", err);
     return {
@@ -381,10 +388,12 @@ export async function runIdentityAuditFromStorage(
   error?: string;
   failure_reason?: string;
   engine_raw?: unknown;
+  raw_ocr?: { rawOcrText: string; mimeType: string };
 }> {
   let documentText = input.documentTextOverride?.trim() ?? "";
   let perceptionMode: IdentityAuditResult["mode"] = "deepseek-r1";
   let visionProviderError: string | undefined;
+  let rawOcr: { rawOcrText: string; mimeType: string } | undefined;
 
   if (!documentText) {
     const downloaded = await downloadVerificationDocument(input.documentPath);
@@ -415,8 +424,15 @@ export async function runIdentityAuditFromStorage(
       documentText = vision.documentText;
       visionProviderError = vision.failure_reason;
       perceptionMode = "vision+deepseek-r1";
+      if (vision.rawOcrText) {
+        rawOcr = {
+          rawOcrText: vision.rawOcrText,
+          mimeType: vision.mimeType ?? mimeType,
+        };
+      }
     } else {
       documentText = await documentBufferToText(buffer, mimeType, input.documentPath);
+      rawOcr = { rawOcrText: documentText, mimeType };
     }
   }
 
@@ -442,6 +458,7 @@ export async function runIdentityAuditFromStorage(
     result,
     failure_reason: auditRun.providerError ?? visionProviderError,
     engine_raw: auditRun.engineRaw,
+    raw_ocr: rawOcr,
   };
 }
 

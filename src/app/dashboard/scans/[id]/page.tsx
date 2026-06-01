@@ -20,6 +20,7 @@ import { ScanStatusTracker } from "./scan-status-tracker";
 import { FindingsReport } from "./findings-report";
 import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemoryRow } from "./genesis-tabs";
 import { deleteScan } from "../actions";
+import { fetchDashboardAnalytics } from "@/lib/analytics/dashboard-metrics";
 import { SCAN_REPORT_SELECT } from "@/lib/scans/queries";
 import type { ScanReport } from "./findings-report";
 
@@ -116,6 +117,8 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .eq("user_id", user.id)
     .maybeSingle();
   const userPlan = (sub?.plan as "free" | "startup" | "enterprise" | null) ?? "free";
+
+  const analytics = await fetchDashboardAnalytics(supabase);
 
   const { data: rawMemories } = await supabase
     .from("agent_memories")
@@ -256,7 +259,13 @@ export default async function ScanDetailPage({ params }: PageProps) {
         targetUrl={scan.target_url}
         scanIntensity={scan.intensity ?? "standard"}
         discoveryReport={(scanReport?.discovery_report as DiscoveryReport | null) ?? null}
-        aleUsd={scanReport?.ale_usd ?? null}
+        aleUsd={
+          scanReport?.financial_liability_usd ??
+          scanReport?.ale_usd ??
+          null
+        }
+        scanStatus={scan.status}
+        telemetryTrend={analytics.scanTrend}
         socialTemplates={(scanReport?.social_templates as SocialTemplate[] | null) ?? null}
         aegisZipB64={scanReport?.aegis_zip_b64 ?? null}
         agentMemories={agentMemories}

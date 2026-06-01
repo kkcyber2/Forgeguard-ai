@@ -127,7 +127,7 @@ export function IdentityAuditor({
     statusNorm === "failed"
       ? "FAILED"
       : statusNorm === "review"
-        ? "REVIEW"
+        ? "REVIEW_REQUIRED"
         : auditStatus;
   const showFailureTruth =
     !!truthReason?.trim() &&

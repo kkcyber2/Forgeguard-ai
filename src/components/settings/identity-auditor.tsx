@@ -14,6 +14,7 @@ import {
   CameraPermissionOverlay,
   CAMERA_PERMISSION_DENIED_MESSAGE,
 } from "./camera-permission-overlay";
+import { formatIdentityFailureTruth } from "@/lib/verify/identity-failure-display";
 
 function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
@@ -119,9 +120,20 @@ export function IdentityAuditor({
     liveFailureReason ??
     auditResult?.failureReason ??
     initialFailureReason;
-  const showPersistedFailure =
-    (statusNorm === "failed" || statusNorm === "review") &&
-    !!displayFailureReason?.trim();
+  const truthReason = displayFailureReason
+    ? formatIdentityFailureTruth(displayFailureReason)
+    : null;
+  const statusLabel =
+    statusNorm === "failed"
+      ? "FAILED"
+      : statusNorm === "review"
+        ? "REVIEW"
+        : auditStatus;
+  const showFailureTruth =
+    !!truthReason?.trim() &&
+    (statusNorm === "failed" ||
+      statusNorm === "review" ||
+      !!liveFailureReason?.trim());
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -347,12 +359,18 @@ export function IdentityAuditor({
           Identity auditor
         </p>
         <div className="ml-auto flex max-w-[min(100%,280px)] flex-col items-end gap-1 text-right">
-          <span className="font-mono text-[9px] uppercase tracking-widest text-zinc-500">
-            {auditStatus}
+          <span
+            className={
+              statusNorm === "failed"
+                ? "font-mono text-[9px] uppercase tracking-widest text-red-400/80"
+                : "font-mono text-[9px] uppercase tracking-widest text-zinc-500"
+            }
+          >
+            {statusLabel}
           </span>
-          {showPersistedFailure && displayFailureReason && (
+          {showFailureTruth && truthReason && (
             <p className="font-mono text-[10px] leading-relaxed text-[#D1FF00]">
-              {displayFailureReason}
+              {truthReason}
             </p>
           )}
         </div>
@@ -508,15 +526,15 @@ export function IdentityAuditor({
             {auditResult.passed ? "MATCH" : "REVIEW"}
           </p>
           <p className="mt-1 text-zinc-500">{auditResult.notes}</p>
-          {auditResult.failureReason && !showPersistedFailure && (
+          {auditResult.failureReason && !showFailureTruth && (
             <p className="mt-1 font-mono text-[10px] text-[#D1FF00]">
-              {auditResult.failureReason}
+              {formatIdentityFailureTruth(auditResult.failureReason)}
             </p>
           )}
         </div>
       )}
 
-      {error && !showPersistedFailure && (
+      {error && !showFailureTruth && (
         <p className="font-mono text-[10px] text-red-400/90">{error}</p>
       )}
     </div>

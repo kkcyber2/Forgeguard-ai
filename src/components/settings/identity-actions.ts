@@ -69,6 +69,18 @@ export async function runAiAudit(
       profile,
     );
 
+    console.error(
+      "[verify:auditor] runAiAudit outcome (pre-persist):",
+      JSON.stringify({
+        error: outcome.error,
+        failure_reason: outcome.failure_reason,
+        identity_failure_reason: outcome.identity_failure_reason,
+        status: outcome.status,
+        passed: outcome.passed,
+        result: outcome.result,
+      }),
+    );
+
     if (outcome.error) {
       const reason = outcome.identity_failure_reason ?? outcome.failure_reason ?? outcome.error;
       console.error("[verify:auditor] runAiAudit failed:", {

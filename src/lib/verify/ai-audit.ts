@@ -322,6 +322,10 @@ Respond ONLY with valid JSON:
     const completion = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
+    console.error(
+      "[verify:ai-audit] Vision RAW JSON:",
+      JSON.stringify(completion),
+    );
     const raw = completion.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(raw) as {
       extracted_name?: string;
@@ -376,6 +380,7 @@ export async function runIdentityAuditFromStorage(
   result?: IdentityAuditResult;
   error?: string;
   failure_reason?: string;
+  engine_raw?: unknown;
 }> {
   let documentText = input.documentTextOverride?.trim() ?? "";
   let perceptionMode: IdentityAuditResult["mode"] = "deepseek-r1";
@@ -436,12 +441,17 @@ export async function runIdentityAuditFromStorage(
   return {
     result,
     failure_reason: auditRun.providerError ?? visionProviderError,
+    engine_raw: auditRun.engineRaw,
   };
 }
 
 export async function runIdentityAudit(
   input: IdentityAuditInput,
-): Promise<{ result: IdentityAuditResult; providerError?: string }> {
+): Promise<{
+  result: IdentityAuditResult;
+  providerError?: string;
+  engineRaw?: unknown;
+}> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return {
@@ -482,6 +492,10 @@ export async function runIdentityAudit(
     const completion = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
+    console.error(
+      "[verify:ai-audit] DeepSeek-R1 RAW JSON:",
+      JSON.stringify(completion),
+    );
     const raw = completion.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(raw) as Partial<IdentityAuditResult>;
     const extractedName = (parsed.extracted_name ?? "").trim();
@@ -528,6 +542,7 @@ export async function runIdentityAudit(
             : "DeepSeek-R1 identity audit complete."),
         mode: "deepseek-r1",
       },
+      engineRaw: completion,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

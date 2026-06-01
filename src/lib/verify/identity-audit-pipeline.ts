@@ -124,6 +124,12 @@ export async function executeIdentityAuditForUser(
   if (auditResult.error) {
     const reason =
       auditResult.failure_reason ?? auditResult.error;
+    if (auditResult.engine_raw !== undefined) {
+      console.error(
+        "[verify:ai-audit] engine RAW (pre-persist):",
+        JSON.stringify(auditResult.engine_raw),
+      );
+    }
     await persistIdentityFailureReason(userId, reason, {
       status: "failed",
       notes: reason,
@@ -142,6 +148,13 @@ export async function executeIdentityAuditForUser(
     explicit: auditResult.failure_reason,
     result,
   });
+
+  if (auditResult.engine_raw !== undefined) {
+    console.error(
+      "[verify:ai-audit] engine RAW (pre-persist):",
+      JSON.stringify(auditResult.engine_raw),
+    );
+  }
 
   let admin: ReturnType<typeof createAdminSupabase>;
   try {

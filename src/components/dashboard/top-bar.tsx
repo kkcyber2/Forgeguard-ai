@@ -456,13 +456,13 @@ export function TopBar({
   const [lockedFeature, setLockedFeature] = useState("The Forge");
 
   const storeRole = useSovereignStore((s) => s.activeRole);
-  const hydrated = useSovereignStore((s) => s.hydrated);
+  const personaReady = useSovereignStore((s) => s.mounted && s.hydrated);
   const storeAccent = useSovereignAccent();
 
   const activeRole: SovereignRole =
-    hydrated ? storeRole : (sovereignRole ?? (scope === "admin" ? "dev" : viewMode));
+    personaReady ? storeRole : (sovereignRole ?? (scope === "admin" ? "dev" : viewMode));
   const dashboardViewMode = personaToViewMode(activeRole);
-  const accent = hydrated ? storeAccent : SOVEREIGN_ACCENTS[activeRole];
+  const accent = personaReady ? storeAccent : SOVEREIGN_ACCENTS[activeRole];
   const accentHex = accent.primary;
 
   const resolvedPrimary = primaryNav ?? nav;
@@ -591,7 +591,7 @@ export function TopBar({
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 border-l-[0.5px] border-white/[0.06] px-3">
-          {showPersonaSwitcher && (
+          {showPersonaSwitcher && personaReady && (
             <IdentitySwitcher
               activeMode={activeRole}
               canSwitch={canSwitchIdentity}
@@ -599,7 +599,7 @@ export function TopBar({
             />
           )}
 
-          {scope === "user" && activeRole === "hacker" && (
+          {scope === "user" && personaReady && activeRole === "hacker" && (
             <GhostProtocolToggle />
           )}
 

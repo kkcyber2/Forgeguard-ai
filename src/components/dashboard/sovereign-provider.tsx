@@ -15,22 +15,29 @@ export function SovereignProvider({
   children: React.ReactNode;
 }) {
   const hydrate = useSovereignStore((s) => s.hydrate);
+  const setMounted = useSovereignStore((s) => s.setMounted);
   const activeRole = useSovereignStore((s) => s.activeRole);
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
   const hydrated = useSovereignStore((s) => s.hydrated);
+  const mounted = useSovereignStore((s) => s.mounted);
   const accent = useSovereignAccent();
+
+  React.useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, [setMounted]);
 
   React.useEffect(() => {
     hydrate(initial);
   }, [hydrate, initial]);
 
   React.useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !mounted) return;
     const root = document.documentElement;
     root.style.setProperty("--sovereign-accent", accent.primary);
     root.style.setProperty("--sovereign-glow", accent.glow);
     root.setAttribute("data-persona", activeRole === "dev" ? "dev" : activeRole);
-  }, [activeRole, isGhostMode, accent, hydrated]);
+  }, [activeRole, isGhostMode, accent, hydrated, mounted]);
 
   return <>{children}</>;
 }

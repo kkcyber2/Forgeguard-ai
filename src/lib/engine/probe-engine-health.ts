@@ -5,6 +5,7 @@ import {
   logEngineProbeTarget,
   resolveEngineAuthToken,
   resolveEngineBaseUrl,
+  sanitizeHttpHeaderValue,
 } from "@/lib/agathon-config";
 import { coalesce } from "@/lib/cache/fetch-coalesce";
 import {
@@ -16,7 +17,7 @@ import {
 
 export type EngineHealthSnapshot = {
   ok: boolean;
-  status: "unconfigured" | "healthy" | "lockdown";
+  status: "unconfigured" | "healthy" | "lockdown" | "offline";
   latencyMs: number;
   reason?: string;
   httpStatus?: number;
@@ -27,18 +28,42 @@ const CACHE_KEY = "engine:health";
 const FRESH_MS = 15_000;
 const STALE_MS = 60_000;
 const BUNKER_RETRY_MS = 2_000;
+const PROBE_TIMEOUT_MS = 10_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function probeOnce(healthUrl: string, headers: Record<string, string>): Promise<EngineHealthSnapshot> {
+function offlineSnapshot(error?: string): EngineHealthSnapshot {
+  return {
+    ok: false,
+    status: "offline",
+    latencyMs: 0,
+    reason: "Engine bunker unreachable",
+    error: error ?? "Engine probe failed",
+  };
+}
+
+function sanitizeAuthHeaders(
+  auth: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(auth)) {
+    out[sanitizeHttpHeaderValue(k)] = sanitizeHttpHeaderValue(v);
+  }
+  return out;
+}
+
+async function probeOnce(
+  healthUrl: string,
+  headers: Record<string, string>,
+): Promise<EngineHealthSnapshot> {
   const t0 = Date.now();
   try {
     const resp = await fetch(healthUrl, {
       method: "GET",
       headers: { ...headers, "Cache-Control": "no-store" },
-      signal: AbortSignal.timeout(5_000),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
       cache: "no-store",
     });
     const latencyMs = Date.now() - t0;
@@ -65,7 +90,7 @@ async function probeOnce(healthUrl: string, headers: Record<string, string>): Pr
     const message = err instanceof Error ? err.message : "Unknown error";
     return {
       ok: false,
-      status: "lockdown",
+      status: "offline",
       latencyMs: Date.now() - t0,
       reason: "Engine bunker unreachable",
       error: message,
@@ -74,57 +99,71 @@ async function probeOnce(healthUrl: string, headers: Record<string, string>): Pr
 }
 
 async function fetchEngineHealth(): Promise<EngineHealthSnapshot> {
-  const baseUrl = resolveEngineBaseUrl();
-  const token = resolveEngineAuthToken();
+  try {
+    const baseUrl = resolveEngineBaseUrl();
+    const token = resolveEngineAuthToken();
 
-  logEngineHandshakeDiagnostics();
-  logEngineProbeTarget(baseUrl);
+    logEngineHandshakeDiagnostics();
+    logEngineProbeTarget(baseUrl);
 
-  if (!baseUrl) {
-    return { ok: true, status: "unconfigured", latencyMs: 0 };
-  }
-  if (!token) {
-    return {
-      ok: true,
-      status: "unconfigured",
-      latencyMs: 0,
-      reason: "Missing INTERNAL_SCAN_TOKEN",
-    };
-  }
-
-  const authHeader = engineAuthHeaders();
-  if (!authHeader) {
-    return { ok: true, status: "unconfigured", latencyMs: 0, reason: "Auth unavailable" };
-  }
-
-  const healthUrl = buildEngineHealthUrl(baseUrl);
-  let snapshot = await probeOnce(healthUrl, authHeader);
-
-  const shouldRetry =
-    !snapshot.ok &&
-    (snapshot.httpStatus === 503 || snapshot.status === "lockdown");
-
-  if (shouldRetry) {
-    console.error(
-      "[engine] bunker fallback: retrying after",
-      BUNKER_RETRY_MS,
-      "ms (status",
-      snapshot.httpStatus ?? "error",
-      ")",
-    );
-    await sleep(BUNKER_RETRY_MS);
-    snapshot = await probeOnce(healthUrl, authHeader);
-    if (snapshot.ok) {
-      console.error("[engine] bunker fallback: retry succeeded");
-    } else {
-      console.error(
-        "[engine] bunker fallback: retry failed",
-        snapshot.httpStatus ?? snapshot.error,
-      );
+    if (!baseUrl) {
+      return { ok: true, status: "unconfigured", latencyMs: 0 };
     }
-  }
+    if (!token) {
+      return {
+        ok: true,
+        status: "unconfigured",
+        latencyMs: 0,
+        reason: "Missing INTERNAL_SCAN_TOKEN",
+      };
+    }
 
-  return snapshot;
+    const authHeader = engineAuthHeaders();
+    if (!authHeader) {
+      return {
+        ok: true,
+        status: "unconfigured",
+        latencyMs: 0,
+        reason: "Auth unavailable",
+      };
+    }
+
+    const healthUrl = buildEngineHealthUrl(baseUrl);
+    const safeHeaders = sanitizeAuthHeaders(authHeader);
+    let snapshot = await probeOnce(healthUrl, safeHeaders);
+
+    const shouldRetry =
+      !snapshot.ok &&
+      (snapshot.httpStatus === 503 ||
+        snapshot.status === "lockdown" ||
+        snapshot.status === "offline");
+
+    if (shouldRetry) {
+      console.error(
+        "[engine] bunker fallback: retrying after",
+        BUNKER_RETRY_MS,
+        "ms (status",
+        snapshot.httpStatus ?? snapshot.status,
+        ")",
+      );
+      await sleep(BUNKER_RETRY_MS);
+      snapshot = await probeOnce(healthUrl, safeHeaders);
+      if (snapshot.ok) {
+        console.error("[engine] bunker fallback: retry succeeded");
+      } else {
+        console.error(
+          "[engine] bunker fallback: retry failed",
+          snapshot.httpStatus ?? snapshot.error ?? snapshot.status,
+        );
+      }
+    }
+
+    return snapshot;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[engine] fetchEngineHealth:", message);
+    return offlineSnapshot(message);
+  }
 }
 
 function refreshInBackground(): void {
@@ -139,24 +178,33 @@ function refreshInBackground(): void {
  * Returns cached engine health; revalidates in background when stale.
  */
 export async function getEngineHealthSnapshot(): Promise<EngineHealthSnapshot> {
-  const cached = swrGet<EngineHealthSnapshot>(CACHE_KEY);
+  try {
+    const cached = swrGet<EngineHealthSnapshot>(CACHE_KEY);
 
-  if (swrIsFresh(cached)) {
-    return cached!.value;
+    if (swrIsFresh(cached)) {
+      return cached!.value;
+    }
+
+    if (swrIsStaleUsable(cached)) {
+      refreshInBackground();
+      return cached!.value;
+    }
+
+    return coalesce(CACHE_KEY, async () => {
+      const snapshot = await fetchEngineHealth();
+      swrSet(CACHE_KEY, snapshot, FRESH_MS, STALE_MS);
+      return snapshot;
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[engine] getEngineHealthSnapshot:", message);
+    return offlineSnapshot(message);
   }
-
-  if (swrIsStaleUsable(cached)) {
-    refreshInBackground();
-    return cached!.value;
-  }
-
-  return coalesce(CACHE_KEY, async () => {
-    const snapshot = await fetchEngineHealth();
-    swrSet(CACHE_KEY, snapshot, FRESH_MS, STALE_MS);
-    return snapshot;
-  });
 }
 
 export function isEngineLockdown(snapshot: EngineHealthSnapshot): boolean {
-  return snapshot.status === "lockdown" && !snapshot.ok;
+  return (
+    !snapshot.ok &&
+    (snapshot.status === "lockdown" || snapshot.status === "offline")
+  );
 }

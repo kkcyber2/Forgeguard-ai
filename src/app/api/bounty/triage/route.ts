@@ -18,6 +18,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { openRouterRequestHeaders } from "@/lib/agathon-config";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -285,12 +286,10 @@ export async function POST(req: NextRequest) {
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${openrouterKey}`,
-        "HTTP-Referer":  "https://forgeguard.ai",
-        "X-Title":       "ForgeGuard AI — Bounty Vault CVSS Triage",
-      },
+      headers: openRouterRequestHeaders({
+        apiKey: openrouterKey,
+        title: "ForgeGuard AI - Bounty Vault CVSS Triage",
+      }),
       body: JSON.stringify({
         model:       "deepseek/deepseek-r1",
         messages:    [{ role: "user", content: buildTriagePrompt(data) }],

@@ -17,7 +17,9 @@ export interface SovereignHydratePayload {
 
 interface SovereignState extends SovereignHydratePayload {
   hydrated: boolean;
+  mounted: boolean;
   hydrate: (payload: SovereignHydratePayload) => void;
+  setMounted: (mounted: boolean) => void;
   setActiveRole: (role: SovereignRole) => void;
   setGhostMode: (active: boolean) => void;
 }
@@ -33,6 +35,7 @@ export const useSovereignStore = create<SovereignState>((set, get) => ({
   canGhost: false,
   operatorId: "",
   hydrated: false,
+  mounted: false,
   hydrate: (payload) => {
     let role = payload.activeRole;
     if (typeof window !== "undefined" && payload.canSwitch) {
@@ -47,6 +50,7 @@ export const useSovereignStore = create<SovereignState>((set, get) => ({
       hydrated: true,
     });
   },
+  setMounted: (mounted) => set({ mounted }),
   setActiveRole: (role) => {
     if (typeof window !== "undefined" && get().canSwitch) {
       localStorage.setItem(PERSONA_STORAGE_KEY, role);
@@ -56,17 +60,29 @@ export const useSovereignStore = create<SovereignState>((set, get) => ({
   setGhostMode: (active) => set({ isGhostMode: active }),
 }));
 
+/** True after client mount (avoids hydration #418 on persona UI). */
+export function useSovereignMounted(): boolean {
+  return useSovereignStore((s) => s.mounted);
+}
+
 /** True after SovereignProvider has hydrated client persona state. */
 export function useSovereignHydrated(): boolean {
   return useSovereignStore((s) => s.hydrated);
 }
 
-export function useSovereignAccent() {
+/** Persona UI safe to render (mounted + hydrated). */
+export function useSovereignPersonaReady(): boolean {
+  const mounted = useSovereignStore((s) => s.mounted);
   const hydrated = useSovereignStore((s) => s.hydrated);
+  return mounted && hydrated;
+}
+
+export function useSovereignAccent() {
+  const ready = useSovereignPersonaReady();
   const activeRole = useSovereignStore((s) => s.activeRole);
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
 
-  if (!hydrated) {
+  if (!ready) {
     return SOVEREIGN_ACCENTS.hacker;
   }
 
@@ -78,16 +94,16 @@ export function useSovereignAccent() {
 }
 
 export function useDashboardViewMode() {
-  const hydrated = useSovereignStore((s) => s.hydrated);
+  const ready = useSovereignPersonaReady();
   const activeRole = useSovereignStore((s) => s.activeRole);
-  if (!hydrated) return "hacker";
+  if (!ready) return "hacker";
   return activeRole === "client" ? "client" : "hacker";
 }
 
 export function useHackerPersonaAccent() {
-  const hydrated = useSovereignStore((s) => s.hydrated);
+  const ready = useSovereignPersonaReady();
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
-  if (!hydrated) {
+  if (!ready) {
     return SOVEREIGN_ACCENTS.hacker.primary;
   }
   return isGhostMode ? GHOST_MODE_ACCENT.primary : SOVEREIGN_ACCENTS.hacker.primary;

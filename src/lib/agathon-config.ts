@@ -67,6 +67,29 @@ export function logEngineHandshakeDiagnostics(): void {
   console.error(`ENV_SOURCE: ${resolveEngineUrlSource()}`);
 }
 
+/** Strip to ASCII-safe bytes for Fetch API Headers (ByteString). */
+export function sanitizeHttpHeaderValue(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
+}
+
+/** OpenRouter / engine fetch headers with ASCII-safe X-Title and Referer. */
+export function openRouterRequestHeaders(opts: {
+  apiKey: string;
+  title: string;
+  referer?: string;
+}): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${opts.apiKey}`,
+    "HTTP-Referer": sanitizeHttpHeaderValue(opts.referer ?? "https://forgeguard.ai"),
+    "X-Title": sanitizeHttpHeaderValue(opts.title),
+  };
+}
+
 /** @deprecated Use engineAuthHeaders */
 export function engineAuthorizationHeader():
   | Record<string, string>
@@ -81,11 +104,12 @@ export function engineAuthorizationHeader():
 export function engineAuthHeaders():
   | { "x-internal-scan-token": string; Authorization: string }
   | undefined {
-  const token = resolveEngineAuthToken();
-  if (!token) {
+  const raw = resolveEngineAuthToken();
+  if (!raw) {
     console.error("TOKEN_SENT: FALSE");
     return undefined;
   }
+  const token = sanitizeHttpHeaderValue(raw);
   return {
     "x-internal-scan-token": token,
     Authorization: `Bearer ${token}`,

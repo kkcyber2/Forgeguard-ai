@@ -13,7 +13,7 @@ import {
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import {
   useSovereignStore,
-  useSovereignHydrated,
+  useSovereignPersonaReady,
   useHackerPersonaAccent,
 } from "@/stores/use-sovereign-store";
 
@@ -43,7 +43,7 @@ export function IdentitySwitcher({
   compact?: boolean;
 }) {
   const router = useRouter();
-  const hydrated = useSovereignHydrated();
+  const personaReady = useSovereignPersonaReady();
   const storeRole = useSovereignStore((s) => s.activeRole);
   const canDev = useSovereignStore((s) => s.canDev);
   const canSwitchStore = useSovereignStore((s) => s.canSwitch);
@@ -53,8 +53,10 @@ export function IdentitySwitcher({
 
   const isSovereign = isSovereignOperator(operatorEmail);
   const activeMode =
-    activeModeProp ?? (hydrated ? storeRole : ("hacker" as SovereignRole));
-  const ghostTint = hydrated && isGhostMode;
+    activeModeProp ?? (personaReady ? storeRole : ("hacker" as SovereignRole));
+  const ghostTint = personaReady && isGhostMode;
+
+  if (!personaReady) return null;
   const canSwitch = canSwitchProp ?? canSwitchStore;
   const showDevChip = isSovereign && canDev;
 

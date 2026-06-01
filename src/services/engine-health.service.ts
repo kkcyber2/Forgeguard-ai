@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Client singleton for /api/health/engine — one poll stream, bunker retry on 503.
+ * Client singleton for /api/health/engine — one poll stream, bunker retry on offline.
  * Polling pauses while the tab is hidden to reduce setInterval lag.
  */
 
@@ -53,6 +53,15 @@ function bindVisibilityPause(): void {
   });
 }
 
+function isEngineDown(data: ClientEngineHealth): boolean {
+  return (
+    !data.ok &&
+    (data.status === "lockdown" ||
+      data.status === "offline" ||
+      data.status === "unconfigured")
+  );
+}
+
 async function fetchHealthOnce(): Promise<ClientEngineHealth> {
   const res = await fetch("/api/health/engine", { cache: "no-store" });
   return (await res.json()) as ClientEngineHealth;
@@ -62,7 +71,7 @@ async function probeWithBunkerFallback(): Promise<ClientEngineHealth> {
   try {
     let data = await fetchHealthOnce();
 
-    if (!data.ok && data.status === "lockdown") {
+    if (isEngineDown(data) && data.status !== "unconfigured") {
       console.error("[engine-health] client bunker fallback in", BUNKER_RETRY_MS, "ms");
       await sleep(BUNKER_RETRY_MS);
       data = await fetchHealthOnce();
@@ -71,13 +80,15 @@ async function probeWithBunkerFallback(): Promise<ClientEngineHealth> {
     health = data;
     listeners.forEach((fn) => fn(data));
     return data;
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
     const offline: ClientEngineHealth = {
       ok: false,
-      status: "lockdown",
+      status: "offline",
       latencyMs: 0,
       reason: "Engine bunker unreachable",
     };
+    console.error("[engine-health] probe failed:", message);
     health = offline;
     listeners.forEach((fn) => fn(offline));
     return offline;

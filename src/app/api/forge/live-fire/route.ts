@@ -18,6 +18,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { openRouterRequestHeaders } from "@/lib/agathon-config";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { normalizeHackerRankLabel } from "@/lib/access/ranks";
 
@@ -139,12 +140,10 @@ async function callOpenRouter(
 
   const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type":  "application/json",
-      "HTTP-Referer":  "https://forgeguard.ai",
-      "X-Title":       "ForgeGuard Live Fire",
-    },
+    headers: openRouterRequestHeaders({
+      apiKey,
+      title: "ForgeGuard Live Fire",
+    }),
     body: JSON.stringify({
       model:       modelMap[model],
       messages:    [

@@ -18,6 +18,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { openRouterRequestHeaders } from "@/lib/agathon-config";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -75,12 +76,10 @@ Return ONLY valid JSON:
   try {
     const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://forgeguard.ai",
-        "X-Title": "ForgeGuard Bazaar Customs",
-      },
+      headers: openRouterRequestHeaders({
+        apiKey,
+        title: "ForgeGuard Bazaar Customs",
+      }),
       body: JSON.stringify({
         model: "google/gemini-flash-1.5",  // Scout tier — FREE
         messages: [

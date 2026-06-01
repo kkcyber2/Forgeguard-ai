@@ -3,6 +3,7 @@
  * Shared by /api/verify/ai-audit, runAiAudit server action, and admin triage.
  */
 
+import { openRouterRequestHeaders } from "@/lib/agathon-config";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { resolveAppUrl } from "@/lib/app-url";
 
@@ -283,12 +284,11 @@ Respond ONLY with valid JSON:
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": resolveAppUrl(),
-        "X-Title": "ForgeGuard AI — Identity Perception",
-      },
+      headers: openRouterRequestHeaders({
+        apiKey,
+        title: "ForgeGuard AI - Identity Perception",
+        referer: resolveAppUrl(),
+      }),
       body: JSON.stringify({
         model: VISION_MODEL,
         messages: [
@@ -480,12 +480,11 @@ export async function runIdentityAudit(
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": resolveAppUrl(),
-        "X-Title": "ForgeGuard AI — Identity Auditor",
-      },
+      headers: openRouterRequestHeaders({
+        apiKey,
+        title: "ForgeGuard AI - Identity Auditor",
+        referer: resolveAppUrl(),
+      }),
       body: JSON.stringify({
         model: "deepseek/deepseek-r1",
         messages: [{ role: "user", content: buildPrompt(input) }],

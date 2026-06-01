@@ -3,6 +3,8 @@ export {
   useSovereignStore,
   useSovereignAccent,
   useSovereignHydrated,
+  useSovereignMounted,
+  useSovereignPersonaReady,
   useDashboardViewMode,
   useHackerPersonaAccent,
   type SovereignHydratePayload,

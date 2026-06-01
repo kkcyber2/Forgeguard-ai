@@ -6,7 +6,10 @@ import { Ghost, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GHOST_ACCENT, GHOST_LOCK_TOOLTIP } from "@/lib/access/ghost-mode";
 import { toggleGhostMode } from "@/components/dashboard/ghost-actions";
-import { useSovereignStore, useSovereignHydrated } from "@/stores/use-sovereign-store";
+import {
+  useSovereignStore,
+  useSovereignPersonaReady,
+} from "@/stores/use-sovereign-store";
 
 const GLITCH_VARIANTS = {
   idle: { x: 0, opacity: 1, filter: "none" },
@@ -33,7 +36,7 @@ export function GhostProtocolToggle({
   compact = false,
   className,
 }: GhostProtocolToggleProps) {
-  const hydrated = useSovereignHydrated();
+  const personaReady = useSovereignPersonaReady();
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
   const canGhost = useSovereignStore((s) => s.canGhost);
   const setGhostMode = useSovereignStore((s) => s.setGhostMode);
@@ -43,7 +46,7 @@ export function GhostProtocolToggle({
   const [error, setError] = React.useState<string | null>(null);
   const [glitchKey, setGlitchKey] = React.useState(0);
 
-  if (!hydrated || activeRole !== "hacker") return null;
+  if (!personaReady || activeRole !== "hacker") return null;
 
   async function handleToggle() {
     if (!canGhost || pending) return;

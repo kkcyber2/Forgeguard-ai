@@ -2,6 +2,7 @@
 
 /**
  * Client singleton for /api/health/engine — one poll stream, bunker retry on 503.
+ * Polling pauses while the tab is hidden to reduce setInterval lag.
  */
 
 export type ClientEngineHealth = {
@@ -14,16 +15,42 @@ export type ClientEngineHealth = {
 type Listener = (health: ClientEngineHealth) => void;
 
 const BUNKER_RETRY_MS = 2_000;
+const POLL_MS = 30_000;
 
 let health: ClientEngineHealth | null = null;
 let inflight: Promise<ClientEngineHealth> | null = null;
 let intervalId: ReturnType<typeof setInterval> | null = null;
+let visibilityBound = false;
 const listeners = new Set<Listener>();
-
-const POLL_MS = 30_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function stopPolling(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+  }
+}
+
+function startPolling(): void {
+  if (intervalId) return;
+  if (typeof document !== "undefined" && document.hidden) return;
+  void probe();
+  intervalId = setInterval(() => void probe(), POLL_MS);
+}
+
+function bindVisibilityPause(): void {
+  if (visibilityBound || typeof document === "undefined") return;
+  visibilityBound = true;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopPolling();
+    } else if (listeners.size > 0) {
+      startPolling();
+    }
+  });
 }
 
 async function fetchHealthOnce(): Promise<ClientEngineHealth> {
@@ -68,9 +95,8 @@ async function probe(): Promise<ClientEngineHealth> {
 }
 
 function ensurePolling(): void {
-  if (intervalId) return;
-  void probe();
-  intervalId = setInterval(() => void probe(), POLL_MS);
+  bindVisibilityPause();
+  startPolling();
 }
 
 /** Subscribe to shared engine health polls. */
@@ -80,9 +106,8 @@ export function subscribeEngineHealth(listener: Listener): () => void {
   if (health) listener(health);
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
+    if (listeners.size === 0) {
+      stopPolling();
     }
   };
 }

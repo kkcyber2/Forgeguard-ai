@@ -76,12 +76,14 @@ export function IdentityAuditor({
   auditStatus,
   auditScore,
   profileFullName,
+  initialFailureReason = null,
   sovereignBypass = false,
 }: {
   documentPath: string | null;
   auditStatus: string;
   auditScore: number | null;
   profileFullName?: string;
+  initialFailureReason?: string | null;
   sovereignBypass?: boolean;
 }) {
   const router = useRouter();
@@ -106,8 +108,20 @@ export function IdentityAuditor({
     failureReason?: string;
   } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [liveFailureReason, setLiveFailureReason] = useState<string | null>(
+    initialFailureReason,
+  );
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
   const busy = pending || auditing;
+
+  const statusNorm = auditStatus.toLowerCase();
+  const displayFailureReason =
+    liveFailureReason ??
+    auditResult?.failureReason ??
+    initialFailureReason;
+  const showPersistedFailure =
+    (statusNorm === "failed" || statusNorm === "review") &&
+    !!displayFailureReason?.trim();
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -217,12 +231,19 @@ export function IdentityAuditor({
 
       if (audit.error || !audit.ok) {
         const reason =
-          audit.failure_reason ?? audit.error ?? "AI audit failed.";
+          audit.identity_failure_reason ??
+          audit.failure_reason ??
+          audit.error ??
+          "AI audit failed.";
+        setLiveFailureReason(reason);
         setError(reason);
         return;
       }
 
       const passed = !!audit.passed;
+      const persistedReason =
+        audit.identity_failure_reason ?? audit.failure_reason ?? null;
+      setLiveFailureReason(passed ? null : persistedReason);
       const extractedName = audit.result?.extracted_name ?? "";
       const profileName = audit.profile_full_name ?? profileFullName ?? "";
 
@@ -244,8 +265,8 @@ export function IdentityAuditor({
         failureReason: passed ? undefined : audit.failure_reason,
       });
 
-      if (!passed && audit.failure_reason) {
-        setError(audit.failure_reason);
+      if (!passed && persistedReason) {
+        setError(null);
       }
 
       router.refresh();
@@ -325,9 +346,16 @@ export function IdentityAuditor({
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
           Identity auditor
         </p>
-        <span className="ml-auto font-mono text-[9px] uppercase tracking-widest text-zinc-500">
-          {auditStatus}
-        </span>
+        <div className="ml-auto flex max-w-[min(100%,280px)] flex-col items-end gap-1 text-right">
+          <span className="font-mono text-[9px] uppercase tracking-widest text-zinc-500">
+            {auditStatus}
+          </span>
+          {showPersistedFailure && displayFailureReason && (
+            <p className="font-mono text-[10px] leading-relaxed text-[#D1FF00]">
+              {displayFailureReason}
+            </p>
+          )}
+        </div>
       </div>
 
       <p className="font-mono text-[10px] leading-relaxed text-white/55">
@@ -480,16 +508,15 @@ export function IdentityAuditor({
             {auditResult.passed ? "MATCH" : "REVIEW"}
           </p>
           <p className="mt-1 text-zinc-500">{auditResult.notes}</p>
-          {auditResult.failureReason && (
-            <p className="mt-1 text-red-400/90">{auditResult.failureReason}</p>
+          {auditResult.failureReason && !showPersistedFailure && (
+            <p className="mt-1 font-mono text-[10px] text-[#D1FF00]">
+              {auditResult.failureReason}
+            </p>
           )}
         </div>
       )}
 
-      {error && !auditResult?.failureReason && (
-        <p className="font-mono text-[10px] text-red-400/90">{error}</p>
-      )}
-      {error && auditResult?.failureReason && error !== auditResult.failureReason && (
+      {error && !showPersistedFailure && (
         <p className="font-mono text-[10px] text-red-400/90">{error}</p>
       )}
     </div>

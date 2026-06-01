@@ -10,6 +10,9 @@ import "./globals.css";
  * No Supabase client created here — server components that need auth
  * should import from @/lib/supabase/server and create a request-scoped
  * client. Never instantiate a Supabase client at module scope.
+ *
+ * Extension errors (e.g. "import statement" in the console) are from browser
+ * extensions — use Incognito for clean logs.
  */
 
 // Fail fast on boot if public env is misconfigured.

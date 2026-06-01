@@ -16,6 +16,7 @@ export type IdentityAuditorClientWrapperProps = {
   auditStatus: string;
   auditScore: number | null;
   profileFullName: string;
+  initialFailureReason?: string | null;
   sovereignBypass?: boolean;
 };
 

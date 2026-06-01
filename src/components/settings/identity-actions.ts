@@ -4,13 +4,17 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
-import { executeIdentityAuditForUser } from "@/lib/verify/identity-audit-pipeline";
+import {
+  executeIdentityAuditForUser,
+  persistIdentityFailureReason,
+} from "@/lib/verify/identity-audit-pipeline";
 import type { IdentityAuditResult } from "@/lib/verify/ai-audit";
 
 export interface RunAiAuditResponse {
   ok?: boolean;
   error?: string;
   failure_reason?: string;
+  identity_failure_reason?: string | null;
   profile_full_name?: string;
   result?: IdentityAuditResult;
   passed?: boolean;
@@ -20,12 +24,17 @@ export interface RunAiAuditResponse {
 export async function runAiAudit(
   documentPath: string,
 ): Promise<RunAiAuditResponse> {
+  let userId: string | undefined;
+
   try {
     const user = await getSessionUser();
     if (!user) return { error: "Not authenticated." };
+    userId = user.id;
 
     if (!documentPath?.trim()) {
-      return { error: "No identity document on file. Upload or capture first." };
+      const reason = "No identity document on file. Upload or capture first.";
+      await persistIdentityFailureReason(user.id, reason);
+      return { error: reason, failure_reason: reason, identity_failure_reason: reason };
     }
 
     let admin: ReturnType<typeof createAdminSupabase>;
@@ -49,10 +58,9 @@ export async function runAiAudit(
     }
 
     if (!profile?.full_name) {
-      return {
-        error: "Set your full name in Profile before auditing.",
-        failure_reason: "Profile name required for ID cross-check.",
-      };
+      const reason = "Profile name required for ID cross-check.";
+      await persistIdentityFailureReason(user.id, reason);
+      return { error: "Set your full name in Profile before auditing.", failure_reason: reason, identity_failure_reason: reason };
     }
 
     const outcome = await executeIdentityAuditForUser(
@@ -62,33 +70,42 @@ export async function runAiAudit(
     );
 
     if (outcome.error) {
+      const reason = outcome.identity_failure_reason ?? outcome.failure_reason ?? outcome.error;
       console.error("[verify:auditor] runAiAudit failed:", {
         userId: user.id,
         documentPath: documentPath.trim(),
         error: outcome.error,
-        failure_reason: outcome.failure_reason ?? outcome.error,
+        failure_reason: reason,
       });
       return {
         error: outcome.error,
-        failure_reason: outcome.failure_reason ?? outcome.error,
+        failure_reason: reason,
+        identity_failure_reason: reason,
+        status: "failed",
       };
     }
 
     revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard");
 
+    const reason = outcome.identity_failure_reason ?? outcome.failure_reason ?? null;
+
     return {
       ok: true,
       result: outcome.result,
       passed: outcome.passed,
       status: outcome.status,
-      failure_reason: outcome.failure_reason,
+      failure_reason: reason ?? undefined,
+      identity_failure_reason: reason,
       profile_full_name: profile.full_name ?? undefined,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Identity audit failed";
     console.error("[verify:auditor] runAiAudit:", msg);
-    return { error: msg, failure_reason: msg };
+    if (userId) {
+      await persistIdentityFailureReason(userId, msg);
+    }
+    return { error: msg, failure_reason: msg, identity_failure_reason: msg };
   }
 }
 

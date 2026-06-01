@@ -1445,6 +1445,7 @@ export type Database = {
           identity_audit_notes: string | null
           identity_audit_score: number | null
           identity_audit_status: string | null
+          identity_failure_reason: string | null
           identity_document_path: string | null
           identity_status: string | null
           identity_verified: boolean | null
@@ -1496,6 +1497,7 @@ export type Database = {
           identity_audit_notes?: string | null
           identity_audit_score?: number | null
           identity_audit_status?: string | null
+          identity_failure_reason?: string | null
           identity_document_path?: string | null
           identity_status?: string | null
           identity_verified?: boolean | null
@@ -1547,6 +1549,7 @@ export type Database = {
           identity_audit_notes?: string | null
           identity_audit_score?: number | null
           identity_audit_status?: string | null
+          identity_failure_reason?: string | null
           identity_document_path?: string | null
           identity_status?: string | null
           identity_verified?: boolean | null

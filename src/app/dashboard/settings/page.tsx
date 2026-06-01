@@ -120,6 +120,7 @@ export default async function SettingsPage() {
                 auditStatus={data.profile?.identity_audit_status ?? "none"}
                 auditScore={data.auditScore}
                 profileFullName={data.profile?.full_name ?? ""}
+                initialFailureReason={data.profile?.identity_failure_reason ?? null}
                 sovereignBypass={sovereignBypass}
               />
             </div>

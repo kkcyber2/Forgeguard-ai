@@ -315,6 +315,7 @@ Respond ONLY with valid JSON:
       return {
         documentText:
           `[IMAGE] profile=${profileFullName}. Vision HTTP ${response.status} — fallback metadata.`,
+        failure_reason: `Gemini vision rejected request (HTTP ${response.status}): ${bodySnippet.slice(0, 200) || "no body"}`,
       };
     }
 
@@ -378,6 +379,7 @@ export async function runIdentityAuditFromStorage(
 }> {
   let documentText = input.documentTextOverride?.trim() ?? "";
   let perceptionMode: IdentityAuditResult["mode"] = "deepseek-r1";
+  let visionProviderError: string | undefined;
 
   if (!documentText) {
     const downloaded = await downloadVerificationDocument(input.documentPath);
@@ -406,6 +408,7 @@ export async function runIdentityAuditFromStorage(
       }
 
       documentText = vision.documentText;
+      visionProviderError = vision.failure_reason;
       perceptionMode = "vision+deepseek-r1";
     } else {
       documentText = await documentBufferToText(buffer, mimeType, input.documentPath);
@@ -419,24 +422,33 @@ export async function runIdentityAuditFromStorage(
     };
   }
 
-  const result = await runIdentityAudit({
+  const auditRun = await runIdentityAudit({
     documentText,
     profileFullName: input.profileFullName,
     profileEmail: input.profileEmail,
   });
+  const result = auditRun.result;
 
   if (perceptionMode === "vision+deepseek-r1" && result.mode === "deepseek-r1") {
     result.mode = "vision+deepseek-r1";
   }
 
-  return { result };
+  return {
+    result,
+    failure_reason: auditRun.providerError ?? visionProviderError,
+  };
 }
 
 export async function runIdentityAudit(
   input: IdentityAuditInput,
-): Promise<IdentityAuditResult> {
+): Promise<{ result: IdentityAuditResult; providerError?: string }> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return heuristicIdentityAudit(input);
+  if (!apiKey) {
+    return {
+      result: heuristicIdentityAudit(input),
+      providerError: "OPENROUTER_API_KEY not configured — heuristic audit only.",
+    };
+  }
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -459,12 +471,12 @@ export async function runIdentityAudit(
 
     if (!response.ok) {
       const bodySnippet = (await response.text().catch(() => "")).slice(0, 500);
-      console.error(
-        "[verify:ai-audit] DeepSeek-R1 HTTP",
-        response.status,
-        bodySnippet || "<empty body>",
-      );
-      return heuristicIdentityAudit(input);
+      const providerError = `DeepSeek-R1 rejected request (HTTP ${response.status}): ${bodySnippet.slice(0, 200) || "no body"}`;
+      console.error("[verify:ai-audit] DeepSeek-R1 HTTP", response.status, bodySnippet);
+      return {
+        result: heuristicIdentityAudit(input),
+        providerError,
+      };
     }
 
     const completion = (await response.json()) as {
@@ -505,19 +517,24 @@ export async function runIdentityAudit(
     );
 
     return {
-      extracted_name: extractedName || input.profileFullName,
-      name_match: nameMatch,
-      confidence_score: nameMatch && fuzzyMatch && confidence < 80 ? 85 : confidence,
-      audit_notes:
-        parsed.audit_notes ??
-        (fuzzyMatch
-          ? "DeepSeek-R1 fuzzy identity match (≥80% similar)."
-          : "DeepSeek-R1 identity audit complete."),
-      mode: "deepseek-r1",
+      result: {
+        extracted_name: extractedName || input.profileFullName,
+        name_match: nameMatch,
+        confidence_score: nameMatch && fuzzyMatch && confidence < 80 ? 85 : confidence,
+        audit_notes:
+          parsed.audit_notes ??
+          (fuzzyMatch
+            ? "DeepSeek-R1 fuzzy identity match (≥80% similar)."
+            : "DeepSeek-R1 identity audit complete."),
+        mode: "deepseek-r1",
+      },
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[verify:ai-audit] DeepSeek-R1 request failed:", msg);
-    return heuristicIdentityAudit(input);
+    return {
+      result: heuristicIdentityAudit(input),
+      providerError: `DeepSeek-R1 request failed: ${msg}`,
+    };
   }
 }

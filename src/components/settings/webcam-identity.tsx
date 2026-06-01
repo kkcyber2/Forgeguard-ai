@@ -269,9 +269,9 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   }
 
   return (
-    <form
+    <div
+      role="group"
       className="flex flex-col gap-4"
-      onSubmit={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
           e.preventDefault();
@@ -416,6 +416,6 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
           </>
         ) : null}
       </div>
-    </form>
+    </div>
   );
 }

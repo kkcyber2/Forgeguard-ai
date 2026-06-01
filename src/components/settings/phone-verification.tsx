@@ -46,10 +46,10 @@ export function PhoneVerification({
   }
 
   return (
-    <form
+    <div
+      role="group"
       className="space-y-3 scroll-mt-24"
       id="clearance-phone"
-      onSubmit={(e) => e.preventDefault()}
     >
       <div className="flex items-center gap-2">
         <Phone size={12} className="text-[#D1FF00]/80" />
@@ -145,6 +145,6 @@ export function PhoneVerification({
           OTP storage.
         </p>
       )}
-    </form>
+    </div>
   );
 }

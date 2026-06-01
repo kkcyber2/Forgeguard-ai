@@ -112,6 +112,51 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (event.kind === "scan.completed" && event.scanId && body.payload) {
+    const p = body.payload;
+    const technicalReport =
+      typeof p.technical_report_md === "string" ? p.technical_report_md : null;
+    const aleUsd = p.ale_usd ?? p.financial_liability_usd ?? null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin as any)
+        .from("scans")
+        .update({
+          status: (p.status as string) ?? "completed",
+          progress_pct: 100,
+          ...(p.failure_reason
+            ? { failure_reason: String(p.failure_reason) }
+            : {}),
+        })
+        .eq("id", event.scanId);
+
+      if (technicalReport) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin as any).from("scan_reports").upsert(
+          {
+            scan_id: event.scanId,
+            audit_report_md: technicalReport,
+            executive_summary_md:
+              typeof p.executive_summary === "string"
+                ? p.executive_summary
+                : technicalReport.slice(0, 4000),
+            cvss_overall: p.overall_cvss
+              ? Number.parseFloat(String(p.overall_cvss))
+              : 0,
+            risk_label: String(p.overall_severity ?? "NONE").toUpperCase(),
+            financial_liability_usd: aleUsd
+              ? Number.parseFloat(String(aleUsd))
+              : null,
+            ale_usd: aleUsd ? Number.parseFloat(String(aleUsd)) : null,
+          },
+          { onConflict: "scan_id" },
+        );
+      }
+    } catch (err) {
+      console.warn("[webhook:agathon] scan.completed persist skipped:", err);
+    }
+  }
+
   if (event.kind.includes("scans") && event.scanId && body.record) {
     const status = body.record.status as string | undefined;
     const progress = body.record.progress_pct as number | undefined;

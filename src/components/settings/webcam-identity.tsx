@@ -81,7 +81,8 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
     if (startingRef.current) return;
 
     if (typeof window !== "undefined" && !window.isSecureContext) {
-      setErrorMsg("Camera requires HTTPS. Use a secure URL (not plain HTTP).");
+      alert("SSL REQUIRED FOR BIOMETRICS");
+      setErrorMsg("Camera requires HTTPS.");
       setState("error");
       return;
     }
@@ -150,6 +151,13 @@ export function WebcamIdentity({ verified }: { verified: boolean }) {
   }, [stopCamera]);
 
   const forceRequestPermissions = useCallback(async () => {
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      alert("SSL REQUIRED FOR BIOMETRICS");
+      setErrorMsg("Camera requires HTTPS.");
+      setState("error");
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setErrorMsg("Camera API unavailable. Use HTTPS or a modern browser.");
       setState("error");

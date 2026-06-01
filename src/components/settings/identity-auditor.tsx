@@ -134,6 +134,13 @@ export function IdentityAuditor({
     if (videoRef.current?.srcObject || streamRef.current) return;
     if (startingRef.current) return;
 
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      alert("SSL REQUIRED FOR BIOMETRICS");
+      setCamError("Camera requires HTTPS.");
+      setCamState("error");
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setCamError("Camera unavailable in this browser.");
       setCamState("error");

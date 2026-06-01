@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Client singleton for /api/health/engine — one poll stream for all subscribers.
+ * Client singleton for /api/health/engine — one poll stream, bunker retry on 503.
  */
 
 export type ClientEngineHealth = {
@@ -13,6 +13,8 @@ export type ClientEngineHealth = {
 
 type Listener = (health: ClientEngineHealth) => void;
 
+const BUNKER_RETRY_MS = 2_000;
+
 let health: ClientEngineHealth | null = null;
 let inflight: Promise<ClientEngineHealth> | null = null;
 let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -20,30 +22,47 @@ const listeners = new Set<Listener>();
 
 const POLL_MS = 30_000;
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchHealthOnce(): Promise<ClientEngineHealth> {
+  const res = await fetch("/api/health/engine", { cache: "no-store" });
+  return (await res.json()) as ClientEngineHealth;
+}
+
+async function probeWithBunkerFallback(): Promise<ClientEngineHealth> {
+  try {
+    let data = await fetchHealthOnce();
+
+    if (!data.ok && data.status === "lockdown") {
+      console.error("[engine-health] client bunker fallback in", BUNKER_RETRY_MS, "ms");
+      await sleep(BUNKER_RETRY_MS);
+      data = await fetchHealthOnce();
+    }
+
+    health = data;
+    listeners.forEach((fn) => fn(data));
+    return data;
+  } catch {
+    const offline: ClientEngineHealth = {
+      ok: false,
+      status: "lockdown",
+      latencyMs: 0,
+      reason: "Engine bunker unreachable",
+    };
+    health = offline;
+    listeners.forEach((fn) => fn(offline));
+    return offline;
+  }
+}
+
 async function probe(): Promise<ClientEngineHealth> {
   if (inflight) return inflight;
 
-  inflight = (async () => {
-    try {
-      const res = await fetch("/api/health/engine", { cache: "no-store" });
-      const data = (await res.json()) as ClientEngineHealth;
-      health = data;
-      listeners.forEach((fn) => fn(data));
-      return data;
-    } catch {
-      const offline: ClientEngineHealth = {
-        ok: false,
-        status: "lockdown",
-        latencyMs: 0,
-        reason: "Engine bunker unreachable",
-      };
-      health = offline;
-      listeners.forEach((fn) => fn(offline));
-      return offline;
-    } finally {
-      inflight = null;
-    }
-  })();
+  inflight = probeWithBunkerFallback().finally(() => {
+    inflight = null;
+  });
 
   return inflight;
 }
@@ -54,6 +73,7 @@ function ensurePolling(): void {
   intervalId = setInterval(() => void probe(), POLL_MS);
 }
 
+/** Subscribe to shared engine health polls. */
 export function subscribeEngineHealth(listener: Listener): () => void {
   listeners.add(listener);
   ensurePolling();

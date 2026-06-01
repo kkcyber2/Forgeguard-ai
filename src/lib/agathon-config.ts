@@ -19,6 +19,15 @@ export function resolveEngineAuthToken(): string | undefined {
   );
 }
 
+/** Log the exact engine health URL (no secrets). */
+export function logEngineProbeTarget(baseUrl: string | undefined): void {
+  if (!baseUrl) {
+    console.error("[engine] probe URL: <unset — configure PYTHON_ENGINE_URL>");
+    return;
+  }
+  console.error("[engine] probe URL:", `${baseUrl.replace(/\/$/, "")}/health`);
+}
+
 /** @deprecated Use engineAuthHeaders */
 export function engineAuthorizationHeader():
   | Record<string, string>

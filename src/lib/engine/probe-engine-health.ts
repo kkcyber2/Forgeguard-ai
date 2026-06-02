@@ -4,6 +4,7 @@ import {
   engineAuthHeaders,
   logEngineHandshakeDiagnostics,
   logEngineProbeTarget,
+  logSovereignHandshakeDebug,
   resolveEngineAuthToken,
   resolveEngineBaseUrl,
   sanitizeHttpHeaderValue,
@@ -130,6 +131,7 @@ async function fetchEngineHealth(): Promise<EngineHealthSnapshot> {
     }
 
     const healthUrl = buildEngineHealthUrl(baseUrl);
+    logSovereignHandshakeDebug(healthUrl);
     const safeHeaders = sanitizeAuthHeaders(authHeader);
     let snapshot = await probeOnce(healthUrl, safeHeaders);
 

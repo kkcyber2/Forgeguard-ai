@@ -76,6 +76,17 @@ export function logEngineHandshakeDiagnostics(): void {
   console.error(`ENV_SOURCE: ${resolveEngineUrlSource()}`);
 }
 
+/** Visible in Vercel Runtime Logs — URL + token prefix only (no full secret). */
+export function logSovereignHandshakeDebug(url: string): void {
+  const tokenPrefix =
+    process.env.INTERNAL_SCAN_TOKEN?.substring(0, 4) ??
+    process.env.AGATHON_INTERNAL_SECRET?.substring(0, 4);
+  console.log("--- SOVEREIGN HANDSHAKE DEBUG ---");
+  console.log("URL:", url);
+  console.log("TOKEN_PREFIX:", tokenPrefix);
+  console.log("---------------------------------");
+}
+
 /** Strip to ASCII-safe bytes for Fetch API Headers (ByteString). */
 export function sanitizeHttpHeaderValue(value: string): string {
   return value
@@ -303,6 +314,7 @@ export async function directPingEngine(): Promise<DirectPingResult> {
 
   const url = buildEngineHealthUrl(base);
   const headers = engineAuthHeaders();
+  logSovereignHandshakeDebug(url);
   console.error("ENGINE_DIRECT_PING_URL:", url);
 
   if (!headers) {

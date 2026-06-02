@@ -21,9 +21,13 @@ export function SovereignProvider({
   const hydrated = useSovereignStore((s) => s.hydrated);
   const mounted = useSovereignStore((s) => s.mounted);
   const accent = useSovereignAccent();
+  const [clientReady, setClientReady] = React.useState(false);
 
-  React.useEffect(() => {
-    setMounted(true);
+  React.useLayoutEffect(() => {
+    if (typeof document !== "undefined") {
+      setClientReady(true);
+      setMounted(true);
+    }
     return () => setMounted(false);
   }, [setMounted]);
 
@@ -38,6 +42,15 @@ export function SovereignProvider({
     root.style.setProperty("--sovereign-glow", accent.glow);
     root.setAttribute("data-persona", activeRole === "dev" ? "dev" : activeRole);
   }, [activeRole, isGhostMode, accent, hydrated, mounted]);
+
+  if (!clientReady) {
+    return (
+      <div
+        className="min-h-0 animate-pulse bg-obsidian-950/40"
+        aria-hidden="true"
+      />
+    );
+  }
 
   return <>{children}</>;
 }

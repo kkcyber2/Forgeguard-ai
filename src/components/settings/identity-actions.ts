@@ -12,13 +12,40 @@ import type { IdentityAuditResult } from "@/lib/verify/ai-audit";
 
 export interface RunAiAuditResponse {
   ok?: boolean;
+  success?: boolean;
   error?: string;
+  reason?: string;
   failure_reason?: string;
   identity_failure_reason?: string | null;
   profile_full_name?: string;
   result?: IdentityAuditResult;
   passed?: boolean;
   status?: string;
+}
+
+const ENGINE_COMM_FAIL_REASON =
+  "Engine communication failed — check Railway/Vercel token sync.";
+
+function isEngineCommunicationError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    /engine ocr|python_engine_url|internal_scan_token|fetch failed|503|401|502|504|engine unreachable|engine communication|timed out|timeout|abort/i.test(
+      message,
+    ) || lower.includes("engine")
+  );
+}
+
+function engineCommFailResponse(reason: string): RunAiAuditResponse {
+  return {
+    success: false,
+    ok: false,
+    error: "ENGINE_COMM_FAIL",
+    reason,
+    failure_reason: reason,
+    identity_failure_reason:
+      "Engine unreachable — verify INTERNAL_SCAN_TOKEN matches Railway.",
+    status: "failed",
+  };
 }
 
 export async function runAiAudit(
@@ -63,11 +90,19 @@ export async function runAiAudit(
       return { error: "Set your full name in Profile before auditing.", failure_reason: reason, identity_failure_reason: reason };
     }
 
-    const outcome = await executeIdentityAuditForUser(
-      user.id,
-      documentPath.trim(),
-      profile,
-    );
+    let outcome: Awaited<ReturnType<typeof executeIdentityAuditForUser>>;
+    try {
+      outcome = await executeIdentityAuditForUser(
+        user.id,
+        documentPath.trim(),
+        profile,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error("[verify:auditor] ENGINE_COMM_FAIL:", reason);
+      await persistIdentityFailureReason(user.id, ENGINE_COMM_FAIL_REASON);
+      return engineCommFailResponse(reason);
+    }
 
     console.error(
       "[verify:auditor] runAiAudit outcome (pre-persist):",
@@ -83,6 +118,15 @@ export async function runAiAudit(
 
     if (outcome.error) {
       const reason = outcome.identity_failure_reason ?? outcome.failure_reason ?? outcome.error;
+      if (isEngineCommunicationError(outcome.error) || isEngineCommunicationError(reason)) {
+        console.error("[verify:auditor] ENGINE_COMM_FAIL (soft):", {
+          userId: user.id,
+          documentPath: documentPath.trim(),
+          error: outcome.error,
+          failure_reason: reason,
+        });
+        return engineCommFailResponse(reason);
+      }
       console.error("[verify:auditor] runAiAudit failed:", {
         userId: user.id,
         documentPath: documentPath.trim(),
@@ -104,6 +148,7 @@ export async function runAiAudit(
 
     return {
       ok: true,
+      success: true,
       result: outcome.result,
       passed: outcome.passed,
       status: outcome.status,
@@ -117,7 +162,10 @@ export async function runAiAudit(
     if (userId) {
       await persistIdentityFailureReason(userId, msg);
     }
-    return { error: msg, failure_reason: msg, identity_failure_reason: msg };
+    if (isEngineCommunicationError(msg)) {
+      return engineCommFailResponse(msg);
+    }
+    return { error: msg, failure_reason: msg, identity_failure_reason: msg, success: false, ok: false };
   }
 }
 

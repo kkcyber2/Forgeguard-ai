@@ -243,10 +243,13 @@ export function IdentityAuditor({
 
       if (audit.error || !audit.ok) {
         const reason =
-          audit.identity_failure_reason ??
-          audit.failure_reason ??
-          audit.error ??
-          "AI audit failed.";
+          audit.error === "ENGINE_COMM_FAIL"
+            ? (audit.identity_failure_reason ??
+              "Engine unreachable — verify INTERNAL_SCAN_TOKEN matches Railway.")
+            : (audit.identity_failure_reason ??
+              audit.failure_reason ??
+              audit.error ??
+              "AI audit failed.");
         setLiveFailureReason(reason);
         setError(reason);
         return;

@@ -89,7 +89,7 @@ export function DomainVerifier({ existingDomain, domainVerified }: Props) {
         >
           <BadgeCheck size={14} style={{ color: "#38BDF8" }} strokeWidth={1.5} />
           <span className="font-mono text-sm font-semibold" style={{ color: "#38BDF8" }}>
-            [{domain.toUpperCase()}]
+            [{String(domain ?? "").toUpperCase()}]
           </span>
           <span className="text-xs ml-2" style={{ color: "rgba(255,255,255,0.35)" }}>
             Domain ownership confirmed. Badge active on all missions.

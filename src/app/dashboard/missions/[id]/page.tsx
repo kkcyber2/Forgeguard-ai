@@ -185,7 +185,7 @@ export default async function MissionDetailPage({ params }: Props) {
               className="font-mono text-[10px] uppercase tracking-[0.15em]"
               style={{ color: mission.status === "open" ? "#D1FF00" : "rgba(255,255,255,0.3)" }}
             >
-              ● {mission.status?.toUpperCase()}
+              ● {String(mission.status ?? "").toUpperCase()}
             </span>
             {isOwner && mission.status === "in_progress" && (
               <CompleteMissionButton missionId={id} />

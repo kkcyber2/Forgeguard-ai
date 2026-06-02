@@ -1,5 +1,6 @@
 import {
   buildEngineHealthUrl,
+  directPingEngine,
   engineAuthHeaders,
   logEngineHandshakeDiagnostics,
   logEngineProbeTarget,
@@ -155,7 +156,10 @@ async function fetchEngineHealth(): Promise<EngineHealthSnapshot> {
           "[engine] bunker fallback: retry failed",
           snapshot.httpStatus ?? snapshot.error ?? snapshot.status,
         );
+        await directPingEngine();
       }
+    } else if (!snapshot.ok && snapshot.status !== "unconfigured") {
+      await directPingEngine();
     }
 
     return snapshot;

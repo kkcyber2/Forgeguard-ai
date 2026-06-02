@@ -241,7 +241,9 @@ function ReconMap({ report, targetUrl }: { report: DiscoveryReport | null; targe
           {/* Endpoint branches */}
           {endpoints.map((ep, i) => {
             const y = 32 + 28 + i * 26;
-            const methodClass = METHOD_COLOR[ep.method?.toUpperCase()] || "text-foreground-muted";
+            const methodClass =
+              METHOD_COLOR[String(ep.method ?? "").toUpperCase()] ||
+              "text-foreground-muted";
             const methodFill = ep.method === "GET" ? "#4ade80" : ep.method === "POST" ? "#d1ff00" :
               ep.method === "DELETE" ? "#f87171" : ep.method === "PUT" ? "#60a5fa" : "#c084fc";
             return (

@@ -164,7 +164,7 @@ export function UserDirectory({ operators, searchQuery }: UserDirectoryProps) {
                     void runAction(op.id, () =>
                       setOperatorRank(
                         op.id,
-                        rank.toUpperCase(),
+                        String(rank ?? "").toUpperCase(),
                         level ? parseInt(level, 10) : undefined,
                       ),
                     );

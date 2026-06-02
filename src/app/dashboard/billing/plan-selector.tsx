@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, CreditCard, Lock, ShieldCheck, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanId, PlanMeta } from "@/lib/lemonsqueezy-client";
-import { buildCheckoutUrl } from "@/lib/lemonsqueezy-client";
+import { resolveCheckoutUrl } from "@/lib/payments/lemon-squeezy";
 
 /* ─────────────────────────── helpers ─────────────────────────────────── */
 
@@ -400,7 +400,7 @@ function PlanCardClient({
 export function PlanSelector({
   plans,
   currentPlan,
-  variantMap,
+  variantMap: _variantMap,
   userEmail,
   userId,
 }: {
@@ -410,14 +410,13 @@ export function PlanSelector({
   userEmail: string;
   userId: string;
 }) {
+  void _variantMap;
   const [selectedPlan, setSelectedPlan] = React.useState<PlanId | null>(null);
 
   const activePlan = selectedPlan ?? null;
   const activeMeta = activePlan ? plans.find((p) => p.id === activePlan) : null;
   const checkoutUrl =
-    activePlan && variantMap[activePlan]
-      ? buildCheckoutUrl(variantMap[activePlan], userEmail, userId)
-      : null;
+    activePlan ? resolveCheckoutUrl(activePlan, userEmail, userId) : null;
 
   const showPayment = !!activePlan && activePlan !== "free" && !!checkoutUrl;
 

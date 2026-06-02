@@ -6,6 +6,8 @@
 import { openRouterRequestHeaders } from "@/lib/agathon-config";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { resolveAppUrl } from "@/lib/app-url";
+import { callEngineIdentityOcr } from "@/lib/verify/engine-identity-ocr";
+import { stripNonAscii } from "@/lib/verify/text-transport";
 
 export interface IdentityAuditInput {
   documentText: string;
@@ -31,6 +33,16 @@ export interface StoredDocumentInput {
 const MAX_IMAGE_BYTES = 900_000;
 const VISION_MODEL = "google/gemini-flash-1.5";
 const FUZZY_MATCH_THRESHOLD = 0.8;
+const AUDIT_TIMEOUT_MS = 20_000;
+
+/** Returned when engine/AI exceeds slow-path threshold — manual review, not hard fail. */
+export const REVIEW_REQUIRED_AUDIT_RESULT: IdentityAuditResult = {
+  extracted_name: "",
+  name_match: false,
+  confidence_score: 50,
+  audit_notes: "REVIEW_REQUIRED - engine or AI slow; manual review.",
+  mode: "heuristic",
+};
 
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
@@ -184,6 +196,32 @@ export function deriveFailureReason(
   return result.audit_notes || "Identity audit did not pass.";
 }
 
+async function assertVerificationDocumentExists(
+  documentPath: string,
+): Promise<{ ok: true } | { error: string }> {
+  const admin = createAdminSupabase();
+  const slash = documentPath.lastIndexOf("/");
+  const folder = slash >= 0 ? documentPath.slice(0, slash) : "";
+  const fileName = slash >= 0 ? documentPath.slice(slash + 1) : documentPath;
+
+  const { data, error } = await admin.storage
+    .from("verification-docs")
+    .list(folder);
+
+  if (error) {
+    console.error("[verify:ai-audit] storage list:", error.message);
+    return { error: "Could not verify document in secure storage." };
+  }
+
+  const found = (data ?? []).some((f) => f.name === fileName);
+  if (!found) {
+    return {
+      error: "Identity document not found in secure storage. Re-upload and retry.",
+    };
+  }
+  return { ok: true };
+}
+
 async function downloadVerificationDocument(
   documentPath: string,
 ): Promise<{ buffer: Buffer; mimeType: string } | { error: string }> {
@@ -304,11 +342,13 @@ Respond ONLY with valid JSON:
         max_tokens: 700,
         response_format: { type: "json_object" },
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(AUDIT_TIMEOUT_MS),
     });
 
     if (!response.ok) {
-      const bodySnippet = (await response.text().catch(() => "")).slice(0, 500);
+      const bodySnippet = stripNonAscii(
+        (await response.text().catch(() => "")).slice(0, 500),
+      );
       console.error(
         "[verify:ai-audit] Vision HTTP",
         response.status,
@@ -328,7 +368,7 @@ Respond ONLY with valid JSON:
       "[verify:ai-audit] Vision RAW JSON:",
       JSON.stringify(completion),
     );
-    const raw = completion.choices?.[0]?.message?.content ?? "{}";
+    const raw = stripNonAscii(completion.choices?.[0]?.message?.content ?? "{}");
     const parsed = JSON.parse(raw) as {
       extracted_name?: string;
       document_readable?: boolean;
@@ -339,15 +379,17 @@ Respond ONLY with valid JSON:
 
     if (parsed.blur_detected || parsed.document_readable === false) {
       return {
-        documentText: parsed.ocr_text ?? "",
+        documentText: stripNonAscii(parsed.ocr_text ?? ""),
         blocked: true,
         failure_reason: "Image blurry — hold steady and retake.",
-        audit_notes: parsed.audit_notes ?? "Image too blurry to verify.",
+        audit_notes: stripNonAscii(
+          parsed.audit_notes ?? "Image too blurry to verify.",
+        ),
       };
     }
 
-    const ocr = (parsed.ocr_text ?? "").trim();
-    const extracted = (parsed.extracted_name ?? "").trim();
+    const ocr = stripNonAscii((parsed.ocr_text ?? "").trim());
+    const extracted = stripNonAscii((parsed.extracted_name ?? "").trim());
     const documentText =
       ocr.length >= 20
         ? ocr
@@ -389,8 +431,14 @@ export async function runIdentityAuditFromStorage(
   failure_reason?: string;
   engine_raw?: unknown;
   raw_ocr?: { rawOcrText: string; mimeType: string };
+  reviewRequired?: boolean;
 }> {
-  let documentText = input.documentTextOverride?.trim() ?? "";
+  const exists = await assertVerificationDocumentExists(input.documentPath);
+  if ("error" in exists) {
+    return { error: exists.error, failure_reason: exists.error };
+  }
+
+  let documentText = stripNonAscii(input.documentTextOverride?.trim() ?? "");
   let perceptionMode: IdentityAuditResult["mode"] = "deepseek-r1";
   let visionProviderError: string | undefined;
   let rawOcr: { rawOcrText: string; mimeType: string } | undefined;
@@ -398,40 +446,85 @@ export async function runIdentityAuditFromStorage(
   if (!documentText) {
     const downloaded = await downloadVerificationDocument(input.documentPath);
     if ("error" in downloaded) {
-      return { error: downloaded.error };
+      return { error: downloaded.error, failure_reason: downloaded.error };
     }
 
     const { buffer, mimeType } = downloaded;
 
     if (isImageMime(mimeType)) {
-      const vision = await runVisionPerception(
-        buffer,
-        mimeType,
-        input.profileFullName,
-        input.profileEmail,
-      );
-
-      if (vision.blocked) {
+      if (buffer.byteLength > MAX_IMAGE_BYTES) {
         return {
           result: blockedAuditResult(
-            vision.audit_notes ?? vision.failure_reason ?? "Document unreadable.",
-            vision.failure_reason ?? "Document unreadable.",
+            "Image too large for AI perception.",
+            "Image too large — retake closer or use a compressed photo.",
           ),
-          failure_reason: vision.failure_reason,
+          failure_reason: "Image too large — retake closer or use a compressed photo.",
         };
       }
 
-      documentText = vision.documentText;
-      visionProviderError = vision.failure_reason;
-      perceptionMode = "vision+deepseek-r1";
-      if (vision.rawOcrText) {
+      const b64 = buffer.toString("base64");
+      const engineOcr = await callEngineIdentityOcr({
+        imageBase64: b64,
+        mimeType,
+        profileFullName: input.profileFullName,
+      });
+
+      if (engineOcr.timedOut) {
+        return { reviewRequired: true };
+      }
+
+      if (engineOcr.result?.ocr_text && engineOcr.result.ocr_text.length >= 10) {
+        documentText = engineOcr.result.ocr_text;
+        perceptionMode = "vision+deepseek-r1";
         rawOcr = {
-          rawOcrText: vision.rawOcrText,
-          mimeType: vision.mimeType ?? mimeType,
+          rawOcrText: engineOcr.result.ocr_text,
+          mimeType,
         };
+        if (
+          engineOcr.result.audit_notes.toLowerCase().includes("unreadable") ||
+          engineOcr.result.audit_notes.toLowerCase().includes("blur")
+        ) {
+          return {
+            result: blockedAuditResult(
+              engineOcr.result.audit_notes,
+              engineOcr.result.audit_notes,
+            ),
+            failure_reason: engineOcr.result.audit_notes,
+            raw_ocr: rawOcr,
+          };
+        }
+      } else {
+        const vision = await runVisionPerception(
+          buffer,
+          mimeType,
+          input.profileFullName,
+          input.profileEmail,
+        );
+
+        if (vision.blocked) {
+          return {
+            result: blockedAuditResult(
+              vision.audit_notes ?? vision.failure_reason ?? "Document unreadable.",
+              vision.failure_reason ?? "Document unreadable.",
+            ),
+            failure_reason: vision.failure_reason,
+          };
+        }
+
+        documentText = stripNonAscii(vision.documentText);
+        visionProviderError = vision.failure_reason;
+        perceptionMode = "vision+deepseek-r1";
+        if (vision.rawOcrText) {
+          rawOcr = {
+            rawOcrText: stripNonAscii(vision.rawOcrText),
+            mimeType: vision.mimeType ?? mimeType,
+          };
+        }
       }
     } else {
-      documentText = await documentBufferToText(buffer, mimeType, input.documentPath);
+      documentText = stripNonAscii(
+        await documentBufferToText(buffer, mimeType, input.documentPath),
+      );
       rawOcr = { rawOcrText: documentText, mimeType };
     }
   }
@@ -443,11 +536,29 @@ export async function runIdentityAuditFromStorage(
     };
   }
 
-  const auditRun = await runIdentityAudit({
-    documentText,
-    profileFullName: input.profileFullName,
-    profileEmail: input.profileEmail,
-  });
+  let auditRun: Awaited<ReturnType<typeof runIdentityAudit>>;
+  try {
+    auditRun = await Promise.race([
+      runIdentityAudit({
+        documentText,
+        profileFullName: input.profileFullName,
+        profileEmail: input.profileEmail,
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("AUDIT_TIMEOUT")), AUDIT_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "AUDIT_TIMEOUT" || msg.toLowerCase().includes("timeout")) {
+      return { reviewRequired: true };
+    }
+    return {
+      error: msg,
+      failure_reason: msg,
+    };
+  }
+
   const result = auditRun.result;
 
   if (perceptionMode === "vision+deepseek-r1" && result.mode === "deepseek-r1") {
@@ -492,11 +603,13 @@ export async function runIdentityAudit(
         max_tokens: 400,
         response_format: { type: "json_object" },
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(AUDIT_TIMEOUT_MS),
     });
 
     if (!response.ok) {
-      const bodySnippet = (await response.text().catch(() => "")).slice(0, 500);
+      const bodySnippet = stripNonAscii(
+        (await response.text().catch(() => "")).slice(0, 500),
+      );
       const providerError = `DeepSeek-R1 rejected request (HTTP ${response.status}): ${bodySnippet.slice(0, 200) || "no body"}`;
       console.error("[verify:ai-audit] DeepSeek-R1 HTTP", response.status, bodySnippet);
       return {
@@ -512,9 +625,9 @@ export async function runIdentityAudit(
       "[verify:ai-audit] DeepSeek-R1 RAW JSON:",
       JSON.stringify(completion),
     );
-    const raw = completion.choices?.[0]?.message?.content ?? "{}";
+    const raw = stripNonAscii(completion.choices?.[0]?.message?.content ?? "{}");
     const parsed = JSON.parse(raw) as Partial<IdentityAuditResult>;
-    const extractedName = (parsed.extracted_name ?? "").trim();
+    const extractedName = stripNonAscii((parsed.extracted_name ?? "").trim());
 
     const profileNorm = normalizeName(input.profileFullName);
     const extractedNorm = normalizeName(extractedName);
@@ -551,11 +664,12 @@ export async function runIdentityAudit(
         extracted_name: extractedName || input.profileFullName,
         name_match: nameMatch,
         confidence_score: nameMatch && fuzzyMatch && confidence < 80 ? 85 : confidence,
-        audit_notes:
+        audit_notes: stripNonAscii(
           parsed.audit_notes ??
-          (fuzzyMatch
-            ? "DeepSeek-R1 fuzzy identity match (≥80% similar)."
-            : "DeepSeek-R1 identity audit complete."),
+            (fuzzyMatch
+              ? "DeepSeek-R1 fuzzy identity match (>=80% similar)."
+              : "DeepSeek-R1 identity audit complete."),
+        ),
         mode: "deepseek-r1",
       },
       engineRaw: completion,
@@ -563,6 +677,15 @@ export async function runIdentityAudit(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[verify:ai-audit] DeepSeek-R1 request failed:", msg);
+    if (
+      msg.toLowerCase().includes("timeout") ||
+      (err instanceof Error && err.name === "TimeoutError")
+    ) {
+      return {
+        result: REVIEW_REQUIRED_AUDIT_RESULT,
+        providerError: "DeepSeek-R1 slow — manual review required.",
+      };
+    }
     return {
       result: heuristicIdentityAudit(input),
       providerError: `DeepSeek-R1 request failed: ${msg}`,

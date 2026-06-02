@@ -8,6 +8,7 @@ import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import {
   deriveFailureReason,
   fuzzyNameSimilarity,
+  REVIEW_REQUIRED_AUDIT_RESULT,
   runIdentityAuditFromStorage,
   type IdentityAuditResult,
 } from "@/lib/verify/ai-audit";
@@ -232,6 +233,40 @@ export async function executeIdentityAuditForUser(
     profileEmail: profile.email ?? "",
     documentTextOverride,
   });
+
+  if (auditResult.reviewRequired) {
+    const reviewResult = REVIEW_REQUIRED_AUDIT_RESULT;
+    const failure_reason = resolvePersistedFailureReason({
+      passed: false,
+      status: "review",
+      result: reviewResult,
+    });
+    let adminReview: ReturnType<typeof createAdminSupabase>;
+    try {
+      adminReview = createAdminSupabase();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Admin client unavailable";
+      return { error: msg };
+    }
+    await adminReview
+      .from("profiles")
+      .update({
+        identity_audit_score: reviewResult.confidence_score,
+        identity_audit_status: "review",
+        identity_audit_notes: reviewResult.audit_notes,
+        identity_failure_reason: failure_reason,
+        sovereign_pending: true,
+        identity_document_path: documentPath,
+      })
+      .eq("id", userId);
+    return {
+      result: reviewResult,
+      passed: false,
+      status: "review",
+      failure_reason: failure_reason ?? undefined,
+      identity_failure_reason: failure_reason,
+    };
+  }
 
   if (auditResult.error) {
     const reason = auditResult.failure_reason ?? auditResult.error;

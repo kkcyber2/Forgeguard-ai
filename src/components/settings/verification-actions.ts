@@ -12,6 +12,51 @@ import type { Database } from "@/types/supabase";
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
 const OTP_TTL_MS = 10 * 60 * 1000;
+const SIMULATION_DELAY_MS = 2000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readTwilioSimulationMode(): Promise<boolean> {
+  if (
+    process.env.TWILIO_SIMULATION_MODE === "true" ||
+    process.env.TWILIO_SIMULATION_MODE === "1"
+  ) {
+    return true;
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!supabaseUrl || !serviceKey) return false;
+
+  try {
+    const res = await fetch(
+      `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/platform_flags?key=eq.twilio_simulation_mode&select=value`,
+      {
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+        },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) {
+      const msg = (await res.text().catch(() => "")).slice(0, 200);
+      if (res.status === 404 || msg.includes("platform_flags")) {
+        return false;
+      }
+      console.warn("[verify:otp] platform_flags HTTP", res.status, msg);
+      return false;
+    }
+    const rows = (await res.json()) as Array<{ value?: boolean }>;
+    return rows[0]?.value === true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[verify:otp] platform_flags fetch:", msg);
+    return false;
+  }
+}
 
 const SCHEMA_SYNC_MSG = "System Syncing - Please Refresh (Ctrl+R)";
 
@@ -106,6 +151,7 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
 
   const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
+  const simulation = await readTwilioSimulationMode();
 
   if (!process.env.TWILIO_ACCOUNT_SID?.trim()) {
     console.error(
@@ -122,7 +168,7 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
     user_id: user.id,
     phone: normalized,
     status: "queued",
-    provider: process.env.TWILIO_ACCOUNT_SID ? "twilio" : "dev",
+    provider: simulation ? "simulation" : process.env.TWILIO_ACCOUNT_SID ? "twilio" : "dev",
   });
 
   const { error: insertErr } = await admin.from("verification_otps").insert({
@@ -149,6 +195,20 @@ export async function sendOTP(phone: string): Promise<{ error?: string; devCode?
     "[verify:otp] OTP queued via service_role into verification_otps for user",
     user.id.slice(0, 8),
   );
+
+  if (simulation) {
+    await sleep(SIMULATION_DELAY_MS);
+    await writeOtpLog(admin, {
+      user_id: user.id,
+      phone: normalized,
+      status: "sent",
+      provider: "simulation",
+    });
+    if (process.env.NODE_ENV === "development") {
+      return { devCode: code };
+    }
+    return {};
+  }
 
   const sms = await sendOtpSms(normalized, code);
   if (!sms.ok) {
@@ -191,6 +251,35 @@ export async function verifyOTP(
     const msg = e instanceof Error ? e.message : "Admin client unavailable";
     console.error("[verify:otp] createAdminSupabase failed:", msg);
     return { error: "Server misconfigured." };
+  }
+
+  const simulation = await readTwilioSimulationMode();
+  if (simulation) {
+    await sleep(SIMULATION_DELAY_MS);
+    const trimmed = code.trim();
+    if (!/^\d{6}$/.test(trimmed)) {
+      return { error: "Enter a 6-digit code." };
+    }
+
+    const { error: profileErr } = await admin
+      .from("profiles")
+      .update({ phone_verified: true, phone: normalized })
+      .eq("id", user.id);
+
+    if (profileErr) {
+      logOtpError("profiles phone update (simulation)", profileErr);
+      return { error: profileErr.message };
+    }
+
+    await writeOtpLog(admin, {
+      user_id: user.id,
+      phone: normalized,
+      status: "verified",
+      provider: "simulation",
+    });
+
+    revalidatePath("/dashboard/settings");
+    return { verified: true };
   }
 
   const { data: row, error: fetchErr } = await admin

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  directPingEngine,
   logEngineHandshakeDiagnostics,
   logEngineProbeTarget,
   resolveEngineBaseUrl,
@@ -31,6 +32,7 @@ export async function GET() {
     if (!snapshot.ok && snapshot.status !== "unconfigured") {
       logEngineHandshakeDiagnostics();
       logEngineProbeTarget(resolveEngineBaseUrl());
+      await directPingEngine();
     }
 
     return NextResponse.json(body, {

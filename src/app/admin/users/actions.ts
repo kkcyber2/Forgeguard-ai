@@ -62,7 +62,7 @@ async function setOperatorRankFromForm(
   if (!(await requireSovereignAdmin())) return { error: "Forbidden." };
 
   const userId = formData.get("user_id") as string;
-  const rank = (formData.get("hacker_rank") as string)?.toUpperCase();
+  const rank = String(formData.get("hacker_rank") ?? "").toUpperCase();
   const accessLevelRaw = formData.get("access_level");
   const accessLevel =
     accessLevelRaw != null && accessLevelRaw !== ""

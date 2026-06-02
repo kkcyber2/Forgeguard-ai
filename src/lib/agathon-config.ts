@@ -12,8 +12,17 @@ export type EngineUrlSource =
   | "AGATHON_ORCHESTRATOR_URL"
   | "unset";
 
+function ensureHttpsEngineUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return trimmed;
+}
+
 function normalizeEngineBase(raw: string): string {
-  let base = raw.trim().replace(/\/+$/, "");
+  let base = ensureHttpsEngineUrl(raw).replace(/\/+$/, "");
   if (base.endsWith("/health")) {
     base = base.slice(0, -"/health".length).replace(/\/+$/, "");
   }
@@ -272,4 +281,56 @@ export function resolveScanDispatchKey(
   }
 
   return { apiKey, targetProvider };
+}
+
+export type DirectPingResult = {
+  ok: boolean;
+  status?: number;
+  body?: string;
+  error?: string;
+  url?: string;
+};
+
+/**
+ * Raw GET /health against the configured engine — logs status + body snippet.
+ */
+export async function directPingEngine(): Promise<DirectPingResult> {
+  const base = resolveEngineBaseUrl();
+  if (!base) {
+    console.error("ENGINE_DIRECT_PING_URL: <unset>");
+    return { ok: false, error: "PYTHON_ENGINE_URL unset" };
+  }
+
+  const url = buildEngineHealthUrl(base);
+  const headers = engineAuthHeaders();
+  console.error("ENGINE_DIRECT_PING_URL:", url);
+
+  if (!headers) {
+    console.error("ENGINE_DIRECT_PING_STATUS: skipped (no INTERNAL_SCAN_TOKEN)");
+    return { ok: false, error: "INTERNAL_SCAN_TOKEN unset", url };
+  }
+
+  try {
+    const resp = await fetch(url, {
+      method: "GET",
+      headers: { ...headers, "Cache-Control": "no-store" },
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    const body = (await resp.text().catch(() => "")).slice(0, 500);
+    const safeBody = sanitizeHttpHeaderValue(body) || body.replace(/[^\x20-\x7E]/g, "");
+    console.error("ENGINE_DIRECT_PING_STATUS:", resp.status);
+    console.error("ENGINE_DIRECT_PING_BODY:", safeBody || "<empty>");
+    return {
+      ok: resp.ok,
+      status: resp.status,
+      body: safeBody,
+      url,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("ENGINE_DIRECT_PING_STATUS: error");
+    console.error("ENGINE_DIRECT_PING_BODY:", message);
+    return { ok: false, error: message, url };
+  }
 }

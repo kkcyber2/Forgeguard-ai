@@ -27,11 +27,11 @@ export function CookieConsent({ initialConsented = false }: CookieConsentProps) 
   const [hasAccepted, setHasAccepted] = React.useState(initialConsented);
   const [pending, setPending] = React.useState(false);
 
-  React.useEffect(() => {
-    setMounted(true);
+  React.useLayoutEffect(() => {
     if (initialConsented || readLocalConsent()) {
       setHasAccepted(true);
     }
+    setMounted(true);
   }, [initialConsented]);
 
   if (hasAccepted) return null;
@@ -62,7 +62,10 @@ export function CookieConsent({ initialConsented = false }: CookieConsentProps) 
   }
 
   function handleAccept() {
-    dismissOptimistic();
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LS_KEY, COOKIE_CONSENT_VERSION);
+    }
+    setHasAccepted(true);
     void persistConsent();
   }
 

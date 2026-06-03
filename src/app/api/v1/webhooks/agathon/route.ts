@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
+import { prepareScanReportUpsert, stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 /**
@@ -196,11 +196,31 @@ export async function POST(request: NextRequest) {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any).from("scan_reports").upsert(
-        stringifyPayloadNumerics(patch) as Record<string, unknown>,
+        prepareScanReportUpsert(patch),
         { onConflict: "scan_id" },
       );
     } catch (err) {
-      console.warn("[webhook:agathon] scan.completed persist skipped:", err);
+      const detail =
+        err instanceof Error ? err.message : String(err);
+      console.warn("[webhook:agathon] scan.completed persist skipped:", detail);
+      // #region agent log
+      fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "c20499",
+        },
+        body: JSON.stringify({
+          sessionId: "c20499",
+          runId: "post-fix",
+          hypothesisId: "22P02",
+          location: "route.ts:scan.completed",
+          message: "scan_reports_upsert_failed",
+          data: { scanId: event.scanId, detail: detail.slice(0, 400) },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
     }
   }
 

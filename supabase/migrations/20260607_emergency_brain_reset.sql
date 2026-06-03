@@ -18,7 +18,13 @@ ALTER TABLE public.scan_reports
 
 ALTER TABLE public.scan_reports
   ALTER COLUMN attacks_run TYPE numeric
-  USING attacks_run::numeric;
+  USING (
+    CASE
+      WHEN attacks_run IS NULL THEN NULL
+      WHEN trim(attacks_run::text) = '' THEN NULL
+      ELSE attacks_run::numeric
+    END
+  );
 
 COMMENT ON COLUMN public.scan_reports.attacks_run IS
   'Total attack vectors executed (numeric for engine decimal/string payloads).';

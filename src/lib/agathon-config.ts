@@ -369,6 +369,29 @@ export type DirectPingResult = {
   url?: string;
 };
 
+export type EngineCongestedPayload = { status: "congested" };
+
+/** True when upstream returned a gateway timeout (HTML body, not JSON). */
+export function isEngineGatewayTimeout(status: number): boolean {
+  return status === 502 || status === 504;
+}
+
+/**
+ * Safe JSON parse for engine health probes — never throws on HTML 502/504 bodies.
+ */
+export async function parseEngineHealthJson(
+  response: Response,
+): Promise<Record<string, unknown> | EngineCongestedPayload> {
+  if (isEngineGatewayTimeout(response.status)) {
+    return { status: "congested" };
+  }
+  try {
+    return (await response.json()) as Record<string, unknown>;
+  } catch {
+    return { status: "congested" };
+  }
+}
+
 /**
  * Raw GET /health against the configured engine — logs status + body snippet.
  */

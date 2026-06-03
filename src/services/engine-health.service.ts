@@ -5,9 +5,11 @@
  * Polling pauses while the tab is hidden to reduce setInterval lag.
  */
 
+import { parseEngineHealthJson } from "@/lib/agathon-config";
 import {
   BUNKER_RETRY_MS,
   BUNKER_SHIELDING_MESSAGE,
+  ENGINE_CONGESTED_MESSAGE,
 } from "@/lib/engine/bunker-shielding";
 
 export type ClientEngineHealth = {
@@ -62,13 +64,23 @@ function isEngineDown(data: ClientEngineHealth): boolean {
     !data.ok &&
     (data.status === "lockdown" ||
       data.status === "offline" ||
+      data.status === "congested" ||
       data.status === "unconfigured")
   );
 }
 
 async function fetchHealthOnce(): Promise<ClientEngineHealth> {
   const res = await fetch("/api/health/engine", { cache: "no-store" });
-  return (await res.json()) as ClientEngineHealth;
+  const parsed = await parseEngineHealthJson(res);
+  if ("status" in parsed && parsed.status === "congested") {
+    return {
+      ok: false,
+      status: "congested",
+      latencyMs: 0,
+      reason: ENGINE_CONGESTED_MESSAGE,
+    };
+  }
+  return parsed as ClientEngineHealth;
 }
 
 async function probeWithBunkerFallback(): Promise<ClientEngineHealth> {

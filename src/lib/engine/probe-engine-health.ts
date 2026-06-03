@@ -20,11 +20,12 @@ import {
 import {
   BUNKER_RETRY_MS,
   BUNKER_SHIELDING_MESSAGE,
+  ENGINE_CONGESTED_MESSAGE,
 } from "@/lib/engine/bunker-shielding";
 
 export type EngineHealthSnapshot = {
   ok: boolean;
-  status: "unconfigured" | "healthy" | "lockdown" | "offline";
+  status: "unconfigured" | "healthy" | "lockdown" | "offline" | "congested";
   latencyMs: number;
   reason?: string;
   httpStatus?: number;
@@ -42,7 +43,11 @@ function sleep(ms: number): Promise<void> {
 const BUNKER_SHIELDING = BUNKER_SHIELDING_MESSAGE;
 
 function isBunkerShieldHttpStatus(status: number): boolean {
-  return status === 499 || status === 502 || status === 503;
+  return status === 499 || status === 502 || status === 503 || status === 504;
+}
+
+function isCongestedHttpStatus(status: number): boolean {
+  return status === 502 || status === 504;
 }
 
 function offlineSnapshot(error?: string): EngineHealthSnapshot {
@@ -81,6 +86,17 @@ async function probeOnce(
 
     if (resp.ok) {
       return { ok: true, status: "healthy", latencyMs };
+    }
+
+    if (isCongestedHttpStatus(resp.status)) {
+      console.error("ENGINE_PROBE_STATUS:", resp.status, "congested");
+      return {
+        ok: false,
+        status: "congested",
+        latencyMs,
+        reason: ENGINE_CONGESTED_MESSAGE,
+        httpStatus: resp.status,
+      };
     }
 
     const bodySnippet = (await resp.text().catch(() => "")).slice(0, 200);
@@ -148,6 +164,7 @@ async function fetchEngineHealth(): Promise<EngineHealthSnapshot> {
 
     const shouldRetry =
       !snapshot.ok &&
+      snapshot.status !== "congested" &&
       (snapshot.httpStatus === 503 ||
         snapshot.httpStatus === 502 ||
         snapshot.httpStatus === 499 ||
@@ -224,6 +241,8 @@ export async function getEngineHealthSnapshot(): Promise<EngineHealthSnapshot> {
 export function isEngineLockdown(snapshot: EngineHealthSnapshot): boolean {
   return (
     !snapshot.ok &&
-    (snapshot.status === "lockdown" || snapshot.status === "offline")
+    (snapshot.status === "lockdown" ||
+      snapshot.status === "offline" ||
+      snapshot.status === "congested")
   );
 }

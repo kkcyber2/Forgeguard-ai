@@ -4,9 +4,12 @@ import { safeQueryRows } from "@/lib/supabase/safe-query";
 
 type ServerSupabase = SupabaseClient<Database>;
 
-type AleRow = { ale_usd: number | null };
+type AleRow = {
+  ale_usd: number | null;
+  financial_liability_usd: number | null;
+};
 
-/** Sum ALE ($) for a user from scan_reports only (live schema). */
+/** Sum ALE ($) for a user from scan_reports (financial_liability_usd preferred). */
 export async function fetchTotalAleRisk(
   supabase: ServerSupabase,
   userId: string,
@@ -22,12 +25,19 @@ export async function fetchTotalAleRisk(
     if (scanIds.length === 0) return 0;
 
     const { data: reports } = await safeQueryRows<AleRow>(
-      "scan_reports/ale_usd",
+      "scan_reports/financial_liability",
       () =>
-        supabase.from("scan_reports").select("ale_usd").in("scan_id", scanIds),
+        supabase
+          .from("scan_reports")
+          .select("financial_liability_usd, ale_usd")
+          .in("scan_id", scanIds),
     );
 
-    return reports.reduce((sum, row) => sum + Number(row.ale_usd ?? 0), 0);
+    return reports.reduce(
+      (sum, row) =>
+        sum + Number(row.financial_liability_usd ?? row.ale_usd ?? 0),
+      0,
+    );
   } catch (err) {
     console.error("[scans/queries] fetchTotalAleRisk:", err);
     return 0;

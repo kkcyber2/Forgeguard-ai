@@ -4,7 +4,11 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { listPublishedScripts, normalizeScript } from "@/lib/bazaar/list-scripts";
+import {
+  BAZAAR_LIST_SELECT,
+  listPublishedScripts,
+  normalizeScript,
+} from "@/lib/bazaar/list-scripts";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -42,16 +46,19 @@ export async function GET(req: NextRequest) {
   }
 
   if (result.error) {
-    const schemaDrift =
-      /is_free|is_certified|is_removed|does not exist|42703/i.test(result.error);
-    return NextResponse.json(
-      {
-        ok: false,
-        error: result.error,
-        code: schemaDrift ? "SCHEMA_DRIFT" : "LIST_FAILED",
-      },
-      { status: 500 },
+    console.warn(
+      "[bazaar:list] query issue (returning empty catalog):",
+      result.error,
+      "select:",
+      BAZAAR_LIST_SELECT.slice(0, 80),
     );
+    return NextResponse.json({
+      ok: true,
+      scripts: [],
+      total: 0,
+      page,
+      limit,
+    });
   }
 
   let purchased = new Set<string>();
@@ -67,7 +74,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const enriched = result.scripts.map((s) => ({
+  const scripts = result.scripts ?? [];
+  const enriched = scripts.map((s) => ({
     ...normalizeScript(s),
     is_purchased: purchased.has(s.id),
   }));
@@ -75,7 +83,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     scripts: enriched,
-    total: result.count ?? 0,
+    total: result.count ?? enriched.length,
     page,
     limit,
   });

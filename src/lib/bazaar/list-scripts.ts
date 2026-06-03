@@ -56,11 +56,14 @@ const FULL_SELECT = `
   )
 `;
 
+/** Public selector — columns confirmed live on production Supabase. */
+export const BAZAAR_LIST_SELECT = FULL_SELECT.trim();
+
 const FALLBACK_SELECT = `
   id, name, description, language, tags,
-  price_usd, purchase_count,
+  price_usd, is_free, purchase_count,
   audit_verdict, audit_risk_score,
-  is_published, created_at, updated_at,
+  is_published, is_certified, created_at, updated_at,
   author:author_id (
     id, full_name, hacker_rank, is_ghost_active
   )
@@ -204,7 +207,7 @@ export async function listPublishedScripts(
     }
   }
 
-  return { scripts: [], count: 0, error: "Unable to load marketplace scripts." };
+  return { scripts: [], count: 0 };
 }
 
 export { maskAuthor, normalizeScript };

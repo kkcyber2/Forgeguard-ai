@@ -4,7 +4,7 @@
  * Hacker Bazaar — Script Upload + AI Customs Agent
  *
  * Flow:
- *   1. Auth guard (access_level ≥ 3)
+ *   1. Auth guard (access_level ≥ 2, or Sovereign operator)
  *   2. Validate payload (name, description, code, price_usd)
  *   3. Call Python customs-audit bridge (or inline Llama-3 via OpenRouter)
  *      → verdict: CLEARED | FLAGGED | REJECTED
@@ -13,12 +13,13 @@
  *   5. Admin manually publishes after review for FLAGGED
  *      CLEARED scripts auto-publish if price == 0 OR author is Hacker rank
  *
- * Auth: Supabase session, access_level ≥ 3.
+ * Auth: Supabase session, access_level ≥ 2 (Rank 2+ hackers) or Sovereign operator.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { openRouterRequestHeaders } from "@/lib/agathon-config";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -143,9 +144,10 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   const accessLevel = (profile?.access_level as number | undefined) ?? 1;
-  if (accessLevel < 3) {
+  const sovereign = isSovereignOperator(user.email);
+  if (!sovereign && accessLevel < 2) {
     return NextResponse.json(
-      { ok: false, error: "Hacker rank required to list scripts.", code: "IDENTITY_GATE" },
+      { ok: false, error: "Rank 2+ required to list scripts.", code: "IDENTITY_GATE" },
       { status: 403 },
     );
   }

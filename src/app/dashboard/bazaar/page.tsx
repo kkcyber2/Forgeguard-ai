@@ -17,6 +17,8 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { purchaseScript } from "@/components/bazaar/actions";
 import { notifyWalletRefresh } from "@/lib/wallet-events";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { createClient } from "@/lib/supabase/client";
 import {
   ShoppingCart, Upload, Search, Filter, Zap,
   Shield, CheckCircle, AlertTriangle, XCircle,
@@ -125,19 +127,19 @@ function buildClientZip(filename: string, content: string): Uint8Array {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function VerifiedBadge() {
+function ForgeGuardCertifiedBadge() {
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-widest uppercase"
+      className="inline-flex items-center gap-1 px-2 py-0.5 font-mono text-[9px] font-semibold tracking-[0.12em] uppercase"
       style={{
         color: "#D1FF00",
-        background: "rgba(209,255,0,0.07)",
+        background: "rgba(209,255,0,0.12)",
         border: "1px solid rgba(209,255,0,0.35)",
       }}
-      title="Verified by ForgeGuard AI — Risk Score ≤ 10"
+      title="ForgeGuard Certified — admin-verified script"
     >
       <ShieldCheck size={10} strokeWidth={2} />
-      Verified
+      ForgeGuard Certified
     </span>
   );
 }
@@ -229,21 +231,23 @@ function ScriptCard({
             <span className="font-mono text-[13px] font-semibold text-white truncate">
               {script.name}
             </span>
-            {script.is_certified && (
-              <span
-                className="shrink-0 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest"
-                style={{
-                  background: "rgba(209,255,0,0.12)",
-                  color: "#D1FF00",
-                  border: "1px solid rgba(209,255,0,0.35)",
-                }}
-              >
-                Certified
-              </span>
-            )}
+            {script.is_certified && <ForgeGuardCertifiedBadge />}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {script.audit_risk_score <= 10 && <VerifiedBadge />}
+            {script.audit_risk_score <= 10 && !script.is_certified && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-widest uppercase"
+                style={{
+                  color: "#D1FF00",
+                  background: "rgba(209,255,0,0.07)",
+                  border: "1px solid rgba(209,255,0,0.35)",
+                }}
+                title="Verified by ForgeGuard AI — Risk Score ≤ 10"
+              >
+                <ShieldCheck size={10} strokeWidth={2} />
+                Verified
+              </span>
+            )}
             <VerdictBadge verdict={script.audit_verdict} />
           </div>
         </div>
@@ -700,7 +704,26 @@ export default function BazaarPage() {
   const [uploading, setUploading]     = React.useState(false);
   const [purchasing, setPurchasing]   = React.useState<string | null>(null);
   const [showUpload, setShowUpload]   = React.useState(false);
+  const [canUpload, setCanUpload]     = React.useState(false);
   const [acquiredCode, setAcquiredCode] = React.useState<{ scriptName: string; code: string; language: string } | null>(null);
+
+  React.useEffect(() => {
+    const supabase = createClient();
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      if (isSovereignOperator(user.email)) {
+        setCanUpload(true);
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("access_level")
+        .eq("id", user.id)
+        .maybeSingle();
+      setCanUpload((profile?.access_level ?? 1) >= 2);
+    })();
+  }, []);
 
   // Load scripts from API
   React.useEffect(() => {
@@ -721,6 +744,7 @@ export default function BazaarPage() {
           setScripts(data.scripts ?? []);
           setLoadError(null);
         } else {
+          setScripts([]);
           setLoadError(data.error ?? "Could not load marketplace scripts.");
         }
         if (certData.ok) {
@@ -838,8 +862,14 @@ export default function BazaarPage() {
             </div>
             <button
               onClick={() => setShowUpload(true)}
-              className="flex items-center gap-2 px-4 py-2.5 font-mono text-[11px] font-semibold uppercase tracking-widest transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 font-mono text-[11px] font-semibold uppercase tracking-widest transition-all disabled:opacity-40"
               style={{ background: "rgba(209,255,0,0.1)", color: "#D1FF00", border: "1px solid rgba(209,255,0,0.3)" }}
+              disabled={!canUpload}
+              title={
+                canUpload
+                  ? "Submit a script for AI Customs audit"
+                  : "Rank 2+ required to upload scripts"
+              }
             >
               <Upload size={13} />
               Upload Script

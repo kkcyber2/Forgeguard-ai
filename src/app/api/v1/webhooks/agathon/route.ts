@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any).from("scan_logs").insert({
         scan_id: event.scanId,
-        type: "info",
+        type: "webhook",
         severity: "info",
         attack_name: "webhook_agathon",
         payload: {
@@ -156,6 +156,9 @@ export async function POST(request: NextRequest) {
             ? defaultPoc
             : undefined;
 
+      const parsedAttacksRun =
+        p.attacks_run != null ? Number.parseFloat(String(p.attacks_run)) : null;
+
       const patch: Record<string, unknown> = {
         scan_id: event.scanId,
         cvss_overall:
@@ -164,6 +167,9 @@ export async function POST(request: NextRequest) {
             : undefined,
         risk_label: riskLabel,
         findings: stringifyPayloadNumerics(findingsArr),
+        ...(parsedAttacksRun != null && !Number.isNaN(parsedAttacksRun)
+          ? { attacks_run: parsedAttacksRun }
+          : {}),
       };
 
       if (typeof p.executive_summary === "string") {

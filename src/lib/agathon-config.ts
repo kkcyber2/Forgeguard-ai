@@ -167,10 +167,72 @@ export function resolveBrainCredential(): { source: "GROQ_API_KEY" } | undefined
   return undefined;
 }
 
+export const HANDSHAKE_ABORT_MESSAGE =
+  "CRITICAL: Key-Provider Mismatch. Strike Aborted.";
+
+function urlHost(normalizedUrl: string): string {
+  try {
+    return new URL(
+      normalizedUrl.startsWith("http")
+        ? normalizedUrl
+        : `https://${normalizedUrl}`,
+    ).hostname.toLowerCase();
+  } catch {
+    return normalizedUrl.toLowerCase();
+  }
+}
+
+function providerFromUrlHost(normalizedUrl: string): TargetProvider | null {
+  const host = urlHost(normalizedUrl);
+  const u = normalizedUrl.toLowerCase();
+  if (host.includes("groq.com") || u.includes("groq.com")) return "groq";
+  if (
+    host.includes("openai.com") ||
+    u.includes("openai.com") ||
+    u.includes("api.openai")
+  ) {
+    return "openai";
+  }
+  if (host.includes("anthropic.com") || u.includes("anthropic.com")) {
+    return "anthropic";
+  }
+  return null;
+}
+
+export function assertProviderHandshake(
+  apiKey: string,
+  targetUrl: string,
+): void {
+  const key = apiKey.trim();
+  const host = urlHost(targetUrl);
+  const u = targetUrl.toLowerCase();
+
+  if (
+    host.includes("openai.com") ||
+    u.includes("openai.com") ||
+    u.includes("api.openai")
+  ) {
+    if (!key.startsWith("sk-")) {
+      console.error(HANDSHAKE_ABORT_MESSAGE);
+      throw new Error(HANDSHAKE_ABORT_MESSAGE);
+    }
+  }
+
+  if (host.includes("groq.com") || u.includes("groq.com")) {
+    if (!key.startsWith("gsk_")) {
+      console.error(HANDSHAKE_ABORT_MESSAGE);
+      throw new Error(HANDSHAKE_ABORT_MESSAGE);
+    }
+  }
+}
+
 export function resolveTargetProvider(
   normalizedUrl: string,
   targetModel: string,
 ): TargetProvider {
+  const fromUrl = providerFromUrlHost(normalizedUrl);
+  if (fromUrl) return fromUrl;
+
   const model = (targetModel ?? "").toLowerCase();
   if (
     model.includes("gpt") ||
@@ -250,17 +312,9 @@ export function resolveScanDispatchKey(
     input.targetUrl,
     input.targetModel,
   );
-  const host = (() => {
-    try {
-      return new URL(
-        input.targetUrl.startsWith("http")
-          ? input.targetUrl
-          : `https://${input.targetUrl}`,
-      ).hostname.toLowerCase();
-    } catch {
-      return input.targetUrl.toLowerCase();
-    }
-  })();
+  const host = urlHost(input.targetUrl);
+
+  assertProviderHandshake(apiKey, input.targetUrl);
 
   const engineKeys = engineEnvKeys();
   if (engineKeys.has(apiKey)) {

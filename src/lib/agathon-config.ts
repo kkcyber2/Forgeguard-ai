@@ -3,9 +3,12 @@
  * Prefer PYTHON_ENGINE_URL / INTERNAL_SCAN_TOKEN; fall back to legacy names.
  *
  * Engine repo: https://github.com/valosd453-bit/AI-red-team
- * HF Spaces: Docker SDK, port 7860. Railway bunker: uses platform $PORT.
- * Vercel: set PYTHON_ENGINE_URL to your Railway public URL (no trailing slash).
+ * HF Spaces: Docker SDK, port 7860. Railway bunker: public root domain only.
+ * Vercel: set PYTHON_ENGINE_URL to Railway public URL — no trailing slash, no :7860.
  */
+
+/** Vercel → Railway engine fetch budget (health + scan dispatch). */
+export const ENGINE_HANDSHAKE_TIMEOUT_MS = 30_000;
 
 export type EngineUrlSource =
   | "PYTHON_ENGINE_URL"
@@ -23,6 +26,16 @@ function ensureHttpsEngineUrl(raw: string): string {
 
 function normalizeEngineBase(raw: string): string {
   let base = ensureHttpsEngineUrl(raw).replace(/\/+$/, "");
+  try {
+    const u = new URL(base);
+    // Root domain from Vercel env — never probe :7860/:8080 on public Railway URL
+    if (u.port === "7860" || u.port === "8080") {
+      u.port = "";
+      base = u.toString().replace(/\/+$/, "");
+    }
+  } catch {
+    /* keep base */
+  }
   if (base.endsWith("/health")) {
     base = base.slice(0, -"/health".length).replace(/\/+$/, "");
   }
@@ -326,7 +339,7 @@ export async function directPingEngine(): Promise<DirectPingResult> {
     const resp = await fetch(url, {
       method: "GET",
       headers: { ...headers, "Cache-Control": "no-store" },
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(ENGINE_HANDSHAKE_TIMEOUT_MS),
       cache: "no-store",
     });
     const body = (await resp.text().catch(() => "")).slice(0, 500);

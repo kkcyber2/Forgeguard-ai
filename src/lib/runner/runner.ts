@@ -6,6 +6,7 @@ import {
   engineAuthHeaders,
   resolveScanDispatchKey,
   maskKeyPrefix,
+  ENGINE_HANDSHAKE_TIMEOUT_MS,
 } from "@/lib/agathon-config";
 import { stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
@@ -194,7 +195,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
         target_provider: dispatchKey.targetProvider,
       }),
       // Don't hold the connection open — Railway acknowledges fast.
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(ENGINE_HANDSHAKE_TIMEOUT_MS),
     });
 
     if (!resp.ok) {

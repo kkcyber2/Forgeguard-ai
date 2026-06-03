@@ -11,6 +11,7 @@ import { getEngineHealthSnapshot } from "@/lib/engine/probe-engine-health";
  * GET /api/health/engine — cached liveness probe with SWR + coalescing.
  * Always returns JSON (200) so the dashboard poller never crashes on 503/500.
  */
+export const maxDuration = 60;
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

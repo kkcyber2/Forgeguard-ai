@@ -8,6 +8,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { sealCredential } from "@/lib/crypto/credentials";
 import { headers } from "next/headers";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { ENGINE_HANDSHAKE_TIMEOUT_MS } from "@/lib/agathon-config";
 import { verifyScanOwnership } from "./ownership-actions";
 
 /**
@@ -200,7 +201,7 @@ export async function createScan(
       body: JSON.stringify({ scan_id: scan.id }),
       // Bail out if Vercel→Vercel routing is somehow slow; the scan row
       // stays in 'queued' and the user can retry.
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(ENGINE_HANDSHAKE_TIMEOUT_MS),
     });
     if (!dispatchResp.ok) {
       const body = await dispatchResp.text().catch(() => "<no body>");

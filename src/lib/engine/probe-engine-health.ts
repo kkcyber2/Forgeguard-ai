@@ -1,6 +1,7 @@
 import {
   buildEngineHealthUrl,
   directPingEngine,
+  ENGINE_HANDSHAKE_TIMEOUT_MS,
   engineAuthHeaders,
   logEngineHandshakeDiagnostics,
   logEngineProbeTarget,
@@ -30,7 +31,6 @@ const CACHE_KEY = "engine:health";
 const FRESH_MS = 15_000;
 const STALE_MS = 60_000;
 const BUNKER_RETRY_MS = 2_000;
-const PROBE_TIMEOUT_MS = 10_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -71,7 +71,7 @@ async function probeOnce(
     const resp = await fetch(healthUrl, {
       method: "GET",
       headers: { ...headers, "Cache-Control": "no-store" },
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(ENGINE_HANDSHAKE_TIMEOUT_MS),
       cache: "no-store",
     });
     const latencyMs = Date.now() - t0;

@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prepareScanReportUpsert, stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
+import {
+  normalizeRiskLabel,
+  prepareScanReportUpsert,
+} from "@/lib/agathon/payload-numerics";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 /**
@@ -33,6 +36,15 @@ function resolveSecret(request: NextRequest): string | null {
     return bearer.slice(7).trim();
   }
   return request.headers.get("x-agathon-webhook-secret")?.trim() ?? null;
+}
+
+function normalizeScanStatus(raw: unknown): string {
+  const status = String(raw ?? "sealed").trim().toLowerCase();
+  if (status === "completed" || status === "success") return "sealed";
+  if (status === "sealed" || status === "failed" || status === "probing") {
+    return status;
+  }
+  return "sealed";
 }
 
 function verifyWebhook(request: NextRequest): boolean {
@@ -122,17 +134,22 @@ export async function POST(request: NextRequest) {
     const findingsArr = Array.isArray(p.findings) ? p.findings : [];
     const defaultPoc = `Status: Clean. Total Vectors Tested: ${attacksRun}. No exploitable vulnerabilities detected.`;
     try {
+      const scanStatus = normalizeScanStatus(p.status);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (admin as any)
+      const { error: scanUpdateErr } = await (admin as any)
         .from("scans")
         .update({
-          status: (p.status as string) ?? "completed",
+          status: scanStatus,
           progress_pct: 100,
+          completed_at: new Date().toISOString(),
           ...(p.failure_reason
             ? { failure_reason: String(p.failure_reason) }
             : {}),
         })
         .eq("id", event.scanId);
+      if (scanUpdateErr) {
+        throw new Error(`scans.update: ${scanUpdateErr.message}`);
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: existing } = await (admin as any)
@@ -145,8 +162,9 @@ export async function POST(request: NextRequest) {
 
       const parsedAle =
         aleUsd != null ? Number.parseFloat(String(aleUsd)) : null;
-      const riskRaw = p.overall_severity ?? existing?.risk_label ?? "NONE";
-      const riskLabel = String(riskRaw).toUpperCase();
+      const riskLabel = normalizeRiskLabel(
+        p.overall_severity ?? existing?.risk_label ?? "NONE",
+      );
 
       const pocText =
         typeof p.technical_proof_of_concept === "string" &&
@@ -157,28 +175,34 @@ export async function POST(request: NextRequest) {
             : undefined;
 
       const parsedAttacksRun =
-        p.attacks_run != null ? Number.parseFloat(String(p.attacks_run)) : null;
+        p.attacks_run != null ? Number.parseFloat(String(p.attacks_run)) : 0;
+      const attacksRunInt = Number.isNaN(parsedAttacksRun)
+        ? 0
+        : Math.round(parsedAttacksRun);
+      const parsedCvss =
+        p.overall_cvss != null ? Number.parseFloat(String(p.overall_cvss)) : 0;
+
+      const executiveMd =
+        (typeof p.executive_summary === "string" && p.executive_summary.trim()
+          ? p.executive_summary
+          : null) ??
+        existing?.executive_summary_md ??
+        (technicalReport ? technicalReport.slice(0, 4000) : null) ??
+        pocText ??
+        defaultPoc;
 
       const patch: Record<string, unknown> = {
         scan_id: event.scanId,
-        cvss_overall:
-          p.overall_cvss != null
-            ? Number.parseFloat(String(p.overall_cvss))
-            : undefined,
+        generator_model: "llama-3.3-70b-versatile",
+        executive_summary_md: executiveMd,
+        cvss_overall: Number.isNaN(parsedCvss) ? 0 : parsedCvss,
         risk_label: riskLabel,
-        findings: stringifyPayloadNumerics(findingsArr),
-        ...(parsedAttacksRun != null && !Number.isNaN(parsedAttacksRun)
-          ? { attacks_run: parsedAttacksRun }
-          : {}),
+        findings: findingsArr,
+        attacks_run: attacksRunInt,
       };
 
       if (typeof p.executive_summary === "string") {
         patch.executive_summary = p.executive_summary;
-        patch.executive_summary_md =
-          p.executive_summary || existing?.executive_summary_md || "";
-      } else if (technicalReport) {
-        patch.executive_summary_md =
-          existing?.executive_summary_md ?? technicalReport.slice(0, 4000);
       }
       if (pocText) {
         patch.technical_proof_of_concept = pocText;
@@ -194,15 +218,15 @@ export async function POST(request: NextRequest) {
         patch.ale_usd = parsedAle;
       }
 
+      const prepared = prepareScanReportUpsert(patch);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (admin as any).from("scan_reports").upsert(
-        prepareScanReportUpsert(patch),
-        { onConflict: "scan_id" },
-      );
-    } catch (err) {
-      const detail =
-        err instanceof Error ? err.message : String(err);
-      console.warn("[webhook:agathon] scan.completed persist skipped:", detail);
+      const { error: upsertErr } = await (admin as any)
+        .from("scan_reports")
+        .upsert(prepared, { onConflict: "scan_id" });
+      if (upsertErr) {
+        throw new Error(`scan_reports.upsert: ${upsertErr.message}`);
+      }
+
       // #region agent log
       fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
         method: "POST",
@@ -213,7 +237,48 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           sessionId: "c20499",
           runId: "post-fix",
-          hypothesisId: "22P02",
+          hypothesisId: "E",
+          location: "route.ts:scan.completed",
+          message: "scan_reports_upsert_ok",
+          data: {
+            scanId: event.scanId,
+            riskLabel: prepared.risk_label,
+            attacksRun: prepared.attacks_run,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    } catch (err) {
+      const detail =
+        err instanceof Error ? err.message : String(err);
+      console.warn("[webhook:agathon] scan.completed persist skipped:", detail);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin as any).from("scan_logs").insert({
+          scan_id: event.scanId,
+          type: "info",
+          severity: "high",
+          attack_name: "webhook_persist_failed",
+          payload: {
+            message: detail.slice(0, 500),
+            kind: event.kind,
+          },
+        });
+      } catch {
+        /* best-effort production evidence */
+      }
+      // #region agent log
+      fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "c20499",
+        },
+        body: JSON.stringify({
+          sessionId: "c20499",
+          runId: "post-fix",
+          hypothesisId: "E",
           location: "route.ts:scan.completed",
           message: "scan_reports_upsert_failed",
           data: { scanId: event.scanId, detail: detail.slice(0, 400) },

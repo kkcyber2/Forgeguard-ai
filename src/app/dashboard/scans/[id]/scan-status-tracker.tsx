@@ -63,6 +63,10 @@ export function ScanStatusTracker({
   const channelRef = React.useRef<ReturnType<
     ReturnType<typeof createClient>["channel"]
   > | null>(null);
+  const statusRef = React.useRef(status);
+  React.useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   React.useEffect(() => {
     const supabase = createClient();
@@ -115,8 +119,25 @@ export function ScanStatusTracker({
 
     subscribe();
 
+    const pollTimer = setInterval(() => {
+      if (cancelled) return;
+      const live = statusRef.current;
+      if (live !== "probing" && live !== "queued") return;
+      void supabase
+        .from("scans")
+        .select("status, progress_pct")
+        .eq("id", scanId)
+        .single()
+        .then(({ data }) => {
+          if (!data || cancelled) return;
+          if (isScanStatus(data.status)) setStatus(data.status);
+          setProgress(data.progress_pct ?? 0);
+        });
+    }, 5000);
+
     return () => {
       cancelled = true;
+      clearInterval(pollTimer);
       if (retryTimer) clearTimeout(retryTimer);
       const ch = channelRef.current;
       channelRef.current = null;

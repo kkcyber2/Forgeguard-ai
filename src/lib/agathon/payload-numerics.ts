@@ -3,6 +3,24 @@
  * Mirrors AI-red-team/agathon/supabase_sync.py stringify_payload_numerics.
  */
 
+const VALID_RISK_LABELS = new Set([
+  "NONE",
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "CRITICAL",
+]);
+
+/** Map reporter/engine severities (e.g. INFO) to scan_reports.risk_label CHECK values. */
+export function normalizeRiskLabel(raw: unknown): string {
+  const upper = String(raw ?? "NONE")
+    .trim()
+    .toUpperCase();
+  if (VALID_RISK_LABELS.has(upper)) return upper;
+  if (upper === "INFO" || upper === "INFORMATIONAL") return "LOW";
+  return "NONE";
+}
+
 /** scan_reports columns that must stay JSON numbers for Postgres NUMERIC/INTEGER. */
 const SCAN_REPORT_NUMERIC_COLUMNS = new Set([
   "attacks_run",
@@ -41,6 +59,33 @@ export function prepareScanReportUpsert(
   patch: Record<string, unknown>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...patch };
+
+  out.risk_label = normalizeRiskLabel(out.risk_label);
+
+  if (out.cvss_overall == null) {
+    out.cvss_overall = 0;
+  } else {
+    const cvss =
+      typeof out.cvss_overall === "number"
+        ? out.cvss_overall
+        : Number.parseFloat(String(out.cvss_overall));
+    out.cvss_overall = Number.isNaN(cvss) ? 0 : Math.min(10, Math.max(0, cvss));
+  }
+
+  if (
+    out.executive_summary_md == null ||
+    String(out.executive_summary_md).trim() === ""
+  ) {
+    out.executive_summary_md =
+      typeof out.technical_proof_of_concept === "string" &&
+      out.technical_proof_of_concept.trim()
+        ? out.technical_proof_of_concept
+        : "Scan complete — no executive summary supplied.";
+  }
+
+  if (out.findings == null) {
+    out.findings = [];
+  }
   if (Array.isArray(out.findings)) {
     out.findings = stringifyPayloadNumerics(out.findings);
   }
@@ -54,7 +99,9 @@ export function prepareScanReportUpsert(
     const val = out[key];
     if (val === undefined || val === null) continue;
     const n = typeof val === "number" ? val : Number.parseFloat(String(val));
-    if (!Number.isNaN(n)) out[key] = n;
+    if (!Number.isNaN(n)) {
+      out[key] = key === "attacks_run" ? Math.round(n) : n;
+    }
   }
   return out;
 }

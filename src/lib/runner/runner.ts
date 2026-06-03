@@ -178,6 +178,10 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   });
 
   try {
+    // #region agent log
+    const dispatchT0 = Date.now();
+    fetch('http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c20499'},body:JSON.stringify({sessionId:'c20499',runId:'audit-pre',hypothesisId:'D',location:'runner.ts:runScan',message:'dispatch_fetch_start',data:{scanId,hasToken:Boolean(engineAuthHeaders())},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const resp = await fetch(`${orchestratorUrl}/scan/start`, {
       method: "POST",
       headers: {
@@ -205,6 +209,9 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => "<no body>");
+      // #region agent log
+      fetch('http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c20499'},body:JSON.stringify({sessionId:'c20499',runId:'audit-pre',hypothesisId:'D',location:'runner.ts:runScan',message:'dispatch_fetch_error',data:{scanId,status:resp.status,ms:Date.now()-dispatchT0,bodySnippet:text.slice(0,120)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       throw new Error(
         `Railway returned ${resp.status} ${resp.statusText}: ${text.slice(0, 400)}`,
       );
@@ -215,6 +222,9 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       scan_id?: string;
       intensity?: string;
     };
+    // #region agent log
+    fetch('http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c20499'},body:JSON.stringify({sessionId:'c20499',runId:'audit-pre',hypothesisId:'D',location:'runner.ts:runScan',message:'dispatch_fetch_ok',data:{scanId,status:resp.status,ms:Date.now()-dispatchT0,accepted:json.accepted??false},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     await emit(admin, scanId, {
       type: "info",

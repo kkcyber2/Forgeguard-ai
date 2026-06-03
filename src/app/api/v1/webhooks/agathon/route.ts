@@ -118,6 +118,9 @@ export async function POST(request: NextRequest) {
     const technicalReport =
       typeof p.technical_report_md === "string" ? p.technical_report_md : null;
     const aleUsd = p.ale_usd ?? p.financial_liability_usd ?? null;
+    const attacksRun = p.attacks_run != null ? String(p.attacks_run) : "0";
+    const findingsArr = Array.isArray(p.findings) ? p.findings : [];
+    const defaultPoc = `Status: Clean. Total Vectors Tested: ${attacksRun}. No exploitable vulnerabilities detected.`;
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any)
@@ -131,67 +134,65 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", event.scanId);
 
-      if (
-        technicalReport ||
-        aleUsd != null ||
-        p.findings ||
-        p.executive_summary ||
-        p.technical_proof_of_concept ||
-        p.remediation_code_snippet
-      ) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: existing } = await (admin as any)
-          .from("scan_reports")
-          .select("findings, executive_summary_md, audit_report_md, ale_usd, financial_liability_usd")
-          .eq("scan_id", event.scanId)
-          .maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: existing } = await (admin as any)
+        .from("scan_reports")
+        .select(
+          "findings, executive_summary_md, audit_report_md, ale_usd, financial_liability_usd",
+        )
+        .eq("scan_id", event.scanId)
+        .maybeSingle();
 
-        const parsedAle =
-          aleUsd != null ? Number.parseFloat(String(aleUsd)) : null;
-        const riskRaw = p.overall_severity ?? existing?.risk_label ?? "NONE";
-        const riskLabel =
-          typeof riskRaw === "string"
-            ? riskRaw.toUpperCase()
-            : String(riskRaw).toUpperCase();
+      const parsedAle =
+        aleUsd != null ? Number.parseFloat(String(aleUsd)) : null;
+      const riskRaw = p.overall_severity ?? existing?.risk_label ?? "NONE";
+      const riskLabel = String(riskRaw).toUpperCase();
 
-        const patch: Record<string, unknown> = {
-          scan_id: event.scanId,
-          cvss_overall: p.overall_cvss
+      const pocText =
+        typeof p.technical_proof_of_concept === "string" &&
+        p.technical_proof_of_concept.trim()
+          ? p.technical_proof_of_concept
+          : findingsArr.length === 0
+            ? defaultPoc
+            : undefined;
+
+      const patch: Record<string, unknown> = {
+        scan_id: event.scanId,
+        cvss_overall:
+          p.overall_cvss != null
             ? Number.parseFloat(String(p.overall_cvss))
             : undefined,
-          risk_label: riskLabel,
-        };
+        risk_label: riskLabel,
+        findings: stringifyPayloadNumerics(findingsArr),
+      };
 
-        if (typeof p.executive_summary === "string") {
-          patch.executive_summary = p.executive_summary;
-          patch.executive_summary_md =
-            p.executive_summary || existing?.executive_summary_md || "";
-        } else if (technicalReport) {
-          patch.executive_summary_md =
-            existing?.executive_summary_md ?? technicalReport.slice(0, 4000);
-        }
-        if (typeof p.technical_proof_of_concept === "string") {
-          patch.technical_proof_of_concept = p.technical_proof_of_concept;
-        }
-        if (typeof p.remediation_code_snippet === "string") {
-          patch.remediation_code_snippet = p.remediation_code_snippet;
-        }
-        if (technicalReport) {
-          patch.audit_report_md = technicalReport;
-        }
-        if (parsedAle != null && !Number.isNaN(parsedAle)) {
-          patch.financial_liability_usd = parsedAle;
-          patch.ale_usd = parsedAle;
-        }
-        if (Array.isArray(p.findings)) {
-          patch.findings = stringifyPayloadNumerics(p.findings);
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (admin as any).from("scan_reports").upsert(patch, {
-          onConflict: "scan_id",
-        });
+      if (typeof p.executive_summary === "string") {
+        patch.executive_summary = p.executive_summary;
+        patch.executive_summary_md =
+          p.executive_summary || existing?.executive_summary_md || "";
+      } else if (technicalReport) {
+        patch.executive_summary_md =
+          existing?.executive_summary_md ?? technicalReport.slice(0, 4000);
       }
+      if (pocText) {
+        patch.technical_proof_of_concept = pocText;
+      }
+      if (typeof p.remediation_code_snippet === "string") {
+        patch.remediation_code_snippet = p.remediation_code_snippet;
+      }
+      if (technicalReport) {
+        patch.audit_report_md = technicalReport;
+      }
+      if (parsedAle != null && !Number.isNaN(parsedAle)) {
+        patch.financial_liability_usd = parsedAle;
+        patch.ale_usd = parsedAle;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin as any).from("scan_reports").upsert(
+        stringifyPayloadNumerics(patch) as Record<string, unknown>,
+        { onConflict: "scan_id" },
+      );
     } catch (err) {
       console.warn("[webhook:agathon] scan.completed persist skipped:", err);
     }

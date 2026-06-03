@@ -2008,7 +2008,10 @@ export type Database = {
           cvss_overall: number
           discovery_report: Json | null
           executive_summary_md: string
+          executive_summary: string | null
           financial_liability_usd: number | null
+          technical_proof_of_concept: string | null
+          remediation_code_snippet: string | null
           findings: Json
           generated_at: string
           generation_cost_usd: number | null
@@ -2030,7 +2033,10 @@ export type Database = {
           cvss_overall: number
           discovery_report?: Json | null
           executive_summary_md: string
+          executive_summary?: string | null
           financial_liability_usd?: number | null
+          technical_proof_of_concept?: string | null
+          remediation_code_snippet?: string | null
           findings?: Json
           generated_at?: string
           generation_cost_usd?: number | null
@@ -2052,7 +2058,10 @@ export type Database = {
           cvss_overall?: number
           discovery_report?: Json | null
           executive_summary_md?: string
+          executive_summary?: string | null
           financial_liability_usd?: number | null
+          technical_proof_of_concept?: string | null
+          remediation_code_snippet?: string | null
           findings?: Json
           generated_at?: string
           generation_cost_usd?: number | null

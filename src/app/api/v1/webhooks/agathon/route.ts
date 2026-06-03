@@ -131,7 +131,14 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", event.scanId);
 
-      if (technicalReport || aleUsd != null || p.findings) {
+      if (
+        technicalReport ||
+        aleUsd != null ||
+        p.findings ||
+        p.executive_summary ||
+        p.technical_proof_of_concept ||
+        p.remediation_code_snippet
+      ) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: existing } = await (admin as any)
           .from("scan_reports")
@@ -155,13 +162,22 @@ export async function POST(request: NextRequest) {
           risk_label: riskLabel,
         };
 
+        if (typeof p.executive_summary === "string") {
+          patch.executive_summary = p.executive_summary;
+          patch.executive_summary_md =
+            p.executive_summary || existing?.executive_summary_md || "";
+        } else if (technicalReport) {
+          patch.executive_summary_md =
+            existing?.executive_summary_md ?? technicalReport.slice(0, 4000);
+        }
+        if (typeof p.technical_proof_of_concept === "string") {
+          patch.technical_proof_of_concept = p.technical_proof_of_concept;
+        }
+        if (typeof p.remediation_code_snippet === "string") {
+          patch.remediation_code_snippet = p.remediation_code_snippet;
+        }
         if (technicalReport) {
           patch.audit_report_md = technicalReport;
-          patch.executive_summary_md =
-            typeof p.executive_summary === "string"
-              ? p.executive_summary
-              : existing?.executive_summary_md ??
-                technicalReport.slice(0, 4000);
         }
         if (parsedAle != null && !Number.isNaN(parsedAle)) {
           patch.financial_liability_usd = parsedAle;

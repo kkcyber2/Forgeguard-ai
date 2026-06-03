@@ -101,27 +101,40 @@ export async function POST(request: NextRequest) {
 
   const event = normalizeEvent(body);
   const admin = createAdminSupabase();
+  let persistOk: boolean | null = null;
+  let persistError: string | null = null;
 
   if (event.scanId) {
-    try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: ingressErr } = await (admin as any).from("scan_logs").insert({
+      scan_id: event.scanId,
+      type: "webhook",
+      severity: "info",
+      attack_name: "webhook_agathon",
+      payload: {
+        message: "Agathon webhook received",
+        kind: event.kind,
+        table: event.table,
+        record_preview: body.record
+          ? Object.keys(body.record).slice(0, 12)
+          : [],
+        engine_payload: body.payload ?? null,
+      },
+    });
+    if (ingressErr) {
+      console.warn("[webhook:agathon] scan_logs webhook type failed:", ingressErr.message);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any).from("scan_logs").insert({
         scan_id: event.scanId,
-        type: "webhook",
+        type: "info",
         severity: "info",
         attack_name: "webhook_agathon",
         payload: {
-          message: "Agathon webhook received",
+          message: "Agathon webhook received (info fallback)",
           kind: event.kind,
-          table: event.table,
-          record_preview: body.record
-            ? Object.keys(body.record).slice(0, 12)
-            : [],
-          engine_payload: body.payload ?? null,
+          ingress_error: ingressErr.message.slice(0, 200),
         },
       });
-    } catch (err) {
-      console.warn("[webhook:agathon] scan_logs insert skipped:", err);
     }
   }
 
@@ -249,9 +262,24 @@ export async function POST(request: NextRequest) {
         }),
       }).catch(() => {});
       // #endregion
+      persistOk = true;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin as any).from("scan_logs").insert({
+        scan_id: event.scanId,
+        type: "info",
+        severity: "info",
+        attack_name: "webhook_persist_ok",
+        payload: {
+          message: "scan.completed persisted",
+          risk_label: prepared.risk_label,
+          attacks_run: prepared.attacks_run,
+        },
+      });
     } catch (err) {
       const detail =
         err instanceof Error ? err.message : String(err);
+      persistOk = false;
+      persistError = detail;
       console.warn("[webhook:agathon] scan.completed persist skipped:", detail);
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -310,6 +338,8 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    persist_ok: persistOk,
+    persist_error: persistError,
     received: event.kind,
     scan_id: event.scanId,
   });

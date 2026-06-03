@@ -134,6 +134,7 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
   const [showLegal,  setShowLegal]  = React.useState(false);
   const [authId,     setAuthId]     = React.useState<string | null>(null);
   const [surfaceKind,setSurfaceKind]= React.useState<SurfaceKind>("llm");
+  const [assetValue, setAssetValue] = React.useState<string>("");
   const [ownershipToken, setOwnershipToken] = React.useState<string | null>(null);
   const [ownershipVerified, setOwnershipVerified] = React.useState(false);
   const [ownershipBusy, setOwnershipBusy] = React.useState(false);
@@ -155,6 +156,7 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
   }, [targetUrl, intensity, isSovereign]);
 
   const selectedTarget = TARGET_TYPES.find((t) => t.value === surfaceKind)!;
+  const setTargetType = setSurfaceKind;
   const needsOwnership = intensity !== "standard";
 
   async function handleIssueToken() {
@@ -225,6 +227,7 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
       {/* Hidden fields for intensity + auth */}
       <input type="hidden" name="intensity" value={intensity} />
       <input type="hidden" name="surface_kind" value={surfaceKind} />
+      <input type="hidden" name="target_type" value={surfaceKind} />
       {ownershipToken && (
         <input type="hidden" name="ownership_token" value={ownershipToken} />
       )}
@@ -253,7 +256,8 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
                 <button
                   key={t.value}
                   type="button"
-                  onClick={() => setSurfaceKind(t.value)}
+                  aria-pressed={active}
+                  onClick={() => setTargetType(t.value)}
                   className={cn(
                     "flex items-start gap-3 rounded-sm border px-3 py-3 text-left transition-colors",
                     active
@@ -301,6 +305,28 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
               </li>
             ))}
           </ul>
+        </div>
+
+        <div>
+          <Label htmlFor="asset_value_usd">Estimated Value of Data Access</Label>
+          <Input
+            id="asset_value_usd"
+            name="asset_value_usd"
+            type="number"
+            min={0}
+            step={1000}
+            inputMode="numeric"
+            placeholder="500000"
+            value={assetValue}
+            onChange={(e) => setAssetValue(e.target.value)}
+            aria-invalid={!!state.fieldErrors?.asset_value_usd}
+            className="font-mono text-xs tabular-nums"
+          />
+          <FieldError>{state.fieldErrors?.asset_value_usd}</FieldError>
+          <p className="mt-2 text-[11px] leading-relaxed text-foreground-subtle">
+            USD estimate of data exposed if breached — drives the $ALE liability
+            calculation. Leave blank to use intensity-tier defaults.
+          </p>
         </div>
 
         {/* Preset picker */}

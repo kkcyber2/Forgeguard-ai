@@ -36,7 +36,7 @@ export async function fetchTotalAleRisk(
 
 /** Columns that exist on live scan_reports (PostgREST-safe). */
 export const SCAN_REPORT_SELECT =
-  "executive_summary_md, audit_report_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, generation_cost_usd, discovery_report, ale_usd, financial_liability_usd, aegis_zip_b64, attacks_run";
+  "executive_summary_md, executive_summary, audit_report_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, generation_cost_usd, discovery_report, ale_usd, financial_liability_usd, technical_proof_of_concept, remediation_code_snippet, aegis_zip_b64, attacks_run";
 
 export const SCAN_REPORT_SELECT_MINIMAL =
   "executive_summary_md, cvss_overall, risk_label, findings, optimization_suggestions_md, owasp_coverage, generation_cost_usd, discovery_report";

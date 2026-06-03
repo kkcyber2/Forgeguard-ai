@@ -26,7 +26,10 @@ export interface CreateScanState {
   ok: boolean;
   error?: string;
   fieldErrors?: Partial<
-    Record<"target_model" | "target_url" | "api_key" | "notes", string>
+    Record<
+      "target_model" | "target_url" | "api_key" | "notes" | "asset_value_usd",
+      string
+    >
   >;
 }
 
@@ -46,6 +49,12 @@ const CreateScanSchema = z.object({
     .max(2048, "API key too long"),
   notes: z.string().max(2000).optional().nullable(),
   surface_kind: z.enum(SURFACE_KINDS).default("llm"),
+  asset_value_usd: z.coerce
+    .number()
+    .min(0, "Must be zero or positive")
+    .max(1_000_000_000, "Value too large")
+    .optional()
+    .nullable(),
 });
 
 function flattenZod(e: z.ZodError): Record<string, string> {
@@ -66,7 +75,8 @@ export async function createScan(
     target_url: formData.get("target_url"),
     api_key: formData.get("api_key"),
     notes: formData.get("notes") || null,
-    surface_kind: formData.get("surface_kind") || "llm",
+    surface_kind: formData.get("surface_kind") || formData.get("target_type") || "llm",
+    asset_value_usd: formData.get("asset_value_usd") || null,
   });
   if (!parsed.success) {
     return { ok: false, fieldErrors: flattenZod(parsed.error) };
@@ -155,6 +165,10 @@ export async function createScan(
       intensity,
       surface_kind: parsed.data.surface_kind,
       notes: parsed.data.notes ?? null,
+      asset_value_usd:
+        parsed.data.asset_value_usd != null && parsed.data.asset_value_usd > 0
+          ? parsed.data.asset_value_usd
+          : null,
     })
     .select("id")
     .single()) as {

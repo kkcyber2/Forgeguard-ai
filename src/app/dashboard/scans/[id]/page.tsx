@@ -22,6 +22,7 @@ import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemor
 import { deleteScan } from "../actions";
 import { fetchDashboardAnalytics } from "@/lib/analytics/dashboard-metrics";
 import { SCAN_REPORT_SELECT } from "@/lib/scans/queries";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import type { ScanReport } from "./findings-report";
 
 /**
@@ -117,6 +118,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .eq("user_id", user.id)
     .maybeSingle();
   const userPlan = (sub?.plan as "free" | "startup" | "enterprise" | null) ?? "free";
+  const isSovereign = isSovereignOperator(user.email);
 
   const analytics = await fetchDashboardAnalytics(supabase);
 
@@ -252,6 +254,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
         targetModel={scan.target_model}
         targetUrl={scan.target_url}
         userPlan={userPlan}
+        isSovereign={isSovereign}
       />
 
       <GenesisTabs

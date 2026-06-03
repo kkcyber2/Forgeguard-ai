@@ -5,6 +5,11 @@
  * Polling pauses while the tab is hidden to reduce setInterval lag.
  */
 
+import {
+  BUNKER_RETRY_MS,
+  BUNKER_SHIELDING_MESSAGE,
+} from "@/lib/engine/bunker-shielding";
+
 export type ClientEngineHealth = {
   ok: boolean;
   status: string;
@@ -14,7 +19,6 @@ export type ClientEngineHealth = {
 
 type Listener = (health: ClientEngineHealth) => void;
 
-const BUNKER_RETRY_MS = 2_000;
 const POLL_MS = 30_000;
 
 let health: ClientEngineHealth | null = null;
@@ -72,7 +76,11 @@ async function probeWithBunkerFallback(): Promise<ClientEngineHealth> {
     let data = await fetchHealthOnce();
 
     if (isEngineDown(data) && data.status !== "unconfigured") {
-      console.error("[engine-health] client bunker fallback in", BUNKER_RETRY_MS, "ms");
+      console.error(
+        "[engine-health] client bunker fallback in",
+        BUNKER_RETRY_MS,
+        "ms",
+      );
       await sleep(BUNKER_RETRY_MS);
       data = await fetchHealthOnce();
     }
@@ -82,16 +90,24 @@ async function probeWithBunkerFallback(): Promise<ClientEngineHealth> {
     return data;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    const offline: ClientEngineHealth = {
-      ok: false,
-      status: "offline",
-      latencyMs: 0,
-      reason: "Bunker Shielding...",
-    };
     console.error("[engine-health] probe failed:", message);
-    health = offline;
-    listeners.forEach((fn) => fn(offline));
-    return offline;
+    await sleep(BUNKER_RETRY_MS);
+    try {
+      const retry = await fetchHealthOnce();
+      health = retry;
+      listeners.forEach((fn) => fn(retry));
+      return retry;
+    } catch {
+      const offline: ClientEngineHealth = {
+        ok: false,
+        status: "offline",
+        latencyMs: 0,
+        reason: BUNKER_SHIELDING_MESSAGE,
+      };
+      health = offline;
+      listeners.forEach((fn) => fn(offline));
+      return offline;
+    }
   }
 }
 

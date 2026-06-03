@@ -6,6 +6,7 @@ import {
   resolveEngineBaseUrl,
 } from "@/lib/agathon-config";
 import { getEngineHealthSnapshot } from "@/lib/engine/probe-engine-health";
+import { BUNKER_SHIELDING_MESSAGE } from "@/lib/engine/bunker-shielding";
 
 /**
  * GET /api/health/engine — cached liveness probe with SWR + coalescing.
@@ -47,7 +48,7 @@ export async function GET() {
         ok: false,
         status: "offline",
         latencyMs: 0,
-        reason: "Bunker Shielding...",
+        reason: BUNKER_SHIELDING_MESSAGE,
         error: message,
       },
       { headers: { "Cache-Control": SWR_HEADER } },

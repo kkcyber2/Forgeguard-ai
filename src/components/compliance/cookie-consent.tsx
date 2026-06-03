@@ -34,8 +34,8 @@ export function CookieConsent({ initialConsented = false }: CookieConsentProps) 
     setMounted(true);
   }, [initialConsented]);
 
+  if (!mounted) return null;
   if (hasAccepted) return null;
-  if (!mounted && initialConsented) return null;
 
   function dismissOptimistic() {
     setHasAccepted(true);

@@ -7,6 +7,7 @@ import {
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { runScan } from "@/lib/runner/runner";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import {
   getEngineHealthSnapshot,
   isEngineLockdown,
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
     .select("plan, status, scans_used_this_period, scans_allowed, period_expired")
     .maybeSingle()) as { data: QuotaRow | null };
 
-  if (quota) {
+  if (quota && !isSovereignOperator(user.email)) {
     const isActive = quota.status === "active" || quota.status === "on_trial";
     const periodOk  = !quota.period_expired;
     const underLimit =

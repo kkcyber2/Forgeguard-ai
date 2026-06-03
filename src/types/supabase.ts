@@ -2088,6 +2088,7 @@ export type Database = {
       scans: {
         Row: {
           ale_usd: number | null
+          asset_value_usd: number | null
           brain_input_tokens_used: number
           brain_output_tokens_used: number
           completed_at: string | null
@@ -2110,6 +2111,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          asset_value_usd?: number | null
           brain_input_tokens_used?: number
           brain_output_tokens_used?: number
           completed_at?: string | null
@@ -2132,6 +2134,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          asset_value_usd?: number | null
           brain_input_tokens_used?: number
           brain_output_tokens_used?: number
           completed_at?: string | null

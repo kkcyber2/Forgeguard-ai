@@ -17,6 +17,10 @@ import {
   swrIsStaleUsable,
   swrSet,
 } from "@/lib/cache/stale-while-revalidate";
+import {
+  BUNKER_RETRY_MS,
+  BUNKER_SHIELDING_MESSAGE,
+} from "@/lib/engine/bunker-shielding";
 
 export type EngineHealthSnapshot = {
   ok: boolean;
@@ -30,13 +34,12 @@ export type EngineHealthSnapshot = {
 const CACHE_KEY = "engine:health";
 const FRESH_MS = 15_000;
 const STALE_MS = 60_000;
-const BUNKER_RETRY_MS = 2_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const BUNKER_SHIELDING = "Bunker Shielding...";
+const BUNKER_SHIELDING = BUNKER_SHIELDING_MESSAGE;
 
 function isBunkerShieldHttpStatus(status: number): boolean {
   return status === 499 || status === 502 || status === 503;

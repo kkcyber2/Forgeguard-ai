@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BUNKER_SHIELDING_MESSAGE } from "@/lib/engine/bunker-shielding";
 import {
   subscribeEngineHealth,
   refreshEngineHealth,
@@ -51,7 +52,7 @@ export function EngineStatus() {
           >
             <AlertTriangle size={13} strokeWidth={1.5} className="shrink-0" />
             <p className="flex-1 font-mono text-[11px]">
-              {health?.reason ?? "Bunker Shielding..."}
+              {health?.reason ?? BUNKER_SHIELDING_MESSAGE}
             </p>
             <button
               type="button"

@@ -63,7 +63,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   const { data: scan, error: scanErr } = (await admin
     .from("scans")
     .select(
-      "id, user_id, target_model, target_url, target_credential_encrypted, intensity, surface_kind",
+      "id, user_id, target_model, target_url, target_credential_encrypted, intensity, surface_kind, asset_value_usd",
     )
     .eq("id", scanId)
     .maybeSingle()) as {
@@ -75,6 +75,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       target_credential_encrypted: string | null;
       intensity: string | null;
       surface_kind: string | null;
+      asset_value_usd: number | null;
     } | null;
     error: { message: string } | null;
   };
@@ -190,6 +191,10 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
         target_url: normalizedUrl,
         intensity: scan.intensity ?? "standard",
         surface_kind: scan.surface_kind ?? "llm",
+        asset_value_usd:
+          scan.asset_value_usd != null && scan.asset_value_usd > 0
+            ? scan.asset_value_usd
+            : undefined,
         api_key: dispatchKey.apiKey,
         ownership_verified: sovereign,
         target_provider: dispatchKey.targetProvider,

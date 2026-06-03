@@ -61,6 +61,7 @@ export interface OWASPBucket {
 
 export interface ScanReport {
   executive_summary_md?: string;
+  executive_summary?: string | null;
   audit_report_md?: string;
   cvss_overall?: number;
   risk_label?: "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -73,6 +74,8 @@ export interface ScanReport {
   discovery_report?: Record<string, unknown> | null;
   ale_usd?: number | null;
   financial_liability_usd?: number | null;
+  technical_proof_of_concept?: string | null;
+  remediation_code_snippet?: string | null;
   social_templates?: Record<string, unknown>[] | null;
   aegis_zip_b64?: string | null;
 }
@@ -83,7 +86,7 @@ function formatUsd(n: number): string {
   return n.toFixed(0);
 }
 
-/** Section B — Financial Liability ($ALE) */
+/** Section B — CFO View: Financial Liability ($ALE) */
 export function FinancialLiabilitySection({
   aleUsd,
   findings,
@@ -100,24 +103,37 @@ export function FinancialLiabilitySection({
   }
 
   return (
-    <div className="rounded-sm border border-[#D1FF00]/20 bg-[#D1FF00]/[0.03] p-5">
-      <SectionHead icon={ShieldAlert} label="Section B — Financial Liability ($ALE)" />
+    <div
+      className="rounded-sm border border-red-500/40 bg-red-950/20 p-5"
+      style={{
+        boxShadow:
+          "0 0 32px rgba(239,68,68,0.35), inset 0 0 24px rgba(239,68,68,0.06)",
+        animation: "ale-neon-pulse 2.4s ease-in-out infinite",
+      }}
+    >
+      <style>{`
+        @keyframes ale-neon-pulse {
+          0%, 100% { box-shadow: 0 0 24px rgba(239,68,68,0.25), inset 0 0 16px rgba(239,68,68,0.04); }
+          50% { box-shadow: 0 0 48px rgba(239,68,68,0.55), inset 0 0 28px rgba(239,68,68,0.12); }
+        }
+      `}</style>
+      <SectionHead icon={ShieldAlert} label="Section B — CFO View · Financial Liability ($ALE)" />
       {aleUsd != null && aleUsd > 0 && (
-        <p className="mb-4 font-mono text-2xl font-bold tabular-nums text-[#D1FF00]">
+        <p className="mb-4 font-mono text-3xl font-black tabular-nums text-red-400 drop-shadow-[0_0_12px_rgba(239,68,68,0.8)]">
           ${formatUsd(aleUsd)}
-          <span className="ml-2 text-[10px] font-normal uppercase tracking-widest text-foreground-muted">
-            projected exposure
+          <span className="ml-3 block text-[10px] font-normal uppercase tracking-[0.2em] text-red-300/70 sm:inline">
+            annualized loss expectancy
           </span>
         </p>
       )}
       {perFinding.length > 0 && (
-        <ul className="space-y-2 font-mono text-[11px] text-foreground-muted">
+        <ul className="space-y-2 font-mono text-[11px] text-red-200/80">
           {perFinding.map((f) => {
             const usd = f.financial_liability_usd ?? f.ale_usd ?? 0;
             return (
-              <li key={f.id} className="flex justify-between gap-4 border-t border-white/[0.06] pt-2">
-                <span className="text-foreground">{f.attack}</span>
-                <span className="shrink-0 text-[#D1FF00]">${formatUsd(usd)}</span>
+              <li key={f.id} className="flex justify-between gap-4 border-t border-red-500/20 pt-2">
+                <span className="text-red-100">{f.attack}</span>
+                <span className="shrink-0 font-semibold text-red-400">${formatUsd(usd)}</span>
               </li>
             );
           })}
@@ -127,12 +143,23 @@ export function FinancialLiabilitySection({
   );
 }
 
-/** Section A — Executive Summary (CEO briefing) */
-export function ExecutiveSummarySection({ md }: { md: string }) {
+/** Section A — CEO View: Executive Summary (high-density monospace) */
+export function ExecutiveSummarySection({
+  md,
+  plain,
+}: {
+  md?: string;
+  plain?: string | null;
+}) {
+  const text = (plain?.trim() || md?.trim() || "").replace(/^#+\s*/gm, "");
+  if (!text) return null;
+
   return (
-    <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-      <SectionHead icon={FileText} label="Section A — Executive Summary" />
-      <MarkdownBlock md={md} />
+    <div className="rounded-sm border border-white/[0.08] bg-black/50 p-5">
+      <SectionHead icon={FileText} label="Section A — CEO View · Executive Summary" />
+      <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-[1.65] tracking-tight text-white/85">
+        {text}
+      </pre>
     </div>
   );
 }
@@ -170,33 +197,102 @@ export function RemediationSection({
   );
 }
 
-/** Section C — Technical PoC */
-export function TechnicalPoCSection({
+/** Lightweight syntax tint for PoC blocks (no extra deps). */
+function highlightCode(code: string): React.ReactNode[] {
+  const kw =
+    /\b(import|from|def|class|return|if|else|elif|for|while|try|except|async|await|const|let|var|function|curl|POST|GET|Bearer|true|false|null)\b/g;
+  return code.split("\n").map((line, li) => {
+    const parts: React.ReactNode[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    kw.lastIndex = 0;
+    while ((m = kw.exec(line)) !== null) {
+      if (m.index > last) parts.push(line.slice(last, m.index));
+      parts.push(
+        <span key={`${li}-${m.index}`} className="text-sky-300">
+          {m[0]}
+        </span>,
+      );
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) parts.push(line.slice(last));
+    return (
+      <div key={li} className="table-row">
+        <span className="table-cell select-none pr-3 text-right text-[9px] text-white/20">
+          {li + 1}
+        </span>
+        <span className="table-cell whitespace-pre">{parts.length ? parts : " "}</span>
+      </div>
+    );
+  });
+}
+
+function CodeBlock({ code, label }: { code: string; label?: string }) {
+  return (
+    <div className="relative rounded border border-white/[0.08] bg-[#050505]">
+      <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
+        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-acid/70">
+          {label ?? "proof-of-concept"}
+        </span>
+        <CopyButton text={code} />
+      </div>
+      <pre className="overflow-x-auto p-3 font-mono text-[11px] leading-relaxed text-emerald-100/90">
+        <code className="table w-full">{highlightCode(code)}</code>
+      </pre>
+    </div>
+  );
+}
+
+/** Section C — Dev View: Technical Proof of Concept */
+export function TechnicalPoCKineticSection({
+  pocText,
   auditMd,
   findings,
 }: {
+  pocText?: string | null;
   auditMd?: string;
   findings: Finding[];
 }) {
   const withPoc = findings.filter(
     (f) => f.proof_of_concept?.curl || f.proof_of_concept?.python,
   );
-
-  if (!auditMd && withPoc.length === 0) return null;
+  const hasContent = Boolean(pocText?.trim()) || Boolean(auditMd) || withPoc.length > 0;
+  if (!hasContent) return null;
 
   return (
     <div className="space-y-4">
-      {withPoc.length > 0 && (
-        <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
-          <SectionHead icon={Terminal} label="Section C — Technical PoC" />
-          <div className="space-y-2">
-            {withPoc.map((f, i) => (
-              <FindingCard key={f.id} finding={f} index={i} />
-            ))}
+      <div className="rounded-sm border border-cyan-500/20 bg-cyan-950/10 p-5">
+        <SectionHead icon={Terminal} label="Section C — Dev View · Technical Proof of Concept" />
+        {pocText?.trim() && <CodeBlock code={pocText.trim()} label="kinetic-poc" />}
+        {withPoc.length > 0 && (
+          <div className={cn("space-y-2", pocText?.trim() && "mt-4")}>
+            {withPoc.map((f, i) => {
+              const code =
+                f.proof_of_concept?.python || f.proof_of_concept?.curl || "";
+              return code ? (
+                <CodeBlock key={f.id} code={code} label={f.attack || `finding-${i + 1}`} />
+              ) : null;
+            })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
       {auditMd && <AuditReportPanel md={auditMd} />}
+    </div>
+  );
+}
+
+/** Section D — Immunity: THE AEGIS SHIELD */
+export function AegisShieldSection({ snippet }: { snippet?: string | null }) {
+  const code = snippet?.trim();
+  if (!code) return null;
+
+  return (
+    <div className="rounded-sm border border-acid/30 bg-acid/[0.04] p-5">
+      <SectionHead icon={ShieldCheck} label="Section D — Immunity · THE AEGIS SHIELD" />
+      <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-acid/80">
+        Drop-in remediation — copy and deploy
+      </p>
+      <CodeBlock code={code} label="remediation_code_snippet" />
     </div>
   );
 }
@@ -941,6 +1037,7 @@ interface FindingsReportProps {
   targetModel?: string;
   targetUrl?: string;
   userPlan?: PlanId;
+  isSovereign?: boolean;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -1101,14 +1198,17 @@ function DownloadReportButton({
   targetModel,
   targetUrl,
   userPlan = "free",
+  isSovereign = false,
 }: {
   report: ScanReport;
   scanId: string;
   targetModel: string;
   targetUrl: string;
   userPlan?: PlanId;
+  isSovereign?: boolean;
 }) {
-  const hasPdfAccess = userPlan === "startup" || userPlan === "enterprise";
+  const hasPdfAccess =
+    isSovereign || userPlan === "startup" || userPlan === "enterprise";
   if (!hasPdfAccess) {
     return (
       <a
@@ -1214,6 +1314,7 @@ export function FindingsReport({
   targetModel = "",
   targetUrl = "",
   userPlan = "free",
+  isSovereign = false,
 }: FindingsReportProps) {
   if (scanStatus !== "sealed") {
     return null; // only render when scan is done
@@ -1245,10 +1346,11 @@ export function FindingsReport({
         <ShieldAlert size={16} strokeWidth={1.5} className="shrink-0 text-foreground-subtle" />
         <div className="flex-1">
           <p className="text-xs font-medium text-foreground">
-            Intelligence Report
+            Enterprise Intelligence Report
           </p>
           <p className="text-[11px] text-foreground-muted">
-            {findings.length} findings · {report.attacks_run ?? 0} attack vectors tested
+            4-section kinetic briefing · {findings.length} findings ·{" "}
+            {report.attacks_run ?? 0} vectors tested
             {report.wall_seconds ? ` · ${Math.round(report.wall_seconds / 60)}m scan` : ""}
           </p>
         </div>
@@ -1258,8 +1360,8 @@ export function FindingsReport({
           targetModel={targetModel}
           targetUrl={targetUrl}
           userPlan={userPlan}
+          isSovereign={isSovereign}
         />
-        {/* Overall CVSS */}
         <div className={cn("text-right", riskCfg.glow)}>
           <div className={cn("font-mono text-3xl font-bold leading-none", riskCfg.color)}>
             {(report.cvss_overall ?? 0).toFixed(1)}
@@ -1270,16 +1372,21 @@ export function FindingsReport({
         </div>
       </div>
 
-      {report.executive_summary_md && (
-        <ExecutiveSummarySection md={report.executive_summary_md} />
-      )}
+      {/* ── Four-section enterprise report (A → D) ── */}
+      <ExecutiveSummarySection
+        md={report.executive_summary_md}
+        plain={report.executive_summary}
+      />
 
       <FinancialLiabilitySection aleUsd={aleUsd} findings={findings} />
 
-      <TechnicalPoCSection
+      <TechnicalPoCKineticSection
+        pocText={report.technical_proof_of_concept}
         auditMd={report.audit_report_md}
         findings={findings}
       />
+
+      <AegisShieldSection snippet={report.remediation_code_snippet} />
 
       {findings.length > 0 && (
         <div className="rounded-sm border border-white/[0.06] bg-surface p-5">

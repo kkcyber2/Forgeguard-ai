@@ -126,7 +126,7 @@ const SOVEREIGN_AUDIT_RESULT: IdentityAuditResult = {
   mode: "heuristic",
 };
 
-async function persistSovereignBypass(
+export async function persistSovereignBypass(
   userId: string,
   documentPath: string,
 ): Promise<Partial<IdentityAuditExecution> & { error?: string }> {

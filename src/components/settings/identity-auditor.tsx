@@ -124,11 +124,18 @@ export function IdentityAuditor({
     ? formatIdentityFailureTruth(displayFailureReason)
     : null;
   const statusLabel =
-    statusNorm === "failed"
-      ? "FAILED"
-      : statusNorm === "review"
-        ? "REVIEW_REQUIRED"
-        : auditStatus;
+    sovereignBypass && (statusNorm === "passed" || auditResult?.passed)
+      ? "VERIFIED: SOVEREIGN"
+      : statusNorm === "failed"
+        ? "FAILED"
+        : statusNorm === "review"
+          ? "REVIEW_REQUIRED"
+          : auditStatus;
+  const sovereignVerified =
+    sovereignBypass &&
+    (statusNorm === "passed" ||
+      auditResult?.passed ||
+      auditResult?.notes === "VERIFIED: SOVEREIGN");
   const showFailureTruth =
     !!truthReason?.trim() &&
     (statusNorm === "failed" ||
@@ -364,13 +371,20 @@ export function IdentityAuditor({
         <div className="ml-auto flex max-w-[min(100%,280px)] flex-col items-end gap-1 text-right">
           <span
             className={
-              statusNorm === "failed"
-                ? "font-mono text-[9px] uppercase tracking-widest text-red-400/80"
-                : "font-mono text-[9px] uppercase tracking-widest text-zinc-500"
+              sovereignVerified || statusNorm === "passed"
+                ? "font-mono text-[9px] uppercase tracking-widest text-[#D1FF00]"
+                : statusNorm === "failed"
+                  ? "font-mono text-[9px] uppercase tracking-widest text-red-400/80"
+                  : "font-mono text-[9px] uppercase tracking-widest text-zinc-500"
             }
           >
             {statusLabel}
           </span>
+          {sovereignVerified && (
+            <p className="font-mono text-[10px] leading-relaxed text-[#D1FF00]">
+              VERIFIED: SOVEREIGN
+            </p>
+          )}
           {showFailureTruth && truthReason && (
             <p className="font-mono text-[10px] leading-relaxed text-[#D1FF00]">
               {truthReason}

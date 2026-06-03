@@ -36,12 +36,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const BUNKER_SHIELDING = "Bunker Shielding...";
+
+function isBunkerShieldHttpStatus(status: number): boolean {
+  return status === 499 || status === 502 || status === 503;
+}
+
 function offlineSnapshot(error?: string): EngineHealthSnapshot {
   return {
     ok: false,
     status: "offline",
     latencyMs: 0,
-    reason: "Engine bunker unreachable",
+    reason: BUNKER_SHIELDING,
     error: error ?? "Engine probe failed",
   };
 }
@@ -83,9 +89,11 @@ async function probeOnce(
 
     return {
       ok: false,
-      status: "lockdown",
+      status: isBunkerShieldHttpStatus(resp.status) ? "offline" : "lockdown",
       latencyMs,
-      reason: "Engine bunker unreachable",
+      reason: isBunkerShieldHttpStatus(resp.status)
+        ? BUNKER_SHIELDING
+        : "Engine bunker unreachable",
       httpStatus: resp.status,
     };
   } catch (err) {
@@ -94,7 +102,7 @@ async function probeOnce(
       ok: false,
       status: "offline",
       latencyMs: Date.now() - t0,
-      reason: "Engine bunker unreachable",
+      reason: BUNKER_SHIELDING,
       error: message,
     };
   }
@@ -138,6 +146,8 @@ async function fetchEngineHealth(): Promise<EngineHealthSnapshot> {
     const shouldRetry =
       !snapshot.ok &&
       (snapshot.httpStatus === 503 ||
+        snapshot.httpStatus === 502 ||
+        snapshot.httpStatus === 499 ||
         snapshot.status === "lockdown" ||
         snapshot.status === "offline");
 

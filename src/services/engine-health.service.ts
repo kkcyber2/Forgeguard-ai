@@ -86,7 +86,7 @@ async function probeWithBunkerFallback(): Promise<ClientEngineHealth> {
       ok: false,
       status: "offline",
       latencyMs: 0,
-      reason: "Engine bunker unreachable",
+      reason: "Bunker Shielding...",
     };
     console.error("[engine-health] probe failed:", message);
     health = offline;

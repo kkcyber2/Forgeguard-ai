@@ -51,8 +51,7 @@ export function EngineStatus() {
           >
             <AlertTriangle size={13} strokeWidth={1.5} className="shrink-0" />
             <p className="flex-1 font-mono text-[11px]">
-              {health?.reason ??
-                "Engine bunker unreachable — Agathon is offline. New scans will fail until recovery."}
+              {health?.reason ?? "Bunker Shielding..."}
             </p>
             <button
               type="button"

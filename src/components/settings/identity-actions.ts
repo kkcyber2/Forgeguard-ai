@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import {
   executeIdentityAuditForUser,
   persistIdentityFailureReason,
+  persistSovereignBypass,
 } from "@/lib/verify/identity-audit-pipeline";
 import type { IdentityAuditResult } from "@/lib/verify/ai-audit";
 
@@ -57,6 +59,26 @@ export async function runAiAudit(
     const user = await getSessionUser();
     if (!user) return { error: "Not authenticated." };
     userId = user.id;
+
+    if (isSovereignOperator(user.email)) {
+      const path = documentPath?.trim() || `${user.id}/sovereign`;
+      const bypass = await persistSovereignBypass(user.id, path);
+      if (bypass.error) {
+        return {
+          error: bypass.error,
+          failure_reason: bypass.error,
+          identity_failure_reason: bypass.error,
+        };
+      }
+      return {
+        ok: true,
+        success: true,
+        passed: true,
+        status: "passed",
+        result: bypass.result,
+        identity_failure_reason: null,
+      };
+    }
 
     if (!documentPath?.trim()) {
       const reason = "No identity document on file. Upload or capture first.";

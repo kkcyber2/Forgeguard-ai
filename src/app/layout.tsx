@@ -79,7 +79,10 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable} dark`}
       suppressHydrationWarning
     >
-      <body className="bg-background text-foreground antialiased selection:bg-acid/25">
+      <body
+        className="bg-background text-foreground antialiased selection:bg-acid/25"
+        suppressHydrationWarning
+      >
         {/* Ambient grain — single fixed layer for the entire app */}
         <div
           aria-hidden

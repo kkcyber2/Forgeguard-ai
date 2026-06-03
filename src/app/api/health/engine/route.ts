@@ -46,7 +46,7 @@ export async function GET() {
         ok: false,
         status: "offline",
         latencyMs: 0,
-        reason: "Engine bunker unreachable",
+        reason: "Bunker Shielding...",
         error: message,
       },
       { headers: { "Cache-Control": SWR_HEADER } },

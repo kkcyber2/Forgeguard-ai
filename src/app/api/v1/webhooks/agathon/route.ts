@@ -240,28 +240,6 @@ export async function POST(request: NextRequest) {
         throw new Error(`scan_reports.upsert: ${upsertErr.message}`);
       }
 
-      // #region agent log
-      fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "c20499",
-        },
-        body: JSON.stringify({
-          sessionId: "c20499",
-          runId: "post-fix",
-          hypothesisId: "E",
-          location: "route.ts:scan.completed",
-          message: "scan_reports_upsert_ok",
-          data: {
-            scanId: event.scanId,
-            riskLabel: prepared.risk_label,
-            attacksRun: prepared.attacks_run,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       persistOk = true;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any).from("scan_logs").insert({
@@ -296,24 +274,6 @@ export async function POST(request: NextRequest) {
       } catch {
         /* best-effort production evidence */
       }
-      // #region agent log
-      fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "c20499",
-        },
-        body: JSON.stringify({
-          sessionId: "c20499",
-          runId: "post-fix",
-          hypothesisId: "E",
-          location: "route.ts:scan.completed",
-          message: "scan_reports_upsert_failed",
-          data: { scanId: event.scanId, detail: detail.slice(0, 400) },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     }
   }
 

@@ -191,6 +191,7 @@ export async function POST(req: NextRequest) {
     .insert({
       author_id:         user.id,
       name,
+      title:             name,
       description,
       language,
       tags,

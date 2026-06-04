@@ -1,5 +1,5 @@
 /**
- * Vercel ↔ engine env alignment (Railway or Hugging Face Space).
+ * Vercel ↔ engine env alignment (Railway bunker).
  * Prefer PYTHON_ENGINE_URL / INTERNAL_SCAN_TOKEN; fall back to legacy names.
  *
  * Engine repo: https://github.com/valosd453-bit/AI-red-team

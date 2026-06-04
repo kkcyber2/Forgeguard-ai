@@ -198,7 +198,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
         asset_value_usd:
           scan.asset_value_usd != null && scan.asset_value_usd > 0
             ? scan.asset_value_usd
-            : undefined,
+            : 50000,
         api_key: dispatchKey.apiKey,
         ownership_verified: sovereign,
         target_provider: dispatchKey.targetProvider,

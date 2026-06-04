@@ -195,6 +195,7 @@ export async function POST(req: NextRequest) {
       language,
       tags,
       code,
+      code_content:      code,
       price_usd,
       audit_verdict:     audit.verdict,
       audit_risk_score:  audit.risk_score,

@@ -3,12 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus, Radar } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
-import { ScanCard, type ScanCardData } from "@/components/dashboard/scan-card";
+import { ScanHistory } from "@/components/dashboard/scan-history";
 import { EmptyState } from "@/components/dashboard/empty-state";
-import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { buttonStyles } from "@/components/ui/button";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
-import { scansTableToCards } from "@/lib/scans/adapt";
+import { scansTableToHistory } from "@/lib/scans/adapt";
 
 /**
  * /dashboard/scans — list all scans owned by the current user.
@@ -25,14 +24,14 @@ export default async function ScansListPage() {
   const { data, error } = await supabase
     .from("scans")
     .select(
-      "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, created_at",
+      "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, created_at, started_at",
     )
     .order("created_at", { ascending: false })
     .limit(60);
 
   if (error) console.error("[scans] list:", error.message);
 
-  const cards: ScanCardData[] = scansTableToCards(data ?? []);
+  const history = scansTableToHistory(data ?? []);
 
   return (
     <>
@@ -51,7 +50,7 @@ export default async function ScansListPage() {
         }
       />
 
-      {cards.length === 0 ? (
+      {history.length === 0 ? (
         <EmptyState
           icon={Radar}
           title="No scans found"
@@ -67,13 +66,7 @@ export default async function ScansListPage() {
           }
         />
       ) : (
-        <Stagger className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {cards.map((s) => (
-            <StaggerItem key={s.id}>
-              <ScanCard scan={s} />
-            </StaggerItem>
-          ))}
-        </Stagger>
+        <ScanHistory scans={history} />
       )}
     </>
   );

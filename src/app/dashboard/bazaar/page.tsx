@@ -764,6 +764,10 @@ export default function BazaarPage() {
     setPurchaseError(null);
     try {
       const data = await purchaseScript(scriptId);
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+        return;
+      }
       if (data.ok) {
         const script = scripts.find((s) => s.id === scriptId);
         setScripts((prev) =>

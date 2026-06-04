@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { sealCredential } from "@/lib/crypto/credentials";
 import { headers } from "next/headers";
@@ -267,6 +267,54 @@ export async function deleteScan(formData: FormData): Promise<void> {
   revalidatePath("/dashboard/scans");
   revalidatePath("/dashboard");
   redirect("/dashboard/scans");
+}
+
+const RecoverSchema = z.object({ scan_id: z.string().uuid() });
+
+/** Mark a stale probing scan as failed so the operator can launch a new run. */
+export async function recoverStuckScan(
+  scanId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const parsed = RecoverSchema.safeParse({ scan_id: scanId });
+  if (!parsed.success) return { ok: false, error: "Invalid scan id." };
+
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: "Not authenticated." };
+
+  const supabase = await createServerSupabase();
+  const { data: scan, error: loadErr } = await supabase
+    .from("scans")
+    .select("id, status, started_at, created_at")
+    .eq("id", parsed.data.scan_id)
+    .maybeSingle();
+
+  if (loadErr || !scan) {
+    return { ok: false, error: "Scan not found." };
+  }
+  if (scan.status !== "probing") {
+    return { ok: false, error: "Scan is not stuck in probing." };
+  }
+
+  const startedMs = new Date(scan.started_at ?? scan.created_at ?? 0).getTime();
+  if (!Number.isFinite(startedMs) || Date.now() - startedMs <= 2 * 60 * 60 * 1000) {
+    return { ok: false, error: "Scan has not exceeded the 2-hour recovery window." };
+  }
+
+  const { error: updateErr } = await supabase
+    .from("scans")
+    .update({
+      status: "failed",
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", scan.id);
+
+  if (updateErr) {
+    return { ok: false, error: updateErr.message };
+  }
+
+  revalidatePath("/dashboard/scans");
+  revalidatePath("/dashboard");
+  return { ok: true };
 }
 
 /** Utility used by the API route — redacts the credential from any payload. */

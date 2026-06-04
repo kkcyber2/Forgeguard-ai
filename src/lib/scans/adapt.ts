@@ -20,7 +20,18 @@ type ScanRow = Pick<
   | "finding_count"
   | "high_severity_count"
   | "created_at"
+  | "started_at"
 >;
+
+const RECOVERY_THRESHOLD_MS = 2 * 60 * 60 * 1000;
+
+/** True when a scan has been probing longer than the recovery window. */
+export function isScanRecoverable(row: ScanRow): boolean {
+  if (row.status !== "probing") return false;
+  const startedMs = new Date(row.started_at ?? row.created_at).getTime();
+  if (!Number.isFinite(startedMs)) return false;
+  return Date.now() - startedMs > RECOVERY_THRESHOLD_MS;
+}
 
 /** Map engine-side status → UI-side status (ScanCardData vocabulary). */
 export function toCardStatus(s: Database["public"]["Tables"]["scans"]["Row"]["status"]): ScanCardData["status"] {
@@ -80,7 +91,7 @@ export function scanRowToCard(row: ScanRow): ScanCardData {
     target: prettifyTargetUrl(row.target_url),
     service: row.target_model,
     status: toCardStatus(row.status),
-    startedAt: row.created_at,
+    startedAt: row.started_at ?? row.created_at,
     findings: inferSeverityCounts(row.finding_count, row.high_severity_count),
     href: `/dashboard/scans/${row.id}`,
   };
@@ -88,4 +99,14 @@ export function scanRowToCard(row: ScanRow): ScanCardData {
 
 export function scansTableToCards(rows: ScanRow[]): ScanCardData[] {
   return rows.map(scanRowToCard);
+}
+
+export function scansTableToHistory(
+  rows: ScanRow[],
+): Array<{ id: string; card: ScanCardData; recoverable: boolean }> {
+  return rows.map((row) => ({
+    id: row.id,
+    card: scanRowToCard(row),
+    recoverable: isScanRecoverable(row),
+  }));
 }

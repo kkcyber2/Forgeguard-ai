@@ -9,16 +9,20 @@ type AleRow = {
   financial_liability_usd: number | null;
 };
 
-/** Sum ALE ($) for a user from scan_reports (financial_liability_usd preferred). */
+/** Sum ALE ($) for sealed scans from scan_reports (financial_liability_usd preferred). */
 export async function fetchTotalAleRisk(
   supabase: ServerSupabase,
   userId: string,
 ): Promise<number> {
   try {
     const { data: scanRows } = await safeQueryRows<{ id: string }>(
-      "scans/ids",
+      "scans/sealed-ids",
       () =>
-        supabase.from("scans").select("id").eq("user_id", userId),
+        supabase
+          .from("scans")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("status", "sealed"),
     );
 
     const scanIds = scanRows.map((s) => s.id);
@@ -61,6 +65,7 @@ export type ScanRow = Pick<
   | "finding_count"
   | "high_severity_count"
   | "created_at"
+  | "started_at"
 >;
 
 export async function fetchRecentScans(
@@ -75,7 +80,7 @@ export async function fetchRecentScans(
         supabase
           .from("scans")
           .select(
-            "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, created_at",
+            "id, target_model, target_url, status, progress_pct, finding_count, high_severity_count, created_at, started_at",
           )
           .eq("user_id", userId)
           .order("created_at", { ascending: false })

@@ -11,6 +11,14 @@ export function getPlaceholderCheckoutUrl(planId: PlanId): string {
   return `${PLACEHOLDER_BASE}/${planId}`;
 }
 
+export function getBazaarCheckoutUrl(
+  scriptId: string,
+  userId: string,
+  priceUsd: number,
+): string {
+  return `${PLACEHOLDER_BASE}/bazaar/${scriptId}?user=${encodeURIComponent(userId)}&price=${priceUsd}`;
+}
+
 /**
  * Resolve checkout URL: real Lemon Squeezy when variant configured, else placeholder.
  */
@@ -35,3 +43,11 @@ export function resolveCheckoutUrl(
 
   return getPlaceholderCheckoutUrl(planId);
 }
+
+export type BazaarPurchaseResult = {
+  ok?: boolean;
+  error?: string;
+  code?: string;
+  redirectUrl?: string;
+  already_owned?: boolean;
+};

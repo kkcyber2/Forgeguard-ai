@@ -16,6 +16,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 import { ScanLiveLog } from "./live-log";
+import { ScanDispatchError } from "./scan-dispatch-error";
 import { ScanStatusTracker } from "./scan-status-tracker";
 import { FindingsReport } from "./findings-report";
 import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemoryRow } from "./genesis-tabs";
@@ -72,6 +73,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
     finding_count: number | null;
     high_severity_count: number | null;
     notes: string | null;
+    failure_reason: string | null;
     created_at: string | null;
     started_at: string | null;
     completed_at: string | null;
@@ -79,7 +81,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
   const { data: scan, error: scanErr } = (await supabase
     .from("scans")
     .select(
-      "id, target_model, target_url, status, intensity, progress_pct, finding_count, high_severity_count, notes, created_at, started_at, completed_at",
+      "id, target_model, target_url, status, intensity, progress_pct, finding_count, high_severity_count, notes, failure_reason, created_at, started_at, completed_at",
     )
     .eq("id", id)
     .maybeSingle()) as {
@@ -238,6 +240,11 @@ export default async function ScanDetailPage({ params }: PageProps) {
               {(logs ?? []).length} events
             </span>
           </div>
+          <ScanDispatchError
+            status={scan.status}
+            failureReason={scan.failure_reason}
+            initialLogs={(logs ?? []) as import("./live-log").ScanLogEntry[]}
+          />
           <ScanLiveLog
             scanId={scan.id}
             initial={(logs ?? []) as import("./live-log").ScanLogEntry[]}

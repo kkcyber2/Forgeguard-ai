@@ -277,6 +277,10 @@ function summarize(payload: unknown): string {
   if (typeof payload === "string") return payload;
   if (typeof payload !== "object") return String(payload);
   const p = payload as Record<string, unknown>;
+  if (typeof p.raw_response_body === "string" && p.raw_response_body.trim()) {
+    const raw = p.raw_response_body;
+    return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
+  }
   // Common shapes from the Python runner.
   if (typeof p.message === "string") return p.message;
   if (typeof p.summary === "string") return p.summary;

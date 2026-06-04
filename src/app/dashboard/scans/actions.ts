@@ -35,6 +35,22 @@ export interface CreateScanState {
 
 const SURFACE_KINDS = ["llm", "web", "code", "mobile"] as const;
 
+/** Map UI / engine aliases → scan_surface_kind enum values. */
+function normalizeSurfaceKind(raw: string | null | undefined): (typeof SURFACE_KINDS)[number] {
+  const key = String(raw ?? "llm").trim().toLowerCase();
+  const aliases: Record<string, (typeof SURFACE_KINDS)[number]> = {
+    llm: "llm",
+    web: "web",
+    code: "code",
+    mobile: "mobile",
+    api: "code",
+    bot: "mobile",
+    gateway: "code",
+    chatbot: "mobile",
+  };
+  return aliases[key] ?? "llm";
+}
+
 const CreateScanSchema = z.object({
   target_model: z
     .string()
@@ -75,7 +91,9 @@ export async function createScan(
     target_url: formData.get("target_url"),
     api_key: formData.get("api_key"),
     notes: formData.get("notes") || null,
-    surface_kind: formData.get("surface_kind") || formData.get("target_type") || "llm",
+    surface_kind: normalizeSurfaceKind(
+      String(formData.get("target_type") || formData.get("surface_kind") || "llm"),
+    ),
     asset_value_usd: formData.get("asset_value_usd") || null,
   });
   if (!parsed.success) {

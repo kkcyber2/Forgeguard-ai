@@ -234,6 +234,12 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
       {authId && <input type="hidden" name="legal_auth_id" value={authId} />}
 
       <div className="border-b-[0.5px] border-white/[0.06] px-6 py-5">
+        {isSovereign && (
+          <p className="mb-3 inline-flex items-center gap-2 rounded-sm border border-acid/40 bg-acid/10 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-acid">
+            <ShieldCheck size={12} strokeWidth={1.75} />
+            VERIFIED: SOVEREIGN
+          </p>
+        )}
         <p className="text-eyebrow text-acid">Target acquisition</p>
         <h2 className="mt-2 text-lg font-medium text-foreground">
           Configure probe
@@ -257,7 +263,10 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
                   key={t.value}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => setTargetType(t.value)}
+                  onClick={() => {
+                    setTargetType(t.value);
+                  }}
+                  data-target-type={t.value}
                   className={cn(
                     "flex items-start gap-3 rounded-sm border px-3 py-3 text-left transition-colors",
                     active

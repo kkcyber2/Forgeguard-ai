@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { safeQueryRows } from "@/lib/supabase/safe-query";
 import { fetchUserApiKeys } from "@/lib/supabase/queries";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
 import type { ApiKeyRow } from "@/app/dashboard/settings/api-keys-section";
 import type { Database } from "@/types/supabase";
@@ -90,12 +91,14 @@ export async function fetchSettingsPageData(
       console.error("[settings] user_api_keys fetch:", keysErr);
     }
 
+    const sovereign = isSovereignOperator(user.email);
     const emailVerified = !!user.email_confirmed_at;
     const clearanceRaw = profile?.clearance_tier ?? "tactical";
-    const clearanceTier =
-      clearanceRaw === "professional" ||
-      clearanceRaw === "sovereign" ||
-      clearanceRaw === "pending"
+    const clearanceTier = sovereign
+      ? "sovereign"
+      : clearanceRaw === "professional" ||
+          clearanceRaw === "sovereign" ||
+          clearanceRaw === "pending"
         ? clearanceRaw
         : "tactical";
 
@@ -112,12 +115,12 @@ export async function fetchSettingsPageData(
       domainVerified: profile?.domain_verified ?? false,
       hasSignature: !!profile?.signature_data,
       identityProofed: profile?.identity_proofed ?? false,
-      identityVerified: profile?.identity_verified ?? false,
+      identityVerified: sovereign || (profile?.identity_verified ?? false),
       clearanceTier,
       auditScore: profile?.identity_audit_score
         ? Number(profile.identity_audit_score)
         : null,
-      sovereignPending: profile?.sovereign_pending ?? false,
+      sovereignPending: sovereign ? false : (profile?.sovereign_pending ?? false),
       docPath: profile?.identity_document_path ?? null,
       hackerRankTrust,
     };

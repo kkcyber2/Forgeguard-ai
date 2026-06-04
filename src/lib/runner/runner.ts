@@ -4,8 +4,6 @@ import {
   resolveEngineAuthToken,
   resolveEngineBaseUrl,
   engineAuthHeaders,
-  resolveScanDispatchKey,
-  maskKeyPrefix,
   ENGINE_HANDSHAKE_TIMEOUT_MS,
 } from "@/lib/agathon-config";
 import { stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
@@ -27,11 +25,10 @@ import type { Database } from "@/types/supabase";
  * Flow:
  *   1. Load the scan row with the service-role client (bypasses RLS).
  *   2. Decrypt the target API key with our AES-GCM secret.
- *   3. Normalize the target URL (strip `/v1/chat/completions` etc — the
- *      OpenAI-compatible client appends its own paths).
- *   4. POST to ${AGATHON_ORCHESTRATOR_URL}/scan/start with bearer auth.
- *   5. The orchestrator emits to scan_logs over Postgres + WebSocket.
- *      We just need to mark the scan as "probing" and return.
+ *   3. POST to ${AGATHON_ORCHESTRATOR_URL}/scan/start with bearer auth.
+ *      target_url and api_key are sent exactly as stored on the scan row
+ *      (no URL normalization or provider inference on the dispatcher).
+ *   4. The orchestrator emits to scan_logs over Postgres + WebSocket.
  *
  * Required env vars (Vercel side):
  *   - PYTHON_ENGINE_URL (or AGATHON_ORCHESTRATOR_URL) : Railway public URL
@@ -112,11 +109,9 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     return;
   }
 
-  // 3. Normalize the target URL ------------------------------------------
-  // Users often paste the full endpoint (e.g. ".../v1/chat/completions").
-  // The OpenAI-compatible client on Railway appends its own path, so we
-  // need the base URL only. Strip common trailing paths defensively.
-  const normalizedUrl = normalizeTargetUrl(scan.target_url);
+  // 3. Raw dispatch — URL and key exactly as entered in the scan form --------
+  const targetUrl = scan.target_url;
+  const targetApiKey = apiKey;
 
   // 4. Validate Railway env vars before dispatch -------------------------
   const orchestratorUrl = resolveEngineBaseUrl();
@@ -150,67 +145,91 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     type: "info",
     severity: "info",
     payload: {
-      message: "Dispatching to Agathon orchestrator on Railway",
+      message: "Dispatching to Agathon orchestrator on Railway (raw URL/key)",
       target_model: scan.target_model,
-      target_url: normalizedUrl,
+      target_url: targetUrl,
       intensity: scan.intensity ?? "standard",
     },
   });
 
-  // 6. Validate target key + POST to /scan/start ---------------------------
-  let dispatchKey: ReturnType<typeof resolveScanDispatchKey>;
+  // 6. POST to /scan/start — no provider inference -------------------------
   try {
-    dispatchKey = resolveScanDispatchKey({
-      userApiKey: apiKey,
-      targetUrl: normalizedUrl,
-      targetModel: scan.target_model,
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await markFailure(admin, scanId, msg);
-    return;
-  }
-
-  console.error("[runner] dispatch key resolved:", {
-    scan_id: scanId,
-    target_provider: dispatchKey.targetProvider,
-    key_mask: maskKeyPrefix(dispatchKey.apiKey),
-  });
-
-  try {
+    const dispatchBody = {
+      scan_id: scan.id,
+      user_id: scan.user_id,
+      target_model: scan.target_model,
+      target_url: targetUrl,
+      target_api_key: targetApiKey,
+      api_key: targetApiKey,
+      intensity: scan.intensity ?? "standard",
+      surface_kind: scan.surface_kind ?? "llm",
+      target_type: scan.surface_kind ?? "llm",
+      asset_value_usd:
+        scan.asset_value_usd != null && scan.asset_value_usd > 0
+          ? scan.asset_value_usd
+          : 50000,
+      ownership_verified: sovereign,
+    };
+    // #region agent log
+    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
+      body: JSON.stringify({
+        sessionId: "c20499",
+        location: "runner.ts:dispatch",
+        message: "raw dispatch payload",
+        data: {
+          scan_id: scanId,
+          target_url: targetUrl,
+          url_length: targetUrl.length,
+          has_target_provider: false,
+        },
+        timestamp: Date.now(),
+        hypothesisId: "H1-raw-dispatch",
+      }),
+    }).catch(() => {});
+    // #endregion
     const resp = await fetch(`${orchestratorUrl}/scan/start`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...engineAuthHeaders(),
       },
-      body: JSON.stringify({
-        scan_id: scan.id,
-        user_id: scan.user_id,
-        target_model: scan.target_model,
-        target_url: normalizedUrl,
-        intensity: scan.intensity ?? "standard",
-        surface_kind: scan.surface_kind ?? "llm",
-        asset_value_usd:
-          scan.asset_value_usd != null && scan.asset_value_usd > 0
-            ? scan.asset_value_usd
-            : 50000,
-        api_key: dispatchKey.apiKey,
-        ownership_verified: sovereign,
-        target_provider: dispatchKey.targetProvider,
-      }),
-      // Don't hold the connection open — Railway acknowledges fast.
+      body: JSON.stringify(dispatchBody),
       signal: AbortSignal.timeout(ENGINE_HANDSHAKE_TIMEOUT_MS),
     });
 
+    const text = await resp.text().catch(() => "");
+
     if (!resp.ok) {
-      const text = await resp.text().catch(() => "<no body>");
-      throw new Error(
-        `Railway returned ${resp.status} ${resp.statusText}: ${text.slice(0, 400)}`,
-      );
+      // #region agent log
+      fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
+        body: JSON.stringify({
+          sessionId: "c20499",
+          location: "runner.ts:dispatch-error",
+          message: "orchestrator non-ok response",
+          data: {
+            scan_id: scanId,
+            http_status: resp.status,
+            body_length: text.length,
+            body_preview: text.slice(0, 120),
+          },
+          timestamp: Date.now(),
+          hypothesisId: "H2-raw-error-body",
+        }),
+      }).catch(() => {});
+      // #endregion
+      await markFailure(admin, scanId, {
+        message: `Orchestrator returned HTTP ${resp.status}`,
+        httpStatus: resp.status,
+        rawBody: text,
+      });
+      return;
     }
 
-    const json = (await resp.json().catch(() => ({}))) as {
+    const json = (text ? JSON.parse(text) : {}) as {
       accepted?: boolean;
       scan_id?: string;
       intensity?: string;
@@ -227,19 +246,15 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
     console.error("[runner] dispatch failed:", {
       url: `${orchestratorUrl}/scan/start`,
       scan_id: scanId,
       message,
-      stack,
-      err,
     });
-    await markFailure(
-      admin,
-      scanId,
-      `Failed to dispatch to orchestrator: ${(err as Error).message}`,
-    );
+    await markFailure(admin, scanId, {
+      message: `Failed to dispatch to orchestrator: ${message}`,
+      rawBody: message,
+    });
     return;
   }
 
@@ -249,25 +264,14 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
 }
 
 /* -------------------------------------------------------------------------- */
-/* URL normalization                                                          */
-/* -------------------------------------------------------------------------- */
-
-function normalizeTargetUrl(raw: string): string {
-  let url = raw.trim();
-  // Drop trailing slash.
-  while (url.endsWith("/")) url = url.slice(0, -1);
-  // Strip the conventional OpenAI-compatible chat completions path.
-  url = url.replace(/\/v1\/chat\/completions$/i, "");
-  url = url.replace(/\/v1\/completions$/i, "");
-  url = url.replace(/\/v1\/embeddings$/i, "");
-  // Strip a bare /v1 suffix — the client appends /v1 itself.
-  url = url.replace(/\/v1$/i, "");
-  return url;
-}
-
-/* -------------------------------------------------------------------------- */
 /* Supabase helpers                                                           */
 /* -------------------------------------------------------------------------- */
+
+type FailureDetail = string | {
+  message: string;
+  httpStatus?: number;
+  rawBody?: string;
+};
 
 async function emit(
   admin: ReturnType<typeof createAdminSupabase>,
@@ -313,15 +317,30 @@ async function transitionStatus(
 async function markFailure(
   admin: ReturnType<typeof createAdminSupabase>,
   scanId: string,
-  message: string,
+  detail: FailureDetail,
 ): Promise<void> {
+  const message = typeof detail === "string" ? detail : detail.message;
+  const httpStatus = typeof detail === "string" ? undefined : detail.httpStatus;
+  const rawBody = typeof detail === "string" ? detail : (detail.rawBody ?? detail.message);
+
   await emit(admin, scanId, {
     type: "error",
     severity: "high",
-    payload: { message },
+    attack_name: "dispatch_error",
+    payload: {
+      message,
+      http_status: httpStatus,
+      raw_response_body: rawBody,
+    },
   });
-  await transitionStatus(admin, scanId, "failed", {
-    progress_pct: 100,
-    completed_at: new Date().toISOString(),
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin as any)
+    .from("scans")
+    .update({
+      status: "failed",
+      progress_pct: 100,
+      completed_at: new Date().toISOString(),
+      failure_reason: rawBody,
+    })
+    .eq("id", scanId);
 }

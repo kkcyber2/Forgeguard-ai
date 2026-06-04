@@ -10,6 +10,7 @@ import {
   type PlanId,
 } from "@/lib/lemonsqueezy";
 import { cn } from "@/lib/utils";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { RedeemCodeBox } from "./redeem-code-box";
 import { PlanSelector } from "./plan-selector";
 
@@ -45,6 +46,7 @@ export default async function BillingPage({
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard/billing");
 
+  const isSovereign = isSovereignOperator(user.email);
   const { upgraded, gate } = await searchParams;
   const sub = await getSubscription(user.id);
   const currentPlan: PlanId = sub?.plan ?? "free";
@@ -80,8 +82,23 @@ export default async function BillingPage({
         description="Manage your ForgeGuard subscription and scan quota."
       />
 
+      {isSovereign && (
+        <div className="mb-6 flex items-center gap-3 rounded-sm border border-acid/40 bg-acid/10 px-4 py-3">
+          <CheckCircle2 size={14} className="shrink-0 text-acid" />
+          <div>
+            <p className="font-mono text-[12px] font-semibold uppercase tracking-widest text-acid">
+              VERIFIED: SOVEREIGN
+            </p>
+            <p className="font-mono text-[11px] text-steel-400">
+              Payment and verification gates bypassed — unlimited scan quota and
+              full platform access.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Developer Upgrade Required gate banner */}
-      {gate === "forge" && (
+      {gate === "forge" && !isSovereign && (
         <div className="mb-6 flex items-center gap-3 rounded-sm border border-accent/30 bg-accent/5 px-4 py-3">
           <Lock size={14} className="shrink-0 text-accent" />
           <div>
@@ -170,17 +187,18 @@ export default async function BillingPage({
         )}
       </div>
 
-      {/* Promo code box */}
-      <RedeemCodeBox />
-
-      {/* Plan cards + payment card section (client-side, interactive) */}
-      <PlanSelector
-        plans={PLANS}
-        currentPlan={currentPlan}
-        variantMap={variantMap}
-        userEmail={user.email ?? ""}
-        userId={user.id}
-      />
+      {!isSovereign && (
+        <>
+          <RedeemCodeBox />
+          <PlanSelector
+            plans={PLANS}
+            currentPlan={currentPlan}
+            variantMap={variantMap}
+            userEmail={user.email ?? ""}
+            userId={user.id}
+          />
+        </>
+      )}
 
       <p className="mt-6 text-center text-[11px] text-foreground-subtle">
         Payments are processed securely by LemonSqueezy &middot; Withdraw via Payoneer

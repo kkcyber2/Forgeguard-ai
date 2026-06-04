@@ -8,7 +8,7 @@
  */
 
 /** Vercel → Railway engine fetch budget (health + scan dispatch). */
-export const ENGINE_HANDSHAKE_TIMEOUT_MS = 30_000;
+export const ENGINE_HANDSHAKE_TIMEOUT_MS = 60_000;
 
 export type EngineUrlSource =
   | "PYTHON_ENGINE_URL"

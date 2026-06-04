@@ -18,7 +18,7 @@ import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 import { ScanLiveLog } from "./live-log";
 import { ScanDispatchError } from "./scan-dispatch-error";
 import { ScanStatusTracker } from "./scan-status-tracker";
-import { FindingsReport } from "./findings-report";
+import { ScanResult } from "./findings-report";
 import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemoryRow } from "./genesis-tabs";
 import { deleteScan } from "../actions";
 import { fetchDashboardAnalytics } from "@/lib/analytics/dashboard-metrics";
@@ -254,7 +254,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
       </div>
 
       {/* Detailed findings report — only rendered when scan is sealed */}
-      <FindingsReport
+      <ScanResult
         report={scanReport}
         scanStatus={scan.status}
         scanId={scan.id}

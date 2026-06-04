@@ -143,9 +143,7 @@ export async function POST(request: NextRequest) {
     const technicalReport =
       typeof p.technical_report_md === "string" ? p.technical_report_md : null;
     const aleUsd = p.ale_usd ?? p.financial_liability_usd ?? null;
-    const attacksRun = p.attacks_run != null ? String(p.attacks_run) : "0";
     const findingsArr = Array.isArray(p.findings) ? p.findings : [];
-    const defaultPoc = `Status: Clean. Total Vectors Tested: ${attacksRun}. No exploitable vulnerabilities detected.`;
     try {
       const scanStatus = normalizeScanStatus(p.status);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -179,14 +177,6 @@ export async function POST(request: NextRequest) {
         p.overall_severity ?? existing?.risk_label ?? "NONE",
       );
 
-      const pocText =
-        typeof p.technical_proof_of_concept === "string" &&
-        p.technical_proof_of_concept.trim()
-          ? p.technical_proof_of_concept
-          : findingsArr.length === 0
-            ? defaultPoc
-            : undefined;
-
       const parsedAttacksRun =
         p.attacks_run != null ? Number.parseFloat(String(p.attacks_run)) : 0;
       const attacksRunInt = Number.isNaN(parsedAttacksRun)
@@ -195,14 +185,27 @@ export async function POST(request: NextRequest) {
       const parsedCvss =
         p.overall_cvss != null ? Number.parseFloat(String(p.overall_cvss)) : 0;
 
+      const zeroFindings = findingsArr.length === 0;
+      const securePoc = `${attacksRunInt} vectors tested. Perimeter intake is healthy.`;
+      const securePocFull = `Status: Secure\n${securePoc}`;
+
+      const pocText =
+        typeof p.technical_proof_of_concept === "string" &&
+        p.technical_proof_of_concept.trim()
+          ? p.technical_proof_of_concept.trim()
+          : zeroFindings
+            ? securePocFull
+            : "";
+
       const executiveMd =
         (typeof p.executive_summary === "string" && p.executive_summary.trim()
           ? p.executive_summary
           : null) ??
         existing?.executive_summary_md ??
         (technicalReport ? technicalReport.slice(0, 4000) : null) ??
-        pocText ??
-        defaultPoc;
+        (zeroFindings
+          ? `Status: Secure — ${securePoc}`
+          : pocText || "Scan complete.");
 
       const patch: Record<string, unknown> = {
         scan_id: event.scanId,
@@ -217,9 +220,7 @@ export async function POST(request: NextRequest) {
       if (typeof p.executive_summary === "string") {
         patch.executive_summary = p.executive_summary;
       }
-      if (pocText) {
-        patch.technical_proof_of_concept = pocText;
-      }
+      patch.technical_proof_of_concept = pocText || (zeroFindings ? securePocFull : null);
       if (typeof p.remediation_code_snippet === "string") {
         patch.remediation_code_snippet = p.remediation_code_snippet;
       }
@@ -229,6 +230,9 @@ export async function POST(request: NextRequest) {
       if (parsedAle != null && !Number.isNaN(parsedAle)) {
         patch.financial_liability_usd = parsedAle;
         patch.ale_usd = parsedAle;
+      } else if (zeroFindings) {
+        patch.financial_liability_usd = 0;
+        patch.ale_usd = 0;
       }
 
       const prepared = prepareScanReportUpsert(patch);

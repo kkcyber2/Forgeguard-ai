@@ -86,7 +86,7 @@ function formatUsd(n: number): string {
   return n.toFixed(0);
 }
 
-/** Section B — CFO View: Financial Liability ($ALE) */
+/** Section B — $ALE from financial_liability_usd (pulse red when &gt; $100k). */
 export function FinancialLiabilitySection({
   aleUsd,
   findings,
@@ -97,35 +97,54 @@ export function FinancialLiabilitySection({
   const perFinding = findings.filter(
     (f) => (f.financial_liability_usd ?? f.ale_usd ?? 0) > 0,
   );
-
-  if (aleUsd == null && perFinding.length === 0) {
-    return null;
-  }
+  const displayAle = aleUsd ?? 0;
+  const highAle = displayAle > 100_000;
 
   return (
     <div
-      className="rounded-sm border border-red-500/40 bg-red-950/20 p-5"
-      style={{
-        boxShadow:
-          "0 0 32px rgba(239,68,68,0.35), inset 0 0 24px rgba(239,68,68,0.06)",
-        animation: "ale-neon-pulse 2.4s ease-in-out infinite",
-      }}
+      className={cn(
+        "rounded-sm border p-5",
+        highAle
+          ? "border-red-500/40 bg-red-950/20"
+          : "border-white/[0.08] bg-black/40",
+      )}
+      style={
+        highAle
+          ? {
+              boxShadow:
+                "0 0 32px rgba(239,68,68,0.35), inset 0 0 24px rgba(239,68,68,0.06)",
+              animation: "ale-neon-pulse 2.4s ease-in-out infinite",
+            }
+          : undefined
+      }
     >
-      <style>{`
+      {highAle && (
+        <style>{`
         @keyframes ale-neon-pulse {
           0%, 100% { box-shadow: 0 0 24px rgba(239,68,68,0.25), inset 0 0 16px rgba(239,68,68,0.04); }
           50% { box-shadow: 0 0 48px rgba(239,68,68,0.55), inset 0 0 28px rgba(239,68,68,0.12); }
         }
       `}</style>
-      <SectionHead icon={ShieldAlert} label="Section B — CFO View · Financial Liability ($ALE)" />
-      {aleUsd != null && aleUsd > 0 && (
-        <p className="mb-4 font-mono text-3xl font-black tabular-nums text-red-400 drop-shadow-[0_0_12px_rgba(239,68,68,0.8)]">
-          ${formatUsd(aleUsd)}
-          <span className="ml-3 block text-[10px] font-normal uppercase tracking-[0.2em] text-red-300/70 sm:inline">
+      )}
+      <SectionHead icon={ShieldAlert} label="Section B — $ALE · Financial Liability" />
+      <p
+        className={cn(
+          "mb-4 font-mono text-3xl font-black tabular-nums",
+          highAle
+            ? "text-red-400 drop-shadow-[0_0_12px_rgba(239,68,68,0.8)]"
+            : "text-foreground",
+        )}
+      >
+          ${formatUsd(displayAle)}
+          <span
+            className={cn(
+              "ml-3 block text-[10px] font-normal uppercase tracking-[0.2em] sm:inline",
+              highAle ? "text-red-300/70" : "text-foreground-subtle",
+            )}
+          >
             annualized loss expectancy
           </span>
         </p>
-      )}
       {perFinding.length > 0 && (
         <ul className="space-y-2 font-mono text-[11px] text-red-200/80">
           {perFinding.map((f) => {
@@ -143,20 +162,14 @@ export function FinancialLiabilitySection({
   );
 }
 
-/** Section A — CEO View: Executive Summary (high-density monospace) */
-export function ExecutiveSummarySection({
-  md,
-  plain,
-}: {
-  md?: string;
-  plain?: string | null;
-}) {
-  const text = (plain?.trim() || md?.trim() || "").replace(/^#+\s*/gm, "");
+/** Section A — Executive: what happened (executive_summary_md). */
+export function ExecutiveSummarySection({ md }: { md?: string | null }) {
+  const text = (md?.trim() || "").replace(/^#+\s*/gm, "");
   if (!text) return null;
 
   return (
     <div className="rounded-sm border border-white/[0.08] bg-black/50 p-5">
-      <SectionHead icon={FileText} label="Section A — CEO View · Executive Summary" />
+      <SectionHead icon={FileText} label="Section A — Executive · What Happened" />
       <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-[1.65] tracking-tight text-white/85">
         {text}
       </pre>
@@ -227,6 +240,37 @@ function highlightCode(code: string): React.ReactNode[] {
   });
 }
 
+/** Render PoC text — fenced markdown ``` blocks get syntax highlight. */
+function MarkdownPocContent({ text }: { text: string }) {
+  const parts = text.split(/```(\w*)\n?/);
+  if (parts.length === 1) {
+    return <CodeBlock code={text.trim()} label="technical_proof_of_concept" />;
+  }
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+  while (i < parts.length) {
+    if (i % 2 === 0) {
+      const prose = parts[i]?.trim();
+      if (prose) {
+        nodes.push(
+          <pre
+            key={`p-${i}`}
+            className="mb-3 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-white/75"
+          >
+            {prose}
+          </pre>,
+        );
+      }
+      i += 1;
+      continue;
+    }
+    const code = (parts[i] ?? "").replace(/```\s*$/, "").trim();
+    if (code) nodes.push(<CodeBlock key={`c-${i}`} code={code} label="poc" />);
+    i += 1;
+  }
+  return <div className="space-y-2">{nodes}</div>;
+}
+
 function CodeBlock({ code, label }: { code: string; label?: string }) {
   return (
     <div className="relative rounded border border-white/[0.08] bg-[#050505]">
@@ -243,7 +287,7 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
   );
 }
 
-/** Section C — Dev View: Technical Proof of Concept */
+/** Section C — PoC: technical_proof_of_concept (markdown + code highlight). */
 export function TechnicalPoCKineticSection({
   pocText,
   auditMd,
@@ -262,8 +306,8 @@ export function TechnicalPoCKineticSection({
   return (
     <div className="space-y-4">
       <div className="rounded-sm border border-cyan-500/20 bg-cyan-950/10 p-5">
-        <SectionHead icon={Terminal} label="Section C — Dev View · Technical Proof of Concept" />
-        {pocText?.trim() && <CodeBlock code={pocText.trim()} label="kinetic-poc" />}
+        <SectionHead icon={Terminal} label="Section C — PoC · Technical Proof of Concept" />
+        {pocText?.trim() && <MarkdownPocContent text={pocText.trim()} />}
         {withPoc.length > 0 && (
           <div className={cn("space-y-2", pocText?.trim() && "mt-4")}>
             {withPoc.map((f, i) => {
@@ -281,14 +325,14 @@ export function TechnicalPoCKineticSection({
   );
 }
 
-/** Section D — Immunity: THE AEGIS SHIELD */
+/** Section D — THE AEGIS RULE: remediation_code_snippet. */
 export function AegisShieldSection({ snippet }: { snippet?: string | null }) {
   const code = snippet?.trim();
   if (!code) return null;
 
   return (
     <div className="rounded-sm border border-acid/30 bg-acid/[0.04] p-5">
-      <SectionHead icon={ShieldCheck} label="Section D — Immunity · THE AEGIS SHIELD" />
+      <SectionHead icon={ShieldCheck} label="Section D — THE AEGIS RULE" />
       <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-acid/80">
         Drop-in remediation — copy and deploy
       </p>
@@ -301,6 +345,9 @@ export function AegisShieldSection({ snippet }: { snippet?: string | null }) {
 export function EnterpriseReport(props: FindingsReportProps) {
   return <FindingsReport {...props} />;
 }
+
+/** Scan result page — enterprise A→D report (alias). */
+export const ScanResult = FindingsReport;
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /*  Constants                                                                   */
@@ -1373,10 +1420,7 @@ export function FindingsReport({
       </div>
 
       {/* ── Four-section enterprise report (A → D) ── */}
-      <ExecutiveSummarySection
-        md={report.executive_summary_md}
-        plain={report.executive_summary}
-      />
+      <ExecutiveSummarySection md={report.executive_summary_md} />
 
       <FinancialLiabilitySection aleUsd={aleUsd} findings={findings} />
 

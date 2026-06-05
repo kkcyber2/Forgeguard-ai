@@ -38,6 +38,23 @@ const STATUS_LABEL = {
 
 type ScanStatus = keyof typeof STATUS_TONE;
 
+/** Engine milestones from orchestrator _bump_progress (past the 2% pickup stall). */
+const PROGRESS_MILESTONES: { pct: number; label: string }[] = [
+  { pct: 3, label: "Preflight started" },
+  { pct: 5, label: "Preflight OK" },
+  { pct: 15, label: "Kinetic vectors complete" },
+  { pct: 48, label: "Kinetic battery complete" },
+  { pct: 100, label: "Scan sealed" },
+];
+
+function milestoneForProgress(pct: number): string | null {
+  let hit: (typeof PROGRESS_MILESTONES)[number] | null = null;
+  for (const m of PROGRESS_MILESTONES) {
+    if (pct >= m.pct) hit = m;
+  }
+  return hit && hit.pct > 2 ? hit.label : null;
+}
+
 function isScanStatus(s: unknown): s is ScanStatus {
   return typeof s === "string" && s in STATUS_TONE;
 }
@@ -149,6 +166,7 @@ export function ScanStatusTracker({
 
   const tone = STATUS_TONE[status];
   const isActive = status === "probing" || status === "queued";
+  const milestone = milestoneForProgress(progress);
 
   return (
     <>
@@ -160,6 +178,9 @@ export function ScanStatusTracker({
           {progress}%
         </span>
       </div>
+      {milestone && isActive ? (
+        <p className="mt-1 font-mono text-[10px] text-acid/80">{milestone}</p>
+      ) : null}
       <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/[0.04]">
         <div
           className={

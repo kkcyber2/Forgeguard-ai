@@ -281,6 +281,84 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (event.kind === "scan.vector.breach" && event.scanId && body.payload) {
+    const p = body.payload;
+    const aleUsd = p.ale_usd ?? p.financial_liability_usd ?? null;
+    try {
+      const parsedAle =
+        aleUsd != null ? Number.parseFloat(String(aleUsd)) : null;
+      const executiveMd =
+        (typeof p.executive_summary_md === "string" &&
+        p.executive_summary_md.trim()
+          ? p.executive_summary_md
+          : null) ??
+        (typeof p.executive_summary === "string" && p.executive_summary.trim()
+          ? p.executive_summary
+          : null) ??
+        `Vector breach: ${String(p.probe ?? "unknown")}`;
+
+      const parsedAttacksRun =
+        p.attacks_run != null ? Number.parseFloat(String(p.attacks_run)) : null;
+      const attacksRunInt =
+        parsedAttacksRun != null && !Number.isNaN(parsedAttacksRun)
+          ? Math.round(parsedAttacksRun)
+          : undefined;
+
+      const patch: Record<string, unknown> = {
+        scan_id: event.scanId,
+        generator_model: "llama-3.3-70b-versatile",
+        executive_summary_md: executiveMd,
+        risk_label: normalizeRiskLabel(p.severity ?? "HIGH"),
+      };
+      if (attacksRunInt != null && attacksRunInt >= 0) {
+        patch.attacks_run = attacksRunInt;
+      }
+      if (typeof p.executive_summary === "string") {
+        patch.executive_summary = p.executive_summary;
+      }
+      if (typeof p.technical_proof_of_concept === "string") {
+        patch.technical_proof_of_concept = p.technical_proof_of_concept;
+      }
+      if (typeof p.remediation_code_snippet === "string") {
+        patch.remediation_code_snippet = p.remediation_code_snippet;
+      }
+      if (parsedAle != null && !Number.isNaN(parsedAle)) {
+        patch.financial_liability_usd = parsedAle;
+        patch.ale_usd = parsedAle;
+      }
+
+      const prepared = prepareScanReportUpsert(patch);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: upsertErr } = await (admin as any)
+        .from("scan_reports")
+        .upsert(prepared, { onConflict: "scan_id" });
+      if (upsertErr) {
+        throw new Error(`scan_reports.vector_breach: ${upsertErr.message}`);
+      }
+
+      const progressRaw = p.progress_pct;
+      const progressPct =
+        progressRaw != null ? Number.parseFloat(String(progressRaw)) : null;
+      if (progressPct != null && !Number.isNaN(progressPct) && progressPct > 2) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin as any)
+          .from("scans")
+          .update({ progress_pct: Math.round(progressPct) })
+          .eq("id", event.scanId);
+      }
+
+      persistOk = true;
+    } catch (err) {
+      persistOk = false;
+      persistError =
+        err instanceof Error ? err.message : String(err);
+      console.warn(
+        "[webhook:agathon] scan.vector.breach persist skipped:",
+        persistError,
+      );
+    }
+  }
+
   if (event.kind.includes("scans") && event.scanId && body.record) {
     const status = body.record.status as string | undefined;
     const progress = body.record.progress_pct as number | undefined;

@@ -92,7 +92,7 @@ export async function fetchSettingsPageData(
     }
 
     const sovereign = isSovereignOperator(user.email);
-    const emailVerified = !!user.email_confirmed_at;
+    const emailVerified = sovereign || !!user.email_confirmed_at;
     const clearanceRaw = profile?.clearance_tier ?? "tactical";
     const clearanceTier = sovereign
       ? "sovereign"
@@ -111,15 +111,17 @@ export async function fetchSettingsPageData(
       apiKeys,
       lastSignIn,
       emailVerified,
-      phoneVerified: profile?.phone_verified ?? false,
-      domainVerified: profile?.domain_verified ?? false,
-      hasSignature: !!profile?.signature_data,
-      identityProofed: profile?.identity_proofed ?? false,
+      phoneVerified: sovereign || (profile?.phone_verified ?? false),
+      domainVerified: sovereign || (profile?.domain_verified ?? false),
+      hasSignature: sovereign || !!profile?.signature_data,
+      identityProofed: sovereign || (profile?.identity_proofed ?? false),
       identityVerified: sovereign || (profile?.identity_verified ?? false),
       clearanceTier,
-      auditScore: profile?.identity_audit_score
-        ? Number(profile.identity_audit_score)
-        : null,
+      auditScore: sovereign
+        ? 100
+        : profile?.identity_audit_score
+          ? Number(profile.identity_audit_score)
+          : null,
       sovereignPending: sovereign ? false : (profile?.sovereign_pending ?? false),
       docPath: profile?.identity_document_path ?? null,
       hackerRankTrust,

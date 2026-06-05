@@ -115,6 +115,16 @@ export function IdentityAuditor({
   const isGhostMode = useSovereignStore((s) => s.isGhostMode);
   const busy = pending || auditing;
 
+  useEffect(() => {
+    if (!sovereignBypass) return;
+    setAuditResult({
+      score: 100,
+      passed: true,
+      mode: "sovereign_pulse",
+      notes: "VERIFIED: SOVEREIGN",
+    });
+  }, [sovereignBypass]);
+
   const statusNorm = auditStatus.toLowerCase();
   const displayFailureReason =
     liveFailureReason ??
@@ -123,19 +133,18 @@ export function IdentityAuditor({
   const truthReason = displayFailureReason
     ? formatIdentityFailureTruth(displayFailureReason)
     : null;
-  const statusLabel =
-    sovereignBypass && (statusNorm === "passed" || auditResult?.passed)
-      ? "VERIFIED: SOVEREIGN"
-      : statusNorm === "failed"
-        ? "FAILED"
-        : statusNorm === "review"
-          ? "REVIEW_REQUIRED"
-          : auditStatus;
   const sovereignVerified =
-    sovereignBypass &&
-    (statusNorm === "passed" ||
-      auditResult?.passed ||
-      auditResult?.notes === "VERIFIED: SOVEREIGN");
+    sovereignBypass ||
+    statusNorm === "passed" ||
+    auditResult?.passed ||
+    auditResult?.notes === "VERIFIED: SOVEREIGN";
+  const statusLabel = sovereignVerified
+    ? "VERIFIED: SOVEREIGN"
+    : statusNorm === "failed"
+      ? "FAILED"
+      : statusNorm === "review"
+        ? "REVIEW_REQUIRED"
+        : auditStatus;
   const showFailureTruth =
     !!truthReason?.trim() &&
     (statusNorm === "failed" ||

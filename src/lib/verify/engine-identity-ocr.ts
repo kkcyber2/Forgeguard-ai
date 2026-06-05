@@ -17,6 +17,8 @@ export async function callEngineIdentityOcr(input: {
   imageBase64: string;
   mimeType: string;
   profileFullName: string;
+  userId?: string;
+  isGhostActive?: boolean;
 }): Promise<{ result?: EngineOcrResult; error?: string; timedOut?: boolean }> {
   const base = resolveEngineBaseUrl();
   if (!base) {
@@ -41,6 +43,8 @@ export async function callEngineIdentityOcr(input: {
         image_base64: input.imageBase64,
         mime_type: input.mimeType,
         profile_full_name: input.profileFullName,
+        user_id: input.userId ?? "",
+        is_ghost_active: Boolean(input.isGhostActive),
       }),
       signal: AbortSignal.timeout(OCR_TIMEOUT_MS),
       cache: "no-store",

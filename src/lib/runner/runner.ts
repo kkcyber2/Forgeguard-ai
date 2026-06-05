@@ -88,10 +88,13 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
 
   const { data: profile } = (await admin
     .from("profiles")
-    .select("email")
+    .select("email, is_ghost_active")
     .eq("id", userId)
-    .maybeSingle()) as { data: { email: string | null } | null };
+    .maybeSingle()) as {
+    data: { email: string | null; is_ghost_active: boolean | null } | null;
+  };
   const sovereign = isSovereignOperator(profile?.email);
+  const isGhostActive = Boolean(profile?.is_ghost_active);
 
   // 2. Decrypt the target API key -----------------------------------------
   let apiKey: string;
@@ -169,6 +172,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
           ? scan.asset_value_usd
           : 50000,
       ownership_verified: sovereign,
+      is_ghost_active: isGhostActive,
     };
     const resp = await fetch(`${orchestratorUrl}/scan/start`, {
       method: "POST",

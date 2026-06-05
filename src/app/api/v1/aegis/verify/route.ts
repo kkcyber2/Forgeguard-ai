@@ -7,6 +7,7 @@ export const runtime = "edge";
 const VerifySchema = z.object({
   prompt: z.string().min(1).max(16_000),
   appId: z.string().min(1).max(128),
+  userId: z.string().uuid().optional(),
 });
 
 type ShieldRule = {
@@ -51,18 +52,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { prompt, appId } = parsed.data;
+  const { prompt, appId, userId } = parsed.data;
   const supabase = getEdgeSupabase();
   if (!supabase) {
     return NextResponse.json({ allowed: true, degraded: true });
   }
 
-  const { data: rules, error } = await supabase
+  let rulesQuery = supabase
     .from("aegis_shield_rules")
-    .select("pattern, action, enabled")
+    .select("pattern, action, enabled, user_id")
     .eq("app_id", appId)
     .eq("enabled", true)
     .limit(64);
+
+  if (userId) {
+    rulesQuery = rulesQuery.eq("user_id", userId);
+  }
+
+  const { data: rules, error } = await rulesQuery;
 
   if (error) {
     // Table may not exist yet — fail open for availability

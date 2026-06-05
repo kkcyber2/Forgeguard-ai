@@ -28,6 +28,8 @@ export interface StoredDocumentInput {
   profileFullName: string;
   profileEmail: string;
   documentTextOverride?: string;
+  userId?: string;
+  isGhostActive?: boolean;
 }
 
 const MAX_IMAGE_BYTES = 900_000;
@@ -467,6 +469,8 @@ export async function runIdentityAuditFromStorage(
         imageBase64: b64,
         mimeType,
         profileFullName: input.profileFullName,
+        userId: input.userId,
+        isGhostActive: input.isGhostActive,
       });
 
       if (engineOcr.timedOut) {

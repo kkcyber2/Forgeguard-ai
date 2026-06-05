@@ -37,3 +37,26 @@ export function buildCheckoutUrl(
   });
   return `${base}?${params.toString()}`;
 }
+
+/** Marketing-page checkout — variant ID only (no auth session required). */
+export function buildMarketingCheckoutUrl(variantId: string): string {
+  const base = `https://forgeguard.lemonsqueezy.com/buy/${variantId}`;
+  const params = new URLSearchParams({
+    "checkout[success_url]": `${
+      process.env.NEXT_PUBLIC_APP_URL ?? "https://www.forgeguard-ai.com"
+    }/auth/signup?upgraded=1`,
+  });
+  return `${base}?${params.toString()}`;
+}
+
+export function resolveMarketingPlanCheckout(planId: "startup" | "enterprise"): string | null {
+  const { variantStartup, variantEnterprise } = getLSVariantIds();
+  const variantId =
+    planId === "startup"
+      ? variantStartup?.trim()
+      : planId === "enterprise"
+        ? variantEnterprise?.trim()
+        : "";
+  if (!variantId) return null;
+  return buildMarketingCheckoutUrl(variantId);
+}

@@ -97,7 +97,7 @@ export async function runAiAudit(
 
     const { data: profile, error: profileErr } = await admin
       .from("profiles")
-      .select("full_name, email, identity_document_path")
+      .select("full_name, email, identity_document_path, is_ghost_active")
       .eq("id", user.id)
       .single();
 

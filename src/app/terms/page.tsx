@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "ForgeGuard AI Terms of Service. Governs use of red-teaming tools, bounty programs, and Aegis guardrails.",
 };
 
-const LAST_UPDATED = "June 3, 2026";
+const LAST_UPDATED = "May 22, 2026";
 
 export default function TermsPage() {
   return (

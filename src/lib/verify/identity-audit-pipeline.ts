@@ -207,6 +207,7 @@ export async function executeIdentityAuditForUser(
     full_name: string | null;
     email: string | null;
     identity_document_path?: string | null;
+    is_ghost_active?: boolean | null;
   },
   documentTextOverride?: string,
 ): Promise<{ error?: string } & Partial<IdentityAuditExecution>> {
@@ -232,6 +233,8 @@ export async function executeIdentityAuditForUser(
     profileFullName: fullName,
     profileEmail: profile.email ?? "",
     documentTextOverride,
+    userId,
+    isGhostActive: Boolean(profile.is_ghost_active),
   });
 
   if (auditResult.reviewRequired) {

@@ -47,14 +47,29 @@ export function TermsContent() {
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Intellectual Property">
+      <LegalSection title="7. Subscriptions and Billing">
+        <p>
+          Paid plans are billed monthly through Lemon Squeezy, our merchant of
+          record. Current list prices: Startup ($49/month) and Enterprise
+          ($199/month). Prices may change with 30 days notice to active
+          subscribers.
+        </p>
+        <ul className="mt-3 space-y-2 pl-4">
+          <LegalBullet>Subscriptions renew automatically until cancelled</LegalBullet>
+          <LegalBullet>Cancel anytime from Dashboard → Billing or the Lemon Squeezy customer portal</LegalBullet>
+          <LegalBullet>Refunds are handled per Lemon Squeezy policy and applicable consumer law</LegalBullet>
+          <LegalBullet>Free tier (Hacker) requires no payment and includes limited monthly scans</LegalBullet>
+        </ul>
+      </LegalSection>
+
+      <LegalSection title="8. Intellectual Property">
         <p>
           Platform IP remains ours. You retain ownership of your reports and Bazaar
           scripts subject to the Platform license.
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Privacy and Data Handling">
+      <LegalSection title="9. Privacy and Data Handling">
         <p>
           Use is subject to our{" "}
           <a href="/privacy" className="text-acid hover:underline">
@@ -64,25 +79,25 @@ export function TermsContent() {
         </p>
       </LegalSection>
 
-      <LegalSection title="9. Limitation of Liability">
+      <LegalSection title="10. Limitation of Liability">
         <p>
           TO THE MAXIMUM EXTENT PERMITTED BY LAW, FORGEGUARD AI IS NOT LIABLE FOR
           INDIRECT OR CONSEQUENTIAL DAMAGES. Scan results are advisory, not exhaustive.
         </p>
       </LegalSection>
 
-      <LegalSection title="10. Termination">
+      <LegalSection title="11. Termination">
         <p>
           We may suspend access for Terms violations. Data retention after termination
           is governed by the Privacy Policy.
         </p>
       </LegalSection>
 
-      <LegalSection title="11. Changes to Terms">
+      <LegalSection title="12. Changes to Terms">
         <p>Material changes are communicated via email. Continued use constitutes acceptance.</p>
       </LegalSection>
 
-      <LegalSection title="12. Contact">
+      <LegalSection title="13. Contact">
         <p>
           <a href="mailto:legal@forgeguard.ai" className="text-acid hover:underline">
             legal@forgeguard.ai

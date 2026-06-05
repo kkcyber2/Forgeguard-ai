@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
   const filters = { page, limit, tag, lang, freeOnly, certifiedOnly };
 
   let result = await listPublishedScripts(supabase, filters);
+  let certifiedFallback = false;
 
   if (result.error && user && isSovereignOperator(user.email)) {
     try {
@@ -42,6 +43,21 @@ export async function GET(req: NextRequest) {
       result = await listPublishedScripts(adminDb, filters);
     } catch (e) {
       console.error("[bazaar:list] admin fallback:", e);
+    }
+  }
+
+  if (result.error && !certifiedOnly) {
+    const certified = await listPublishedScripts(supabase, {
+      page: 1,
+      limit,
+      tag: null,
+      lang: null,
+      freeOnly: false,
+      certifiedOnly: true,
+    });
+    if (!certified.error && (certified.scripts?.length ?? 0) > 0) {
+      result = certified;
+      certifiedFallback = true;
     }
   }
 
@@ -58,6 +74,7 @@ export async function GET(req: NextRequest) {
       total: 0,
       page,
       limit,
+      fallback: certifiedOnly,
     });
   }
 
@@ -86,5 +103,6 @@ export async function GET(req: NextRequest) {
     total: result.count ?? enriched.length,
     page,
     limit,
+    ...(certifiedFallback ? { fallback: true } : {}),
   });
 }

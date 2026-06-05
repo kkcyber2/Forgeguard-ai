@@ -3,6 +3,7 @@
 import * as React from "react";
 import { CheckCircle2, Zap, Shield } from "lucide-react";
 import { PLANS, type PlanMeta } from "@/lib/plans";
+import { resolveMarketingPlanCheckout } from "@/lib/lemonsqueezy-client";
 import { cn } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -83,9 +84,19 @@ function PricingCard({
 }) {
   const highlighted = plan.id === "startup";
 
-  const ctaHref = isAuthenticated
-    ? "/dashboard/billing"
-    : "/auth/signup";
+  const lsCheckout =
+    plan.id === "startup" || plan.id === "enterprise"
+      ? resolveMarketingPlanCheckout(plan.id)
+      : null;
+
+  const ctaHref =
+    plan.price === 0
+      ? isAuthenticated
+        ? "/dashboard"
+        : "/auth/signup"
+      : lsCheckout ?? (isAuthenticated ? "/dashboard/billing" : "/auth/signup");
+
+  const ctaExternal = Boolean(lsCheckout && plan.price > 0);
 
   const ctaLabel =
     plan.price === 0
@@ -209,6 +220,8 @@ function PricingCard({
       {/* CTA */}
       <a
         href={ctaHref}
+        target={ctaExternal ? "_blank" : undefined}
+        rel={ctaExternal ? "noopener noreferrer" : undefined}
         className={cn(
           "block rounded-sm border px-4 py-2.5 text-center text-[12px] font-semibold transition-all duration-200",
           highlighted
@@ -218,7 +231,7 @@ function PricingCard({
               : "border-white/[0.1] text-foreground-muted hover:border-white/[0.2] hover:text-foreground",
         )}
       >
-        {ctaLabel}
+        {ctaExternal ? `Subscribe — $${plan.price}/mo` : ctaLabel}
       </a>
     </div>
   );

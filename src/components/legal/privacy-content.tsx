@@ -73,8 +73,16 @@ export function PrivacyContent() {
 
       <LegalSection title="5. Third-Party Services">
         <p>
-          We use Supabase, Railway, LemonSqueezy, Resend, OpenRouter/Groq, and
-          Vercel. Each provider maintains its own privacy policy.
+          We use Supabase (database and authentication), Railway (scan engine
+          hosting), Lemon Squeezy (merchant of record for subscriptions and
+          digital purchases), Resend (transactional email), OpenRouter/Groq
+          (AI inference for identity audit and scan intelligence), and Vercel
+          (application hosting). Each provider maintains its own privacy policy.
+        </p>
+        <p className="mt-3">
+          Subscription payments ($49/month Startup, $199/month Enterprise) are
+          processed by Lemon Squeezy. We do not store full card numbers on our
+          servers.
         </p>
       </LegalSection>
 

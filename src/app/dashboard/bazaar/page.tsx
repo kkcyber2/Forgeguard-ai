@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { purchaseScript } from "@/components/bazaar/actions";
 import { notifyWalletRefresh } from "@/lib/wallet-events";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { fetchBazaarCatalog } from "@/lib/bazaar/fetch-catalog";
 import { createClient } from "@/lib/supabase/client";
 import {
   ShoppingCart, Upload, Search, Filter, Zap,
@@ -696,6 +697,7 @@ export default function BazaarPage() {
   const [scripts, setScripts]         = React.useState<Script[]>([]);
   const [certifiedScripts, setCertifiedScripts] = React.useState<Script[]>([]);
   const [loadError, setLoadError]       = React.useState<string | null>(null);
+  const [catalogFallback, setCatalogFallback] = React.useState(false);
   const [purchaseError, setPurchaseError] = React.useState<string | null>(null);
   const [loading, setLoading]         = React.useState(true);
   const [search, setSearch]           = React.useState("");
@@ -725,32 +727,37 @@ export default function BazaarPage() {
     })();
   }, []);
 
-  // Load scripts from API
+  // Load scripts from API (Bypass-Native — certified fallback on failure)
   React.useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setCatalogFallback(false);
       try {
         const params = new URLSearchParams({ limit: "50" });
-        if (filterLang !== "all") params.set("lang",  filterLang);
-        if (filterFree)           params.set("free",  "true");
+        if (filterLang !== "all") params.set("lang", filterLang);
+        if (filterFree) params.set("free", "true");
+
         const certParams = new URLSearchParams({ certified: "1", limit: "5" });
-        const [res, certRes] = await Promise.all([
-          fetch(`/api/bazaar/list?${params.toString()}`),
-          fetch(`/api/bazaar/list?${certParams.toString()}`),
+        const [data, certData] = await Promise.all([
+          fetchBazaarCatalog(params),
+          fetchBazaarCatalog(certParams),
         ]);
-        const data = await res.json() as { ok: boolean; scripts?: Script[]; error?: string };
-        const certData = await certRes.json() as { ok: boolean; scripts?: Script[] };
+
         if (data.ok) {
-          setScripts(data.scripts ?? []);
+          setScripts((data.scripts ?? []) as Script[]);
+          setCatalogFallback(Boolean(data.fallback));
           setLoadError(null);
         } else {
           setScripts([]);
+          setCatalogFallback(false);
           setLoadError(data.error ?? "Could not load marketplace scripts.");
         }
+
         if (certData.ok) {
-          setCertifiedScripts(certData.scripts ?? []);
+          setCertifiedScripts((certData.scripts ?? []) as Script[]);
         }
       } catch {
+        setScripts([]);
         setLoadError("Network error loading Bazaar.");
       } finally {
         setLoading(false);
@@ -883,6 +890,12 @@ export default function BazaarPage() {
           {(loadError || purchaseError) && (
             <div className="mt-4 rounded-[3px] border border-red-400/30 bg-red-500/10 px-3 py-2 font-mono text-[11px] text-red-300">
               {purchaseError ?? loadError}
+            </div>
+          )}
+
+          {catalogFallback && !loadError && (
+            <div className="mt-4 rounded-[3px] border border-[#D1FF00]/30 bg-[#D1FF00]/5 px-3 py-2 font-mono text-[11px] text-[#D1FF00]">
+              Bypass-Native mode — showing Certified scripts only while full catalog recovers.
             </div>
           )}
 

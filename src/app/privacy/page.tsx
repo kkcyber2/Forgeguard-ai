@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "ForgeGuard AI Privacy Policy. How we collect, use, and protect your data.",
 };
 
-const LAST_UPDATED = "June 3, 2026";
+const LAST_UPDATED = "May 22, 2026";
 
 export default function PrivacyPage() {
   return (

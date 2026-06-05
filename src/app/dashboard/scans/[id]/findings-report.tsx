@@ -12,6 +12,8 @@ import {
   Lock,
   FileText,
   Layers,
+  Loader2,
+  Shield,
   ShieldAlert,
   ShieldCheck,
   Target,
@@ -326,13 +328,29 @@ export function TechnicalPoCKineticSection({
 }
 
 /** Section D — THE AEGIS RULE: remediation_code_snippet. */
-export function AegisShieldSection({ snippet }: { snippet?: string | null }) {
+export function AegisShieldSection({
+  snippet,
+  scanId,
+}: {
+  snippet?: string | null;
+  scanId?: string;
+}) {
   const code = snippet?.trim();
   if (!code) return null;
 
   return (
     <div className="rounded-sm border border-acid/30 bg-acid/[0.04] p-5">
-      <SectionHead icon={ShieldCheck} label="Section D — THE AEGIS RULE" />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <SectionHead icon={ShieldCheck} label="Section D — THE AEGIS RULE" />
+        {scanId && (
+          <ExportAegisRuleButton
+            pattern={code}
+            scanId={scanId}
+            findingId="report-snippet"
+            description="Report-level remediation_code_snippet"
+          />
+        )}
+      </div>
       <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-acid/80">
         Drop-in remediation — copy and deploy
       </p>
@@ -761,10 +779,143 @@ function CWEChip({ cwe }: { cwe: string }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
+/*  Export Aegis Rule                                                           */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+const AEGIS_TOAST_EVENT = "forgeguard:aegis-export-toast";
+
+function ExportAegisRuleButton({
+  pattern,
+  scanId,
+  findingId,
+  description,
+  compact,
+}: {
+  pattern: string;
+  scanId: string;
+  findingId: string;
+  description?: string;
+  compact?: boolean;
+}) {
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleExport(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (loading || !pattern.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/v1/aegis/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pattern,
+          scanId,
+          findingId,
+          description,
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.dispatchEvent(
+          new CustomEvent(AEGIS_TOAST_EVENT, {
+            detail: { message: data.error ?? "Export failed", type: "error" },
+          }),
+        );
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent(AEGIS_TOAST_EVENT, {
+          detail: {
+            message: "Strike vector sealed in Aegis Firewall.",
+            type: "success",
+          },
+        }),
+      );
+    } catch {
+      window.dispatchEvent(
+        new CustomEvent(AEGIS_TOAST_EVENT, {
+          detail: { message: "Network error exporting rule", type: "error" },
+        }),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => void handleExport(e)}
+      disabled={loading || !pattern.trim()}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-xs border font-mono uppercase tracking-[0.1em] transition-colors",
+        compact
+          ? "border-acid/25 bg-acid/[0.05] px-2 py-1 text-[9px] text-acid hover:bg-acid/[0.12]"
+          : "border-acid/30 bg-acid/[0.07] px-3 py-1.5 text-[10px] text-acid hover:bg-acid/[0.14]",
+        "disabled:cursor-not-allowed disabled:opacity-40",
+      )}
+    >
+      {loading ? (
+        <Loader2 size={compact ? 10 : 11} className="animate-spin" />
+      ) : (
+        <Shield size={compact ? 10 : 11} strokeWidth={1.5} />
+      )}
+      Export Aegis Rule
+    </button>
+  );
+}
+
+function AegisExportToast() {
+  const [toast, setToast] = React.useState<{ message: string; type: "success" | "error" } | null>(
+    null,
+  );
+
+  React.useEffect(() => {
+    const onToast = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ message: string; type: "success" | "error" }>).detail;
+      setToast(detail);
+      setTimeout(() => setToast(null), 5000);
+    };
+    window.addEventListener(AEGIS_TOAST_EVENT, onToast);
+    return () => window.removeEventListener(AEGIS_TOAST_EVENT, onToast);
+  }, []);
+
+  if (!toast) return null;
+
+  return (
+    <div
+      className={cn(
+        "fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-sm border px-4 py-3 shadow-lg",
+        toast.type === "success"
+          ? "border-acid/40 bg-obsidian-900 text-acid"
+          : "border-threat/40 bg-obsidian-900 text-threat",
+      )}
+    >
+      {toast.type === "success" ? (
+        <ShieldCheck size={14} strokeWidth={1.5} />
+      ) : (
+        <ShieldAlert size={14} strokeWidth={1.5} />
+      )}
+      <span className="font-mono text-[11px]">{toast.message}</span>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
 /*  FindingCard                                                                 */
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-function FindingCard({ finding, index }: { finding: Finding; index: number }) {
+function FindingCard({
+  finding,
+  index,
+  scanId,
+  remediationSnippet,
+}: {
+  finding: Finding;
+  index: number;
+  scanId?: string;
+  remediationSnippet?: string | null;
+}) {
   const [open, setOpen] = React.useState(false);
   const [pocTab, setPocTab] = React.useState<"curl" | "python">("curl");
 
@@ -775,6 +926,8 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
   const familyLabel = FAMILY_LABEL[finding.family] ?? finding.family ?? finding.attack;
   const poc = finding.proof_of_concept;
   const pocCode = poc ? (pocTab === "curl" ? poc.curl : poc.python) : undefined;
+  const exportPattern =
+    remediationSnippet?.trim() || finding.remediation?.trim() || "";
 
   return (
     <div
@@ -835,8 +988,17 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
           )}
         </div>
 
-        {/* CVSS + chevron */}
+        {/* CVSS + export + chevron */}
         <div className="flex shrink-0 items-center gap-3">
+          {scanId && exportPattern && (
+            <ExportAegisRuleButton
+              pattern={exportPattern}
+              scanId={scanId}
+              findingId={finding.id}
+              description={`${finding.attack} · ${finding.family}`}
+              compact
+            />
+          )}
           <div className="text-right">
             <div className={cn("font-mono text-lg font-bold leading-none", cfg.cvssColor)}>
               {finding.cvss.toFixed(1)}
@@ -1388,6 +1550,7 @@ export function FindingsReport({
 
   return (
     <div className="mt-4 space-y-4">
+      <AegisExportToast />
       {/* ── Report header ── */}
       <div className="flex items-center gap-3 rounded-sm border border-white/[0.06] bg-surface p-5">
         <ShieldAlert size={16} strokeWidth={1.5} className="shrink-0 text-foreground-subtle" />
@@ -1430,7 +1593,10 @@ export function FindingsReport({
         findings={findings}
       />
 
-      <AegisShieldSection snippet={report.remediation_code_snippet} />
+      <AegisShieldSection
+        snippet={report.remediation_code_snippet}
+        scanId={scanId}
+      />
 
       {findings.length > 0 && (
         <div className="rounded-sm border border-white/[0.06] bg-surface p-5">
@@ -1448,7 +1614,13 @@ export function FindingsReport({
           </div>
           <div className="space-y-2">
             {findings.map((finding, i) => (
-              <FindingCard key={finding.id} finding={finding} index={i} />
+              <FindingCard
+                key={finding.id}
+                finding={finding}
+                index={i}
+                scanId={scanId}
+                remediationSnippet={report.remediation_code_snippet}
+              />
             ))}
           </div>
         </div>

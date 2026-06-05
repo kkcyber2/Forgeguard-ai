@@ -199,7 +199,7 @@ const METHOD_COLOR: Record<string, string> = {
 
 function ReconMap({ report, targetUrl }: { report: DiscoveryReport | null; targetUrl: string }) {
   if (!report) {
-    return <EmptyState label="Discovery engine output not yet available." icon={GitBranch} />;
+    return <EmptyState label="Discovery output populates when the scan seals." icon={GitBranch} />;
   }
 
   const domain = report.base_url || targetUrl;
@@ -371,7 +371,7 @@ function FinancialRisk({
     if (scanSealed && telemetryTrend && telemetryTrend.some((n) => n > 0)) {
       return <SovereignTelemetrySparkline trend={telemetryTrend} />;
     }
-    return <EmptyState label="Financial risk quantification not yet available." icon={DollarSign} />;
+    return <EmptyState label="Financial liability populates after kinetic judge runs." icon={DollarSign} />;
   }
 
   const aleDisplay = formatAleDisplay(aleUsd);
@@ -498,7 +498,7 @@ function AegisBundle({ scanId, zipB64 }: { scanId: string; zipB64: string | null
           </button>
         ) : (
           <span className="font-mono text-[10px] text-foreground-subtle/50">
-            Bundle not yet generated
+            Aegis bundle generates on seal
           </span>
         )}
       </div>
@@ -558,7 +558,7 @@ function SocialSwarm({ templates }: { templates: SocialTemplate[] | null }) {
   const [expanded, setExpanded] = React.useState<string | null>(null);
 
   if (!templates || templates.length === 0) {
-    return <EmptyState label="Social engineering templates not yet generated." icon={Users} />;
+    return <EmptyState label="Social engineering templates generate on nuclear seal." icon={Users} />;
   }
 
   return (
@@ -685,7 +685,7 @@ function AgentMemoriesPanel({
   if (!memories || memories.length === 0) {
     return (
       <EmptyState
-        label="Self-evolution trace not yet available. Nuclear scans stream agent reasoning here."
+        label="Self-evolution trace streams during nuclear intensity scans."
         icon={Brain}
       />
     );

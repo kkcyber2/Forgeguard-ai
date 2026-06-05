@@ -65,25 +65,25 @@ const TARGET_TYPES: {
     value: "llm",
     label: "LLM ENDPOINT",
     icon: Bot,
-    modules: ["Prompt Hijacker", "Jailbreak Mutator", "System Prompt Leak"],
+    modules: ["Prompt Hijacker", "Jailbreak Mutator", "Garak Catalogue (400+)"],
   },
   {
     value: "web",
     label: "WEB APPLICATION",
     icon: Globe,
-    modules: ["Logic Discovery", "XSS Vector Scout", "Session Fixation Probe"],
+    modules: ["Logic Discovery", "XSS Vector Scout", "Client Gateway Crawl"],
   },
   {
     value: "code",
     label: "API GATEWAY",
     icon: Server,
-    modules: ["BOLA/IDOR Sweep", "Rate-Limit Bypass", "AuthZ Graph Mapper"],
+    modules: ["BOLA/IDOR Sweep", "UUID IDOR Fuzz", "Hidden User Exfiltration"],
   },
   {
     value: "mobile",
     label: "CHAT BOT",
     icon: MessageSquare,
-    modules: ["Intent Drift Harness", "Tool-Call Injection", "Context Poisoning"],
+    modules: ["Intent Drift Harness", "Tool-Call Injection", "PyRIT Scenarios"],
   },
 ];
 

@@ -24,6 +24,10 @@ function ensureHttpsEngineUrl(raw: string): string {
   return trimmed;
 }
 
+/**
+ * Normalize Railway/HF engine base URL for Vercel handshake.
+ * Strips :7860/:8080, trailing slashes, and /health suffix — prevents 502/503 loops.
+ */
 function normalizeEngineBase(raw: string): string {
   let base = ensureHttpsEngineUrl(raw).replace(/\/+$/, "");
   try {

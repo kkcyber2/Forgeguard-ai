@@ -170,25 +170,6 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
           : 50000,
       ownership_verified: sovereign,
     };
-    // #region agent log
-    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
-      body: JSON.stringify({
-        sessionId: "c20499",
-        location: "runner.ts:dispatch",
-        message: "raw dispatch payload",
-        data: {
-          scan_id: scanId,
-          target_url: targetUrl,
-          url_length: targetUrl.length,
-          has_target_provider: false,
-        },
-        timestamp: Date.now(),
-        hypothesisId: "H1-raw-dispatch",
-      }),
-    }).catch(() => {});
-    // #endregion
     const resp = await fetch(`${orchestratorUrl}/scan/start`, {
       method: "POST",
       headers: {
@@ -202,25 +183,6 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
     const text = await resp.text().catch(() => "");
 
     if (!resp.ok) {
-      // #region agent log
-      fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
-        body: JSON.stringify({
-          sessionId: "c20499",
-          location: "runner.ts:dispatch-error",
-          message: "orchestrator non-ok response",
-          data: {
-            scan_id: scanId,
-            http_status: resp.status,
-            body_length: text.length,
-            body_preview: text.slice(0, 120),
-          },
-          timestamp: Date.now(),
-          hypothesisId: "H2-raw-error-body",
-        }),
-      }).catch(() => {});
-      // #endregion
       await markFailure(admin, scanId, {
         message: `Orchestrator returned HTTP ${resp.status}`,
         httpStatus: resp.status,

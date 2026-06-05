@@ -40,10 +40,10 @@ type ScanStatus = keyof typeof STATUS_TONE;
 
 /** Engine milestones from orchestrator _bump_progress (past the 2% pickup stall). */
 const PROGRESS_MILESTONES: { pct: number; label: string }[] = [
-  { pct: 3, label: "Preflight started" },
   { pct: 5, label: "Preflight OK" },
   { pct: 15, label: "Kinetic vectors complete" },
   { pct: 48, label: "Kinetic battery complete" },
+  { pct: 80, label: "Brain loop active" },
   { pct: 100, label: "Scan sealed" },
 ];
 
@@ -81,6 +81,7 @@ export function ScanStatusTracker({
     ReturnType<typeof createClient>["channel"]
   > | null>(null);
   const statusRef = React.useRef(status);
+  const realtimeOkRef = React.useRef(true);
   React.useEffect(() => {
     statusRef.current = status;
   }, [status]);
@@ -124,7 +125,9 @@ export function ScanStatusTracker({
           },
         )
         .subscribe((st) => {
+          if (st === "SUBSCRIBED") realtimeOkRef.current = true;
           if (st === "CHANNEL_ERROR" && !cancelled) {
+            realtimeOkRef.current = false;
             void supabase.removeChannel(channel);
             channelRef.current = null;
             retryTimer = setTimeout(subscribe, 3000);
@@ -140,6 +143,7 @@ export function ScanStatusTracker({
       if (cancelled) return;
       const live = statusRef.current;
       if (live !== "probing" && live !== "queued") return;
+      // Always poll during active scans; Realtime failure must not stall at 2%.
       void supabase
         .from("scans")
         .select("status, progress_pct")

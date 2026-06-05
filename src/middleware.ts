@@ -8,10 +8,18 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isSovereignOperator, maskOperatorEmail } from "@/lib/access/sovereign-operator";
 import {
-  AEGIS_TRAP_SCRIPT,
+  getClientIp,
   isScraperRequest,
   logBlacklistedEntity,
-} from "@/lib/defense/scraper-detect";
+} from "@/services/scraper-defense.service";
+import {
+  mintPowChallenge,
+  parsePowHeader,
+  powChallengeResponseBody,
+  powHeaderName,
+  POW_VOLUME_THRESHOLD,
+  verifyPowSolution,
+} from "@/services/pow-challenge.service";
 
 interface RateLimitEntry {
   count: number;
@@ -19,6 +27,7 @@ interface RateLimitEntry {
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const powVolumeStore = new Map<string, RateLimitEntry>();
 
 const AEGIS_BURST = { max: 10, windowMs: 1000 } as const;
 
@@ -52,12 +61,6 @@ function isKnownDashboardRoute(pathname: string): boolean {
   return KNOWN_DASHBOARD_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
-}
-
-function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-  return forwarded?.split(",")[0]?.trim() || realIp?.trim() || "unknown";
 }
 
 function getClientKey(request: NextRequest, bucket: string): string {
@@ -287,34 +290,79 @@ async function isSovereignSession(request: NextRequest): Promise<boolean> {
 }
 
 /**
- * Serve CPU trap script to detected scrapers; log IP to blacklisted_entities.
+ * High-volume scrapers must solve SHA-256 PoW before receiving responses.
  */
-async function scraperTrapResponse(
+async function enforcePowChallenge(
   request: NextRequest,
 ): Promise<NextResponse | null> {
-  if (request.nextUrl.pathname.startsWith("/api/")) return null;
   if (request.nextUrl.pathname.startsWith("/_next/")) return null;
-  if (request.nextUrl.pathname === "/aegis-trap.js") return null;
+  if (request.nextUrl.pathname.startsWith("/api/v1/webhooks/")) return null;
 
-  if (!(await isSovereignSession(request)) && isScraperRequest(request)) {
-    logBlacklistedEntity(request, "scraper_trap_poisoned_js");
-    return new NextResponse(AEGIS_TRAP_SCRIPT, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/javascript; charset=utf-8",
-        "Cache-Control": "no-store",
-        "X-Aegis-Trap": "active",
-      },
-    });
+  const ip = getClientIp(request);
+  const volumeKey = `${ip}:powVolume`;
+  const now = Date.now();
+  const windowMs = 60_000;
+  const volEntry = powVolumeStore.get(volumeKey);
+  let count = 1;
+  if (volEntry && now <= volEntry.resetTime) {
+    volEntry.count += 1;
+    count = volEntry.count;
+  } else {
+    powVolumeStore.set(volumeKey, { count: 1, resetTime: now + windowMs });
   }
-  return null;
+
+  const suspicious = isScraperRequest(request);
+  const highVolume = count >= POW_VOLUME_THRESHOLD;
+  if (!suspicious && !highVolume) return null;
+  if (await isSovereignSession(request)) return null;
+
+  const challengeCookie = request.cookies.get("aegis-pow-challenge")?.value;
+  const difficulty = Number.parseInt(
+    request.cookies.get("aegis-pow-difficulty")?.value ?? "4",
+    10,
+  );
+  const powRaw = request.headers.get(powHeaderName());
+  const parsed = parsePowHeader(powRaw);
+
+  if (challengeCookie && parsed) {
+    const ok = await verifyPowSolution(
+      challengeCookie,
+      parsed.nonce,
+      parsed.hash,
+      Number.isNaN(difficulty) ? 4 : difficulty,
+    );
+    if (ok) return null;
+  }
+
+  logBlacklistedEntity(request, highVolume ? "pow_volume_violation" : "pow_scraper_violation");
+  const issued = mintPowChallenge(ip);
+  const res = NextResponse.json(powChallengeResponseBody(issued), {
+    status: 429,
+    headers: {
+      "Cache-Control": "no-store",
+      "X-Aegis-PoW": "required",
+    },
+  });
+  res.cookies.set("aegis-pow-challenge", issued.challenge, {
+    httpOnly: true,
+    maxAge: 3600,
+    sameSite: "lax",
+    path: "/",
+  });
+  res.cookies.set("aegis-pow-difficulty", String(issued.difficulty), {
+    httpOnly: true,
+    maxAge: 3600,
+    sameSite: "lax",
+    path: "/",
+  });
+  return res;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const trap = await scraperTrapResponse(request);
-  if (trap) return trap;
+  const powBlock = await enforcePowChallenge(request);
+  if (powBlock) return powBlock;
 
   if (pathname.startsWith("/dashboard/") && !isKnownDashboardRoute(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -384,7 +432,7 @@ export async function middleware(request: NextRequest) {
     );
     response.headers.set(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization",
+      "Content-Type, Authorization, x-aegis-pow",
     );
     response.headers.set("Access-Control-Allow-Credentials", "true");
     response.headers.set("Access-Control-Max-Age", "86400");

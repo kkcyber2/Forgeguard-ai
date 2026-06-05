@@ -39,8 +39,8 @@ const IDENTITIES: {
   },
   {
     type: "hacker",
-    label: "HACKER",
-    subtitle: "Adversarial Operator",
+    label: "RESEARCHER",
+    subtitle: "Compliance Operator",
     description:
       "You live in terminals and attack surfaces. Unlock the full mutation engine, bounty vault, Mission Feed, and Marine Agent Swarm.",
     icon: ShieldCheck,

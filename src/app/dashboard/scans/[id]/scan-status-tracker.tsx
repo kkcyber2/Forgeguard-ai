@@ -41,9 +41,9 @@ type ScanStatus = keyof typeof STATUS_TONE;
 /** Engine milestones from orchestrator _bump_progress (past the 2% pickup stall). */
 const PROGRESS_MILESTONES: { pct: number; label: string }[] = [
   { pct: 5, label: "Preflight OK" },
-  { pct: 15, label: "Kinetic vectors complete" },
-  { pct: 48, label: "Kinetic battery complete" },
-  { pct: 80, label: "Brain loop active" },
+  { pct: 15, label: "Compliance audit phase complete" },
+  { pct: 48, label: "Compliance audit battery complete" },
+  { pct: 80, label: "Audit Core active" },
   { pct: 100, label: "Scan sealed" },
 ];
 

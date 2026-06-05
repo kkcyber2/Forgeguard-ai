@@ -96,7 +96,7 @@ export default async function UserDashboardPage({
         <DashboardGateModal />
       </Suspense>
       <PageHeader
-        eyebrow={viewMode === "client" ? "Client Sovereign" : "Hacker Sovereign"}
+        eyebrow={viewMode === "client" ? "Client Sovereign" : "Researcher Sovereign"}
         title={greeting(profile?.full_name ?? user.email ?? "Operator")}
         description={
           viewMode === "client"

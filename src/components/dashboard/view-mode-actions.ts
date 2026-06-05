@@ -50,7 +50,7 @@ export async function switchPersona(
     }
   } else {
     if (role === "hacker" && profile.user_type === "client") {
-      return { error: "Client accounts cannot switch to Hacker mode." };
+      return { error: "Client accounts cannot switch to Researcher mode." };
     }
     if (role === "client" && profile.user_type === "hacker") {
       return { error: "Hacker accounts cannot switch to Client mode." };

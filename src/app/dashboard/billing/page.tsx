@@ -90,8 +90,8 @@ export default async function BillingPage({
               VERIFIED: SOVEREIGN
             </p>
             <p className="font-mono text-[11px] text-steel-400">
-              Payment and verification gates bypassed — unlimited scan quota and
-              full platform access.
+              Payment and verification gates bypassed — unlimited enterprise
+              compliance auditing and full platform access.
             </p>
           </div>
         </div>

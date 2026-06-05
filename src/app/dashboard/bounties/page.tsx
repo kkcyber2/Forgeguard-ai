@@ -267,7 +267,7 @@ function TriageResultCard({
             className="overflow-hidden"
           >
             <div className="rounded-xs border border-white/[0.05] bg-obsidian-900/60 px-4 py-2">
-              <CvssRow label="Attack Vector"       value={result.attack_vector} />
+              <CvssRow label="Threat Signature"       value={result.attack_vector} />
               <CvssRow label="Attack Complexity"   value={result.attack_complexity} />
               <CvssRow label="Privileges Required" value={result.privileges_required} />
               <CvssRow label="User Interaction"    value={result.user_interaction} />

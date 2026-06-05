@@ -221,6 +221,7 @@ export type Database = {
           is_removed: boolean
           language: string
           name: string
+          metadata: Record<string, unknown> | null
           price_usd: number
           purchase_count: number
           revenue_usd: number
@@ -247,6 +248,7 @@ export type Database = {
           is_removed?: boolean
           language?: string
           name: string
+          metadata?: Record<string, unknown> | null
           price_usd?: number
           purchase_count?: number
           revenue_usd?: number
@@ -273,6 +275,7 @@ export type Database = {
           is_removed?: boolean
           language?: string
           name?: string
+          metadata?: Record<string, unknown> | null
           price_usd?: number
           purchase_count?: number
           revenue_usd?: number

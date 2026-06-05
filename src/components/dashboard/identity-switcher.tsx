@@ -23,7 +23,7 @@ const PERSONA_MODES: Array<{
   Icon: typeof Building2;
 }> = [
   { role: "client", label: "Client", Icon: Building2 },
-  { role: "hacker", label: "Hacker", Icon: Terminal },
+  { role: "hacker", label: "Researcher", Icon: Terminal },
   { role: "dev", label: "Dev", Icon: Cpu },
 ];
 

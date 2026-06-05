@@ -256,10 +256,10 @@ function formatType(t: ScanLogEntry["type"]): string {
       return "Breach";
     case "attempt":
     case "strike":
-      return "Kinetic strike";
+      return "Compliance Audit";
     case "thought":
     case "brain_decision":
-      return "Strategist thought";
+      return "Audit Core analysis";
     case "finance":
     case "cost_event":
       return "Financial event";

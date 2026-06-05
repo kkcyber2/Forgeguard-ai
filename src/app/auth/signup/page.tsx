@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { ArrowUpRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/input";
+import { AuthLegalLinks } from "@/components/auth/auth-legal-links";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { signup, type AuthActionState } from "../actions";
 import { passwordStrength } from "@/lib/utils";
@@ -102,14 +103,17 @@ export default function SignupPage() {
         </Button>
       </form>
 
-      <div className="border-t-[0.5px] border-white/[0.06] px-6 py-4 flex items-center justify-between text-xs text-foreground-muted">
-        <span>Already onboarded?</span>
-        <Link
-          href="/auth/login"
-          className="inline-flex items-center gap-1 text-foreground hover:text-acid transition-colors"
-        >
-          Sign in <ArrowUpRight size={12} />
-        </Link>
+      <div className="border-t-[0.5px] border-white/[0.06] px-6 py-4 space-y-3">
+        <AuthLegalLinks />
+        <div className="flex items-center justify-between text-xs text-foreground-muted">
+          <span>Already onboarded?</span>
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center gap-1 text-foreground hover:text-acid transition-colors"
+          >
+            Sign in <ArrowUpRight size={12} />
+          </Link>
+        </div>
       </div>
     </div>
   );

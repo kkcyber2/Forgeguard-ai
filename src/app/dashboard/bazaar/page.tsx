@@ -470,7 +470,7 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
     name: "", description: "", language: "python", tags: "", code: "", price_usd: "0",
   });
   const [uploading, setUploading]   = React.useState(false);
-  const [result, setResult]         = React.useState<null | { verdict: string; risk_score: number; reason: string }>(null);
+  const [result, setResult]         = React.useState<null | { verdict: string; risk_score: number; reason: string; remediation_advice?: string }>(null);
   const [error, setError]           = React.useState<string | null>(null);
 
   const submit = async () => {
@@ -486,9 +486,28 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
           price_usd: Number(form.price_usd),
         }),
       });
-      const data = await res.json() as { ok: boolean; audit?: { verdict: string; risk_score: number; reason: string }; error?: string };
+      const data = await res.json() as {
+        ok: boolean;
+        audit?: {
+          verdict: string;
+          risk_score: number;
+          reason: string;
+          remediation_advice?: string;
+        };
+        verdict?: string;
+        risk_score?: number;
+        reason?: string;
+        remediation_advice?: string;
+        error?: string;
+      };
       if (!data.ok) throw new Error(data.error ?? "Upload failed");
-      setResult(data.audit ?? { verdict: "cleared", risk_score: 0, reason: "Cleared by AI Customs." });
+      const audit = data.audit ?? {
+        verdict: data.verdict ?? "cleared",
+        risk_score: data.risk_score ?? 0,
+        reason: data.reason ?? "Cleared by Sovereign Customs Agent.",
+        remediation_advice: data.remediation_advice,
+      };
+      setResult(audit);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -544,7 +563,7 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
               </div>
               <div>
                 <p className="font-mono text-[11px] uppercase tracking-widest" style={{ color: verdictColor }}>
-                  AI Customs — {String(result.verdict ?? "pending").toUpperCase()}
+                  Sovereign Customs — {String(result.verdict ?? "pending").toUpperCase()}
                 </p>
                 <p className="font-mono text-[13px] font-semibold text-white">
                   Risk Score: {result.risk_score}/100
@@ -552,6 +571,15 @@ function UploadPanel({ onClose }: { onClose: () => void }) {
               </div>
             </div>
             <p className="text-[12px] leading-relaxed text-[#9CA3AF]">{result.reason}</p>
+            {result.remediation_advice && (
+              <p className="rounded border border-white/[0.06] bg-black/40 p-3 text-[11px] leading-relaxed text-[#9CA3AF]">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-[#D1FF00]">
+                  Remediation Advice
+                </span>
+                <br />
+                {result.remediation_advice}
+              </p>
+            )}
             {result.verdict !== "rejected" && (
               <p className="font-mono text-[11px] text-[#D1FF00]">
                 {result.verdict === "cleared"

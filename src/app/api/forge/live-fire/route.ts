@@ -322,7 +322,7 @@ export async function POST(req: NextRequest) {
 
       send({ type: "start", line: `[ForgeGuard Live Fire] ${tool} → ${target}` });
       send({ type: "info",  line: `▶ Verification: ${rawDomain} ✓ (verified ${new Date(verification.verified_at as string).toLocaleDateString()})` });
-      send({ type: "info",  line: `▶ Model: ${model === "scout" ? "Gemini Flash 1.5 [SCOUT]" : "DeepSeek-V3 [ASSASSIN]"}` });
+      send({ type: "info",  line: `▶ Model: ${model === "scout" ? "Gemini Flash 1.5 [SCOUT]" : "DeepSeek-V3 [AUDIT CORE]"}` });
       send({ type: "info",  line: `▶ Target: ${target}` });
       send({ type: "info",  line: "─".repeat(60) });
 

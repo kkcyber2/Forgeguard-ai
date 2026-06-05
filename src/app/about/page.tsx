@@ -87,7 +87,7 @@ export default async function AboutPage() {
           {/* Threat counter strip */}
           <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
             {[
-              { value: "2,400+", label: "Attack vectors catalogued" },
+              { value: "2,400+", label: "Threat signatures catalogued" },
               { value: "18 ms", label: "Avg detection latency" },
               { value: "97.4%", label: "True positive rate" },
               { value: "0", label: "Compromised deployments" },

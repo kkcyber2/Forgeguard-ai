@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
         matching_rules: matching.map(r => r.rule_id),
         recommendation: matching.length > 0
           ? `${matching.length} existing Aegis rule(s) cover this vector. Review and tighten rule specificity.`
-          : "No existing Aegis rules match this attack vector. Export to Aegis to generate protective rules.",
+          : "No existing Aegis rules match this threat signature. Export to Aegis to generate protective rules.",
       };
     }
   }

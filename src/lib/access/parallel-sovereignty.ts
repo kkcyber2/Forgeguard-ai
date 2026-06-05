@@ -29,7 +29,7 @@ export const SOVEREIGN_ACCENTS: Record<
   hacker: {
     primary: "#ADFF2F",
     glow: "rgba(173,255,47,0.35)",
-    label: "Hacker Sovereign",
+    label: "Researcher Sovereign",
   },
   dev: {
     primary: "#D1FF00",

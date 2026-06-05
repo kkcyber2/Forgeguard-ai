@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { AuthLegalLinks } from "@/components/auth/auth-legal-links";
 import { Logo } from "@/components/ui/logo";
 import { GridBackground } from "@/components/ui/grid-background";
 import { getSessionUser, getCurrentProfile } from "@/lib/supabase/server";
@@ -47,8 +48,9 @@ export default async function AuthLayout({
         <div className="flex flex-1 items-center justify-center px-6 py-12">
           <div className="w-full max-w-md">{children}</div>
         </div>
-        <footer className="border-t-[0.5px] border-white/[0.06] px-6 py-4 md:px-8">
-          <p className="font-mono text-[11px] text-foreground-subtle">
+        <footer className="border-t-[0.5px] border-white/[0.06] px-6 py-4 md:px-8 space-y-2">
+          <AuthLegalLinks className="text-center md:text-left" />
+          <p className="font-mono text-[11px] text-foreground-subtle text-center md:text-left">
             forgeguard.ai · secure access channel
           </p>
         </footer>

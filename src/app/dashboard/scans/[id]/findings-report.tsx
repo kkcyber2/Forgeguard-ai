@@ -826,7 +826,7 @@ function ExportAegisRuleButton({
       window.dispatchEvent(
         new CustomEvent(AEGIS_TOAST_EVENT, {
           detail: {
-            message: "Strike vector sealed in Aegis Firewall.",
+            message: "Threat signature sealed in Aegis Firewall.",
             type: "success",
           },
         }),
@@ -1056,7 +1056,7 @@ function FindingCard({
           {finding.rationale && (
             <div>
               <span className="text-[10px] uppercase tracking-widest text-foreground-subtle">
-                Brain Rationale
+                Audit Core Rationale
               </span>
               <p className="mt-1 text-xs text-foreground-muted leading-relaxed">
                 {finding.rationale}
@@ -1320,7 +1320,7 @@ function buildReportHTML(
       val: String(findings.filter((f) => f.severity === "high").length),
       color: "#f97316",
     },
-    { label: "Attack Vectors", val: String(report.attacks_run ?? 0) },
+    { label: "Threat Signatures", val: String(report.attacks_run ?? 0) },
   ]
     .map(
       (s) =>
@@ -1559,8 +1559,8 @@ export function FindingsReport({
             Enterprise Intelligence Report
           </p>
           <p className="text-[11px] text-foreground-muted">
-            4-section kinetic briefing · {findings.length} findings ·{" "}
-            {report.attacks_run ?? 0} vectors tested
+            4-section compliance briefing · {findings.length} findings ·{" "}
+            {report.attacks_run ?? 0} threat signatures tested
             {report.wall_seconds ? ` · ${Math.round(report.wall_seconds / 60)}m scan` : ""}
           </p>
         </div>

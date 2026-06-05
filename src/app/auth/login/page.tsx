@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import { ArrowUpRight, Lock, Mail, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, FieldError } from "@/components/ui/input";
+import { AuthLegalLinks } from "@/components/auth/auth-legal-links";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { login, sendMagicLink, type AuthActionState, type MagicLinkState } from "../actions";
 
@@ -169,14 +170,17 @@ export default function LoginPage() {
       )}
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <div className="border-t-[0.5px] border-white/[0.06] px-6 py-4 flex items-center justify-between text-xs text-foreground-muted">
-        <span>No account?</span>
-        <Link
-          href="/auth/signup"
-          className="inline-flex items-center gap-1 text-foreground hover:text-acid transition-colors"
-        >
-          Request access <ArrowUpRight size={12} />
-        </Link>
+      <div className="border-t-[0.5px] border-white/[0.06] px-6 py-4 space-y-3">
+        <AuthLegalLinks />
+        <div className="flex items-center justify-between text-xs text-foreground-muted">
+          <span>No account?</span>
+          <Link
+            href="/auth/signup"
+            className="inline-flex items-center gap-1 text-foreground hover:text-acid transition-colors"
+          >
+            Request access <ArrowUpRight size={12} />
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -371,7 +371,7 @@ function FinancialRisk({
     if (scanSealed && telemetryTrend && telemetryTrend.some((n) => n > 0)) {
       return <SovereignTelemetrySparkline trend={telemetryTrend} />;
     }
-    return <EmptyState label="Financial liability populates after kinetic judge runs." icon={DollarSign} />;
+    return <EmptyState label="Financial liability populates after compliance judge runs." icon={DollarSign} />;
   }
 
   const aleDisplay = formatAleDisplay(aleUsd);

@@ -31,7 +31,8 @@ const columns: Array<{ title: string; items: { label: string; href: string }[] }
       { label: "About", href: "/about" },
       { label: "Careers", href: "/careers" },
       { label: "Contact", href: "/contact" },
-      { label: "Legal", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
     ],
   },
 ];
@@ -105,9 +106,9 @@ export function MarketingFooter() {
             © {new Date().getFullYear()} ForgeGuard AI · All attacks reserved
           </p>
           <div className="flex items-center gap-4 text-xs text-foreground-subtle">
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>
             <span>·</span>
-            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms of Service</Link>
             <span>·</span>
             <Link href="/contact" className="hover:text-foreground">Disclosure</Link>
           </div>

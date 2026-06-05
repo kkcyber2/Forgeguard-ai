@@ -3,16 +3,20 @@ import {
   normalizeRiskLabel,
   prepareScanReportUpsert,
 } from "@/lib/agathon/payload-numerics";
+import { resolveEngineAuthToken } from "@/lib/agathon-config";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import {
+  applyFortressBlock,
+  INTERNAL_SCAN_TOKEN_HEADER,
+} from "@/services/fortress-perimeter.service";
+import { logBlacklistedEntity } from "@/services/scraper-defense.service";
 
 /**
  * POST /api/v1/webhooks/agathon
  * ---------------------------
  * Ingress for Supabase Database Webhooks and engine completion callbacks.
- * Configure in Supabase Dashboard → Database → Webhooks → this URL.
  *
- * Auth: Authorization: Bearer <AGATHON_WEBHOOK_SECRET>
- *       or x-agathon-webhook-secret header (same value).
+ * Auth: x-internal-scan-token header only (matches engine outbound calls).
  */
 
 export const runtime = "nodejs";
@@ -30,12 +34,18 @@ type WebhookBody = {
   payload?: Record<string, unknown>;
 };
 
-function resolveSecret(request: NextRequest): string | null {
-  const bearer = request.headers.get("authorization");
-  if (bearer?.startsWith("Bearer ")) {
-    return bearer.slice(7).trim();
-  }
-  return request.headers.get("x-agathon-webhook-secret")?.trim() ?? null;
+function verifyWebhook(request: NextRequest): boolean {
+  const expected = resolveEngineAuthToken();
+  if (!expected) return false;
+  const provided = request.headers.get(INTERNAL_SCAN_TOKEN_HEADER)?.trim();
+  return provided === expected;
+}
+
+function rejectUnauthorizedWebhook(request: NextRequest): NextResponse {
+  logBlacklistedEntity(request, "webhook_token_violation");
+  const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  applyFortressBlock(res);
+  return res;
 }
 
 function normalizeScanStatus(raw: unknown): string {
@@ -45,16 +55,6 @@ function normalizeScanStatus(raw: unknown): string {
     return status;
   }
   return "sealed";
-}
-
-function verifyWebhook(request: NextRequest): boolean {
-  const expected =
-    process.env.AGATHON_WEBHOOK_SECRET ??
-    process.env.INTERNAL_SCAN_TOKEN ??
-    process.env.AGATHON_INTERNAL_SECRET;
-  if (!expected) return false;
-  const provided = resolveSecret(request);
-  return provided === expected;
 }
 
 /**
@@ -89,7 +89,7 @@ function normalizeEvent(body: WebhookBody): {
 
 export async function POST(request: NextRequest) {
   if (!verifyWebhook(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return rejectUnauthorizedWebhook(request);
   }
 
   let body: WebhookBody;
@@ -387,10 +387,9 @@ export async function POST(request: NextRequest) {
   });
 }
 
-export async function GET() {
-  return NextResponse.json({
-    service: "agathon-webhook",
-    status: "ready",
-    usage: "POST with Bearer AGATHON_WEBHOOK_SECRET",
-  });
+export async function GET(request: NextRequest) {
+  logBlacklistedEntity(request, "webhook_method_violation");
+  const res = NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+  applyFortressBlock(res);
+  return res;
 }

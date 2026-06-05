@@ -28,6 +28,17 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") ?? "/dashboard";
+
+  if (pathname.startsWith("/dashboard/bunker")) {
+    return (
+      <div className="min-h-screen bg-obsidian-950 text-foreground">
+        {children}
+      </div>
+    );
+  }
+
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard");
 
@@ -54,9 +65,6 @@ export default async function DashboardLayout({
     }
     redirect("/admin");
   }
-
-  const headersList = await headers();
-  const pathname = headersList.get("x-pathname") ?? "/dashboard";
 
   const shellResult = await loadDashboardShell({
     userId: user.id,

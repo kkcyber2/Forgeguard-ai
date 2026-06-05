@@ -13,6 +13,16 @@ import {
   logBlacklistedEntity,
 } from "@/services/scraper-defense.service";
 import {
+  enforceAgathonWebhookGate,
+  fortressBlockedResponse,
+  isSessionFortressBlocked,
+} from "@/services/fortress-perimeter.service";
+import {
+  BUNKER_CHALLENGE_PATH,
+  honeypotRedirectUrl,
+  isHoneypotPath,
+} from "@/services/honeypot-defense.service";
+import {
   mintPowChallenge,
   parsePowHeader,
   powChallengeResponseBody,
@@ -43,6 +53,7 @@ const KNOWN_DASHBOARD_PREFIXES = [
   "/dashboard/analytics",
   "/dashboard/aegis",
   "/dashboard/aegis-shield",
+  "/dashboard/bunker",
   "/dashboard/bazaar",
   "/dashboard/bounties",
   "/dashboard/billing",
@@ -290,6 +301,29 @@ async function isSovereignSession(request: NextRequest): Promise<boolean> {
 }
 
 /**
+ * Kinetic honeypots — synchronous, no session auth. Rewrites to bunker PoW.
+ */
+function enforceKineticHoneypot(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith(BUNKER_CHALLENGE_PATH)) return null;
+  if (pathname.startsWith("/api/bunker/")) return null;
+  if (!isHoneypotPath(pathname)) return null;
+
+  logBlacklistedEntity(request, `kinetic_honeypot:${pathname}`);
+  logAttackAttempt(request, "kinetic_honeypot", pathname);
+
+  const rewriteUrl = honeypotRedirectUrl(request, pathname);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", BUNKER_CHALLENGE_PATH);
+
+  const response = NextResponse.rewrite(rewriteUrl, {
+    request: { headers: requestHeaders },
+  });
+  response.headers.set("X-Aegis-Honeypot", "trapped");
+  return response;
+}
+
+/**
  * High-volume scrapers must solve SHA-256 PoW before receiving responses.
  */
 async function enforcePowChallenge(
@@ -360,6 +394,16 @@ async function enforcePowChallenge(
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const honeypotBlock = enforceKineticHoneypot(request);
+  if (honeypotBlock) return honeypotBlock;
+
+  if (isSessionFortressBlocked(request)) {
+    return fortressBlockedResponse();
+  }
+
+  const webhookBlock = enforceAgathonWebhookGate(request);
+  if (webhookBlock) return webhookBlock;
 
   const powBlock = await enforcePowChallenge(request);
   if (powBlock) return powBlock;
@@ -432,7 +476,7 @@ export async function middleware(request: NextRequest) {
     );
     response.headers.set(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, x-aegis-pow",
+      "Content-Type, Authorization, x-aegis-pow, x-internal-scan-token",
     );
     response.headers.set("Access-Control-Allow-Credentials", "true");
     response.headers.set("Access-Control-Max-Age", "86400");
@@ -443,13 +487,12 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    {
-      source:
-        "/((?!_next/static|_next/image|favicon.ico|public/|.*\\.(?:svg|png|jpg|jpeg|webp|woff2?|ttf)).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
+    "/:path((?!_next|favicon.ico).*)",
+    "/.env",
+    "/.env.local",
+    "/wp-admin",
+    "/wp-admin/:path*",
+    "/admin/setup",
+    "/admin/setup/:path*",
   ],
 };

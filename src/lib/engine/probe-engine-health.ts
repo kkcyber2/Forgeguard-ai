@@ -21,6 +21,7 @@ import {
   BUNKER_RETRY_MS,
   BUNKER_SHIELDING_MESSAGE,
   ENGINE_CONGESTED_MESSAGE,
+  FORTRESS_PERIMETER_HEALTH_MESSAGE,
 } from "@/lib/engine/bunker-shielding";
 
 export type EngineHealthSnapshot = {
@@ -85,7 +86,12 @@ async function probeOnce(
     const latencyMs = Date.now() - t0;
 
     if (resp.ok) {
-      return { ok: true, status: "healthy", latencyMs };
+      return {
+        ok: true,
+        status: "healthy",
+        latencyMs,
+        reason: FORTRESS_PERIMETER_HEALTH_MESSAGE,
+      };
     }
 
     if (isCongestedHttpStatus(resp.status)) {

@@ -10,9 +10,13 @@
 /** Vercel → Railway engine fetch budget (health + scan dispatch). */
 export const ENGINE_HANDSHAKE_TIMEOUT_MS = 60_000;
 
+/** Global production engine standard when env vars are unset. */
+export const CANONICAL_ENGINE_URL = "https://engine.forgeguard-ai.com";
+
 export type EngineUrlSource =
   | "PYTHON_ENGINE_URL"
   | "AGATHON_ORCHESTRATOR_URL"
+  | "CANONICAL_ENGINE_URL"
   | "unset";
 
 function ensureHttpsEngineUrl(raw: string): string {
@@ -49,13 +53,13 @@ function normalizeEngineBase(raw: string): string {
 export function resolveEngineUrlSource(): EngineUrlSource {
   if (process.env.PYTHON_ENGINE_URL?.trim()) return "PYTHON_ENGINE_URL";
   if (process.env.AGATHON_ORCHESTRATOR_URL?.trim()) return "AGATHON_ORCHESTRATOR_URL";
-  return "unset";
+  return "CANONICAL_ENGINE_URL";
 }
 
 export function resolveEngineBaseUrl(): string | undefined {
   const python = process.env.PYTHON_ENGINE_URL?.trim();
   const legacy = process.env.AGATHON_ORCHESTRATOR_URL?.trim();
-  const raw = python ?? legacy;
+  const raw = python ?? legacy ?? CANONICAL_ENGINE_URL;
   if (!raw) return undefined;
   return normalizeEngineBase(raw);
 }

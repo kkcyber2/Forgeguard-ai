@@ -10,6 +10,13 @@
 /** Vercel → Railway engine fetch budget (health + scan dispatch). */
 export const ENGINE_HANDSHAKE_TIMEOUT_MS = 60_000;
 
+/**
+ * Groq free-tier precision pacing — mirrors AI-red-team/agathon/pacing_lock.py.
+ * On HTTP 429 the engine holds 10s between the next 5 probe/brain attempts.
+ */
+export const GROQ_PRECISION_PACING_DELAY_MS = 10_000;
+export const GROQ_PRECISION_PACING_ATTEMPTS = 5;
+
 /** Global production engine standard when env vars are unset. */
 export const CANONICAL_ENGINE_URL = "https://engine.forgeguard-ai.com";
 

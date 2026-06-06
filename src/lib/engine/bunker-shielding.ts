@@ -8,6 +8,6 @@ export const FORTRESS_PERIMETER_HEALTH_MESSAGE =
 
 /** Shown when Vercel/Railway returns 502/504 or Groq/OpenAI rate limits apply. */
 export const ENGINE_CONGESTED_MESSAGE =
-  "Engine Throttled: OpenAI/Groq limits reached. Standing by..." as const;
+  "Congestion Management: OpenAI/Groq Throttling detected. Staying in safe-range." as const;
 
 export const BUNKER_RETRY_MS = 5_000;

@@ -75,8 +75,8 @@ export function MarketingFooter() {
           <div className="col-span-2 max-w-sm">
             <Logo />
             <p className="mt-4 text-sm text-foreground-muted text-pretty">
-              Adversarial red-teaming and runtime guardrails for production
-              LLM deployments.
+              Enterprise data protection, ISO/GDPR compliance reporting, and
+              Aegis prompt shields for production AI systems.
             </p>
             <div className="mt-6 flex items-center gap-2">
               <FooterStatus />
@@ -103,7 +103,7 @@ export function MarketingFooter() {
 
         <div className="mt-14 flex flex-col items-start justify-between gap-3 border-t-[0.5px] border-white/[0.06] pt-6 md:flex-row md:items-center">
           <p className="font-mono text-xs text-foreground-subtle">
-            © {new Date().getFullYear()} ForgeGuard AI · All attacks reserved
+            © {new Date().getFullYear()} ForgeGuard AI · All rights reserved
           </p>
           <div className="flex items-center gap-4 text-xs text-foreground-subtle">
             <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>

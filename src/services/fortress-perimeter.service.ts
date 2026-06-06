@@ -39,9 +39,29 @@ export function fortressBlockedResponse(): NextResponse {
 }
 
 /**
- * Agathon webhook — POST only, requires x-internal-scan-token.
+ * Agathon webhook — POST only, requires x-internal-scan-token or Bearer token.
  * Returns a response when the request must be rejected; null when allowed through.
  */
+
+/** Extract shared secret from x-internal-scan-token or Authorization: Bearer. */
+export function resolveProvidedWebhookToken(request: NextRequest): string | null {
+  const headerToken = request.headers.get(INTERNAL_SCAN_TOKEN_HEADER)?.trim();
+  if (headerToken) return headerToken;
+
+  const auth = request.headers.get("authorization") ?? "";
+  if (auth.toLowerCase().startsWith("bearer ")) {
+    return auth.slice(7).trim();
+  }
+  return null;
+}
+
+export function verifyWebhookToken(request: NextRequest): boolean {
+  const expected = resolveEngineAuthToken();
+  if (!expected) return false;
+  const provided = resolveProvidedWebhookToken(request);
+  return Boolean(provided && provided === expected);
+}
+
 export function enforceAgathonWebhookGate(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl;
   if (pathname !== WEBHOOK_PATH) return null;
@@ -54,7 +74,7 @@ export function enforceAgathonWebhookGate(request: NextRequest): NextResponse | 
   }
 
   const expected = resolveEngineAuthToken();
-  const provided = request.headers.get(INTERNAL_SCAN_TOKEN_HEADER)?.trim();
+  const provided = resolveProvidedWebhookToken(request);
 
   if (!expected || !provided || provided !== expected) {
     logBlacklistedEntity(request, "webhook_token_violation");

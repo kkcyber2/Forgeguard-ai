@@ -3,11 +3,10 @@ import {
   normalizeRiskLabel,
   prepareScanReportUpsert,
 } from "@/lib/agathon/payload-numerics";
-import { resolveEngineAuthToken } from "@/lib/agathon-config";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
   applyFortressBlock,
-  INTERNAL_SCAN_TOKEN_HEADER,
+  verifyWebhookToken,
 } from "@/services/fortress-perimeter.service";
 import { logBlacklistedEntity } from "@/services/scraper-defense.service";
 
@@ -16,7 +15,7 @@ import { logBlacklistedEntity } from "@/services/scraper-defense.service";
  * ---------------------------
  * Ingress for Supabase Database Webhooks and engine completion callbacks.
  *
- * Auth: x-internal-scan-token header only (matches engine outbound calls).
+ * Auth: x-internal-scan-token or Authorization: Bearer (mirrors Railway handshake).
  */
 
 export const runtime = "nodejs";
@@ -35,10 +34,7 @@ type WebhookBody = {
 };
 
 function verifyWebhook(request: NextRequest): boolean {
-  const expected = resolveEngineAuthToken();
-  if (!expected) return false;
-  const provided = request.headers.get(INTERNAL_SCAN_TOKEN_HEADER)?.trim();
-  return provided === expected;
+  return verifyWebhookToken(request);
 }
 
 function rejectUnauthorizedWebhook(request: NextRequest): NextResponse {

@@ -2,26 +2,14 @@
 
 import * as React from "react";
 import { motion, useReducedMotion, useInView } from "framer-motion";
-import {
-  Crosshair,
-  ShieldCheck,
-  Activity,
-  Terminal,
-  Layers,
-  Radar,
-} from "lucide-react";
+import { ScanSearch, FileCheck2, ShieldCheck } from "lucide-react";
 import { Section, SectionHeading } from "@/components/ui/section";
 import { cn } from "@/lib/utils";
 
 /**
- * Feature grid — "Linear.app meets SentinelOne" aesthetic.
- * ──────────────────────────────────────────────────────────
- * • Framer Motion stagger: each card enters as a child of the
- *   motion container. useInView triggers once the section scrolls
- *   into the viewport — no instant fire on load.
- * • Sharp 4px radius, 0.5px borders, acid glow on hover.
- * • Icon box transitions from steel to acid on hover.
- * • A hairline acid accent appears at the top of each card on hover.
+ * Feature grid — enterprise compliance pillars for the public landing page.
+ * Three focused capabilities: data-leak auditing, regulatory reporting,
+ * and runtime prompt shields.
  */
 
 const ease = [0.2, 0.7, 0.2, 1] as const;
@@ -47,40 +35,22 @@ const CARD = {
 
 const FEATURES = [
   {
-    icon: Crosshair,
-    title: "Continuous red-teaming",
+    icon: ScanSearch,
+    title: "Data-Leak Auditing",
     body:
-      "600+ adversarial probes — prompt injection, jailbreak, data exfil, tool abuse — fired on every deploy, not once a quarter.",
+      "Automatic detection of PII exposure across prompts, completions, and tool outputs. Sensitive patterns — SSNs, account numbers, credentials — are flagged, scored, and routed to remediation before they leave your perimeter.",
+  },
+  {
+    icon: FileCheck2,
+    title: "ISO/GDPR Compliance Reporting",
+    body:
+      "Board-ready executive summaries in Sections A–D: scope and data inventory, control posture, incident findings, and remediation roadmap. Exportable artifacts aligned with ISO 27001 and GDPR Article 30 record-keeping.",
   },
   {
     icon: ShieldCheck,
-    title: "Runtime guardrails",
+    title: "Aegis Prompt Shields",
     body:
-      "Deterministic and model-based policies evaluated in < 80 ms. Drop the SDK in front of your provider; no router rewrites.",
-  },
-  {
-    icon: Radar,
-    title: "Behavioral telemetry",
-    body:
-      "Every request is diffed against a learned baseline. Anomalies surface in the command-center in near real-time.",
-  },
-  {
-    icon: Activity,
-    title: "MITRE ATLAS coverage",
-    body:
-      "Probes mapped to ATLAS tactics — you see exactly which adversarial ML techniques your stack actually resists.",
-  },
-  {
-    icon: Terminal,
-    title: "Agent-aware testing",
-    body:
-      "First-class support for tool-calling agents: sandboxed exec, multi-hop chains, model-hopping — we test the full graph.",
-  },
-  {
-    icon: Layers,
-    title: "Policy as code",
-    body:
-      "Guardrails live in your repo as versioned YAML. Your security team reviews them in the same PR your engineers ship.",
+      "Instant immunity code generation from audit findings. Drop-in middleware, SDK snippets, and policy-as-code rules that block jailbreaks, injection chains, and exfiltration paths at inference time.",
   },
 ] as const;
 
@@ -91,7 +61,6 @@ export function FeatureGrid() {
 
   return (
     <Section id="platform" className="border-t-[0.5px] border-white/[0.04]">
-      {/* Heading — simple fade-in */}
       <motion.div
         initial={reduce ? undefined : { opacity: 0, y: 16 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -101,21 +70,20 @@ export function FeatureGrid() {
           eyebrow="Platform"
           title={
             <>
-              The offensive + defensive loop,
-              <br className="hidden md:block" /> in one control plane.
+              Enterprise data protection,
+              <br className="hidden md:block" /> from audit to enforcement.
             </>
           }
-          lede="Most teams bolt on a red-team consultancy once a year and hope for the best. ForgeGuard runs the attacks continuously and wires the findings straight into the policy engine guarding production."
+          lede="ForgeGuard unifies continuous compliance auditing, regulatory reporting, and runtime guardrails in one control plane — so security, legal, and engineering share a single source of truth."
         />
       </motion.div>
 
-      {/* Staggered grid */}
       <motion.div
         ref={ref}
         variants={reduce ? undefined : CONTAINER}
         initial={reduce ? undefined : "hidden"}
         animate={reduce ? (inView ? "show" : "hidden") : inView ? "show" : "hidden"}
-        className="mt-14 grid grid-cols-1 gap-px bg-white/[0.04] rounded-sm overflow-hidden border-[0.5px] border-white/[0.06] md:grid-cols-2 lg:grid-cols-3"
+        className="mt-14 grid grid-cols-1 gap-px bg-white/[0.04] rounded-sm overflow-hidden border-[0.5px] border-white/[0.06] md:grid-cols-3"
       >
         {FEATURES.map(({ icon: Icon, title, body }) => (
           <FeatureCard key={title} icon={Icon} title={title} body={body} />
@@ -124,10 +92,6 @@ export function FeatureGrid() {
     </Section>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* Single feature card                                                        */
-/* -------------------------------------------------------------------------- */
 
 function FeatureCard({
   icon: Icon,
@@ -150,7 +114,6 @@ function FeatureCard({
         "hover:bg-obsidian-800",
       )}
     >
-      {/* Acid hairline accent at card top — appears on hover */}
       <motion.span
         aria-hidden
         initial={false}
@@ -161,7 +124,6 @@ function FeatureCard({
       />
 
       <div className="flex items-center gap-3">
-        {/* Icon box */}
         <motion.div
           animate={{
             borderColor: hovered ? "rgba(209,255,0,0.35)" : "rgba(255,255,255,0.08)",

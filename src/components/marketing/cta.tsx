@@ -28,13 +28,13 @@ export function CtaBanner({ isAuthenticated, primaryCta }: CtaBannerProps) {
 
           <div className="relative flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl">
-              <p className="text-eyebrow text-acid mb-4">Next-24-hour onboarding</p>
+              <p className="text-eyebrow text-acid mb-4">Compliance in one afternoon</p>
               <h2 className="text-display-md text-balance text-foreground">
-                Your LLM is shipping tomorrow. Harden it tonight.
+                Ship AI with audit-ready data protection.
               </h2>
               <p className="mt-4 text-base text-foreground-muted">
-                Connect an endpoint, run the red-team suite, turn on guardrails.
-                Most teams hit green coverage in a single afternoon.
+                Connect an endpoint, run a data-leak audit, export your Section A–D
+                report, and deploy Aegis shields — most teams complete onboarding in a single session.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -49,7 +49,7 @@ export function CtaBanner({ isAuthenticated, primaryCta }: CtaBannerProps) {
                 href={isAuthenticated ? "/dashboard" : "/demo"}
                 className={buttonStyles({ variant: "secondary", size: "lg" })}
               >
-                {isAuthenticated ? "Open command center" : "Watch live probe"}
+                {isAuthenticated ? "Open dashboard" : "View live demo"}
               </Link>
             </div>
           </div>

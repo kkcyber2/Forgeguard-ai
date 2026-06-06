@@ -46,11 +46,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { randomBytes } from "crypto";
 import { sha256hex } from "@/lib/crypto/hash";
 import { z } from "zod";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { sealCredential } from "@/lib/crypto/credentials";
+import { launchScan } from "@/services/scan-launcher.service";
 
 export const runtime = "nodejs"; // needs crypto module
 
@@ -100,30 +101,44 @@ export async function POST(req: NextRequest) {
     return json({ error: "Invalid or revoked API key" }, 401);
   }
 
-  // 2b. Enforce Enterprise plan — REST API access is Enterprise-only.
   const userId = keyRow.user_id as string;
-  const { data: subRow } = await admin
-    .from("subscriptions")
-    .select("plan, status")
-    .eq("user_id", userId)
+
+  // Resolve owner email via service-role (bypasses RLS on profiles).
+  const { data: profileRow } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
     .maybeSingle();
 
-  const plan = (subRow?.plan as string | null) ?? "free";
-  const subStatus = (subRow?.status as string | null) ?? "inactive";
-  const isEnterprise =
-    plan === "enterprise" && (subStatus === "active" || subStatus === "trialing");
+  const userEmail = (profileRow?.email as string | undefined) ?? null;
+  const isSovereign = isSovereignOperator(userEmail);
 
-  if (!isEnterprise) {
-    return json(
-      {
-        error: "PLAN_UPGRADE_REQUIRED",
-        message:
-          "REST API access requires the Enterprise plan. Upgrade at /dashboard/billing.",
-        currentPlan: plan,
-        requiredPlan: "enterprise",
-      },
-      403,
-    );
+  // Enterprise plan gate — sovereign operator bypasses tier/quota checks.
+  if (!isSovereign) {
+    const { data: subRow } = await admin
+      .from("subscriptions")
+      .select("plan, status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const plan = (subRow?.plan as string | null) ?? "free";
+    const subStatus = (subRow?.status as string | null) ?? "inactive";
+    const isEnterprise =
+      plan === "enterprise" &&
+      (subStatus === "active" || subStatus === "trialing");
+
+    if (!isEnterprise) {
+      return json(
+        {
+          error: "PLAN_UPGRADE_REQUIRED",
+          message:
+            "REST API access requires the Enterprise plan. Upgrade at /dashboard/billing.",
+          currentPlan: plan,
+          requiredPlan: "enterprise",
+        },
+        403,
+      );
+    }
   }
 
   // 3. Parse + validate body
@@ -188,23 +203,20 @@ export async function POST(req: NextRequest) {
     .eq("id", keyRow.id)
     .then(() => {/* ignore */});
 
-  // 7. Kick the runner
+  // 7. Kick the runner via shared launcher (no session cookies required)
   try {
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ??
-      `https://${req.headers.get("host") ?? "localhost:3000"}`;
-    const runnerResp = await fetch(`${appUrl}/api/scan/start`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scan_id: scanId }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!runnerResp.ok) {
-      const txt = await runnerResp.text().catch(() => "<no body>");
-      console.warn("[api/v1/scans] runner kickoff:", runnerResp.status, txt.slice(0, 200));
+    if (isSovereign) {
+      console.log("DIRECT_DISPATCH_TRIGGERED_FOR_SOVEREIGN");
+    }
+    const launch = await launchScan({ scanId, userId, userEmail });
+    if (!launch.ok) {
+      console.warn(
+        "[api/v1/scans] runner kickoff:",
+        launch.status,
+        launch.error.slice(0, 200),
+      );
     }
   } catch (e) {
-    // Scan row exists in 'queued'; runner will pick it up on next cycle.
     console.warn("[api/v1/scans] runner unreachable:", e);
   }
 

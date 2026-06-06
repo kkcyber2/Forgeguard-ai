@@ -139,12 +139,12 @@ function ThreatRing() {
 function ActivityTicker() {
   const events = React.useMemo(
     () => [
-      "CVE-2025-4471 scored CRITICAL",
-      "Recon sweep completed — 3 hosts",
-      "Bounty #88 submitted",
-      "Forge session started",
-      "Aegis rule deployed",
-      "New mission posted",
+      "PII pattern detected — auto-redacted",
+      "GDPR Section C report generated",
+      "Aegis shield deployed to production",
+      "ISO 27001 control gap remediated",
+      "Compliance audit completed — 0 leaks",
+      "Executive summary exported",
     ],
     [],
   );
@@ -258,7 +258,7 @@ function HolographicMonolith({ className }: { className?: string }) {
             {/* Center — scan count */}
             <div className="flex flex-col items-center justify-center gap-1">
               <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/30">
-                Vulnerabilities Scored
+                Compliance Audits
               </p>
               <div className="flex items-baseline gap-1">
                 <ScanCounter />
@@ -334,26 +334,26 @@ export function HeroSection({
               style={{ boxShadow: "0 0 6px rgba(209,255,0,0.8)" }}
             />
             <span className="font-mono text-[10px] uppercase tracking-[0.18em]">
-              Stronghold 2.0
+              Enterprise Compliance
             </span>
           </Badge>
         </motion.div>
 
         <h1 className="font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-5xl md:text-6xl">
-          Offensive security.{" "}
+          Enterprise data protection.{" "}
           <span
             className="text-transparent"
             style={{
               WebkitTextStroke: "1px rgba(209,255,0,0.7)",
             }}
           >
-            Surgical precision.
+            Audit-ready by design.
           </span>
         </h1>
 
         <p className="max-w-lg text-base leading-relaxed text-white/40">
-          AI-powered red teaming, vulnerability scoring, and adversarial
-          automation — built for operators who move faster than threats.
+          Continuous PII leak detection, ISO/GDPR executive reporting, and
+          Aegis prompt shields — one platform for security teams and compliance officers.
         </p>
 
         <motion.div variants={ITEM} className="flex flex-wrap items-center gap-3">
@@ -390,8 +390,8 @@ export function HeroSection({
           className="flex items-center gap-6 pt-2"
         >
           {[
-            { label: "CVEs Scored", value: "14.8k+" },
-            { label: "Active Ops", value: "342" },
+            { label: "PII Patterns", value: "240+" },
+            { label: "Audits Run", value: "14.8k+" },
             { label: "Uptime", value: "99.97%" },
           ].map(({ label, value }) => (
             <div key={label} className="flex flex-col gap-0.5">

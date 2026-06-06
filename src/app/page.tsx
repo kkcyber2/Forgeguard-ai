@@ -23,8 +23,8 @@ export default async function HomePage() {
   const destination = "/dashboard";
 
   const primaryCta = isAuthenticated
-    ? { href: "/dashboard", label: "Enter Command Center" }
-    : { href: "/auth/signup", label: "Join the Stronghold" };
+    ? { href: "/dashboard", label: "Open Dashboard" }
+    : { href: "/auth/signup", label: "Start Free Audit" };
 
   return (
     <main className="relative w-full">

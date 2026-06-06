@@ -99,6 +99,7 @@ export function logEngineHandshakeDiagnostics(): void {
 
 /** Visible in Vercel Runtime Logs — URL + token prefix only (no full secret). */
 export function logSovereignHandshakeDebug(url: string): void {
+  if (process.env.NODE_ENV !== "development") return;
   const tokenPrefix =
     process.env.INTERNAL_SCAN_TOKEN?.substring(0, 4) ??
     process.env.AGATHON_INTERNAL_SECRET?.substring(0, 4);

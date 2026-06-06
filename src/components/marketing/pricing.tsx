@@ -36,8 +36,8 @@ export function PricingSection({
             Pricing
           </p>
           <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-            Red-team your AI.{" "}
-            <span className="text-acid">No LLC required.</span>
+            Protect your AI stack.{" "}
+            <span className="text-acid">Audit-ready pricing.</span>
           </h2>
           <p className="mt-3 text-sm text-foreground-muted">
             Pay via{" "}

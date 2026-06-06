@@ -278,8 +278,15 @@ async function enforceAdminSovereignGate(
 }
 
 /**
- * Sovereign operators skip the scraper trap (KK / allowlisted emails).
+ * Sovereign operators skip scraper PoW, rate limits, and fortress blocks.
+ * v1 REST routes skip PoW — they authenticate via fg_ Bearer keys (CI/curl safe).
  */
+async function isSovereignRequest(request: NextRequest): Promise<boolean> {
+  if (await isSovereignSession(request)) return true;
+  if (request.nextUrl.pathname.startsWith("/api/v1/")) return true;
+  return false;
+}
+
 async function isSovereignSession(request: NextRequest): Promise<boolean> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -348,7 +355,7 @@ async function enforcePowChallenge(
   const suspicious = isScraperRequest(request);
   const highVolume = count >= POW_VOLUME_THRESHOLD;
   if (!suspicious && !highVolume) return null;
-  if (await isSovereignSession(request)) return null;
+  if (await isSovereignRequest(request)) return null;
 
   const challengeCookie = request.cookies.get("aegis-pow-challenge")?.value;
   const difficulty = Number.parseInt(
@@ -399,7 +406,9 @@ export async function middleware(request: NextRequest) {
   if (honeypotBlock) return honeypotBlock;
 
   if (isSessionFortressBlocked(request)) {
-    return fortressBlockedResponse();
+    if (!(await isSovereignRequest(request))) {
+      return fortressBlockedResponse();
+    }
   }
 
   const webhookBlock = enforceAgathonWebhookGate(request);
@@ -415,27 +424,31 @@ export async function middleware(request: NextRequest) {
   const sovereignBlock = await enforceAdminSovereignGate(request);
   if (sovereignBlock) return sovereignBlock;
 
-  const burstKey = getClientKey(request, "aegisBurst");
-  if (isRateLimited(burstKey, AEGIS_BURST.max, AEGIS_BURST.windowMs)) {
-    return rateLimitResponse(
-      request,
-      AEGIS_BURST.max,
-      AEGIS_BURST.windowMs,
-      "rate_limit_burst",
-      "aegisBurst",
-    );
-  }
+  const sovereignBypass = await isSovereignRequest(request);
 
-  const cfg = getRateLimitConfig(pathname, request.method);
-  const key = getClientKey(request, cfg.bucket);
-  if (isRateLimited(key, cfg.max, cfg.windowMs)) {
-    return rateLimitResponse(
-      request,
-      cfg.max,
-      cfg.windowMs,
-      cfg.reason,
-      cfg.bucket,
-    );
+  if (!sovereignBypass) {
+    const burstKey = getClientKey(request, "aegisBurst");
+    if (isRateLimited(burstKey, AEGIS_BURST.max, AEGIS_BURST.windowMs)) {
+      return rateLimitResponse(
+        request,
+        AEGIS_BURST.max,
+        AEGIS_BURST.windowMs,
+        "rate_limit_burst",
+        "aegisBurst",
+      );
+    }
+
+    const cfg = getRateLimitConfig(pathname, request.method);
+    const key = getClientKey(request, cfg.bucket);
+    if (isRateLimited(key, cfg.max, cfg.windowMs)) {
+      return rateLimitResponse(
+        request,
+        cfg.max,
+        cfg.windowMs,
+        cfg.reason,
+        cfg.bucket,
+      );
+    }
   }
 
   const contentLength = request.headers.get("content-length");

@@ -6,7 +6,7 @@ import { requireAdminProfile } from "@/lib/supabase/server";
 
 export async function releaseBountyFunds(
   escrowId: string,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; payout?: number; event?: string }> {
   const adminProfile = await requireAdminProfile();
   if (!adminProfile) return { error: "Unauthorized." };
 
@@ -21,36 +21,37 @@ export async function releaseBountyFunds(
   if (!escrow) return { error: "Escrow not found." };
   if (escrow.status !== "held") return { error: "Escrow is not in held status." };
 
-  const amount = Number(escrow.amount_usd);
-  const hackerId = escrow.user_id;
-
-  await db.from("user_wallets").upsert({ user_id: hackerId }, { onConflict: "user_id" });
-
-  const { error: creditErr } = await db.rpc("increment_wallet", {
-    p_user_id: hackerId,
-    p_amount: amount,
+  const { data: rpcResult, error: rpcErr } = await db.rpc("release_kinetic_bounty", {
+    p_escrow_id: escrowId,
   });
-  if (creditErr) return { error: creditErr.message };
 
-  await db
-    .from("bounty_escrow")
-    .update({
-      status: "released",
-      released_at: new Date().toISOString(),
-      release_note: `Admin release by ${adminProfile.email}`,
-    })
-    .eq("id", escrowId);
+  if (rpcErr) {
+    console.error("[ledger] release_kinetic_bounty failed:", rpcErr.message);
+    return { error: rpcErr.message };
+  }
 
-  await db.from("platform_transactions").insert({
-    seller_id: hackerId,
-    amount_usd: amount,
-    amount_credits: Math.round(amount),
-    author_payout: amount,
-    platform_fee: 0,
-    tx_type: "bounty_release",
-  });
+  const result = rpcResult as {
+    ok?: boolean;
+    error?: string;
+    payout?: number;
+    event?: string;
+  } | null;
+
+  if (!result?.ok) {
+    return { error: result?.error ?? "Kinetic bounty release failed." };
+  }
+
+  console.info(
+    "[ledger] KINETIC_BOUNTY_PAID escrow=%s payout=%s operator=%s",
+    escrowId,
+    result.payout,
+    adminProfile.email,
+  );
 
   revalidatePath("/admin/bounties");
   revalidatePath("/admin/ledger");
-  return {};
+  return {
+    payout: result.payout,
+    event: result.event ?? "KINETIC_BOUNTY_PAID",
+  };
 }

@@ -57,12 +57,15 @@ export const runtime = "nodejs"; // needs crypto module
 
 // ── Validation ──────────────────────────────────────────────────────────────
 
+const SURFACE_KINDS = ["llm", "web", "code", "mobile"] as const;
+
 const ScanSchema = z.object({
   target_model: z.string().min(2).max(80),
   target_url: z
     .string()
     .url("Must be a full URL — e.g. https://api.openai.com/v1/chat/completions"),
   api_key: z.string().min(8).max(2048),
+  surface_kind: z.enum(SURFACE_KINDS).default("llm"),
   notes: z.string().max(2000).optional().nullable(),
 });
 
@@ -158,7 +161,7 @@ export async function POST(req: NextRequest) {
     return json({ error: "Validation failed", fieldErrors }, 400);
   }
 
-  const { target_model, target_url, api_key, notes } = parsed.data;
+  const { target_model, target_url, api_key, surface_kind, notes } = parsed.data;
 
   // 4. Seal the target API key
   let sealed: string;
@@ -182,6 +185,7 @@ export async function POST(req: NextRequest) {
       target_model,
       target_url,
       target_credential_encrypted: sealed,
+      surface_kind,
       status: "queued",
       progress_pct: 0,
       notes: notes ?? null,
@@ -204,19 +208,45 @@ export async function POST(req: NextRequest) {
     .then(() => {/* ignore */});
 
   // 7. Kick the runner via shared launcher (no session cookies required)
+  let launchStatus = "queued";
+  let launchError: string | undefined;
   try {
     if (isSovereign) {
       console.log("DIRECT_DISPATCH_TRIGGERED_FOR_SOVEREIGN");
     }
     const launch = await launchScan({ scanId, userId, userEmail });
+    // #region agent log
+    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0b9c56" },
+      body: JSON.stringify({
+        sessionId: "0b9c56",
+        hypothesisId: "A",
+        location: "v1/scans/route.ts:launch",
+        message: "v1 launchScan result",
+        data: {
+          scanId,
+          ok: launch.ok,
+          status: launch.ok ? 202 : launch.status,
+          code: launch.ok ? undefined : launch.code,
+          errorPrefix: launch.ok ? undefined : launch.error.slice(0, 120),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (!launch.ok) {
+      launchError = launch.error;
       console.warn(
         "[api/v1/scans] runner kickoff:",
         launch.status,
         launch.error.slice(0, 200),
       );
+    } else {
+      launchStatus = "probing";
     }
   } catch (e) {
+    launchError = e instanceof Error ? e.message : String(e);
     console.warn("[api/v1/scans] runner unreachable:", e);
   }
 
@@ -228,10 +258,11 @@ export async function POST(req: NextRequest) {
   return json(
     {
       scan_id: scanId,
-      status: "queued",
+      status: launchStatus,
+      ...(launchError ? { dispatch_error: launchError } : {}),
       url: `${appUrl}/dashboard/scans/${scanId}`,
     },
-    201,
+    launchError ? 201 : 201,
   );
 }
 

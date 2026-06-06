@@ -58,36 +58,45 @@ export type Database = {
       aegis_rules: {
         Row: {
           action: string
+          app_id: string | null
           created_at: string
           description: string
           enabled: boolean
+          finding_id: string | null
           format: string
           id: number
           pattern: string
+          rule_content: string | null
           rule_id: string
           scan_id: string
           updated_at: string
         }
         Insert: {
           action: string
+          app_id?: string | null
           created_at?: string
           description: string
           enabled?: boolean
+          finding_id?: string | null
           format?: string
           id?: number
           pattern: string
+          rule_content?: string | null
           rule_id: string
           scan_id: string
           updated_at?: string
         }
         Update: {
           action?: string
+          app_id?: string | null
           created_at?: string
           description?: string
           enabled?: boolean
+          finding_id?: string | null
           format?: string
           id?: number
           pattern?: string
+          rule_content?: string | null
           rule_id?: string
           scan_id?: string
           updated_at?: string
@@ -2879,6 +2888,10 @@ export type Database = {
       }
       purchase_bazaar_script: {
         Args: { p_buyer_id: string; p_script_id: string }
+        Returns: Json
+      }
+      release_kinetic_bounty: {
+        Args: { p_escrow_id: string }
         Returns: Json
       }
     }

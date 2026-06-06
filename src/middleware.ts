@@ -74,6 +74,28 @@ function isKnownDashboardRoute(pathname: string): boolean {
   );
 }
 
+/** Static/metadata assets — skip burst limiter (parallel browser fetches). */
+function isStaticAssetPath(pathname: string): boolean {
+  if (
+    pathname === "/opengraph-image" ||
+    pathname === "/twitter-image" ||
+    pathname === "/icon" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
+    pathname === "/manifest.json"
+  ) {
+    return true;
+  }
+  if (
+    pathname.startsWith("/icons/") ||
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/fonts/")
+  ) {
+    return true;
+  }
+  return /\.(svg|png|ico|webp|jpg|jpeg|gif|woff2?)$/i.test(pathname);
+}
+
 function getClientKey(request: NextRequest, bucket: string): string {
   return `${getClientIp(request)}:${bucket}`;
 }
@@ -426,7 +448,7 @@ export async function middleware(request: NextRequest) {
 
   const sovereignBypass = await isSovereignRequest(request);
 
-  if (!sovereignBypass) {
+  if (!sovereignBypass && !isStaticAssetPath(pathname)) {
     const burstKey = getClientKey(request, "aegisBurst");
     if (isRateLimited(burstKey, AEGIS_BURST.max, AEGIS_BURST.windowMs)) {
       return rateLimitResponse(

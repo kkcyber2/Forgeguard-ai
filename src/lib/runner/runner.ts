@@ -186,6 +186,32 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
 
     const text = await resp.text().catch(() => "");
 
+    // #region agent log
+    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0b9c56" },
+      body: JSON.stringify({
+        sessionId: "0b9c56",
+        hypothesisId: "C",
+        location: "runner.ts:dispatch",
+        message: "Railway /scan/start response",
+        data: {
+          scanId,
+          httpStatus: resp.status,
+          ok: resp.ok,
+          bodyPrefix: text.slice(0, 160),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    console.error("[runner:debug]", {
+      scanId,
+      httpStatus: resp.status,
+      ok: resp.ok,
+      bodyPrefix: text.slice(0, 160),
+    });
+    // #endregion
+
     if (!resp.ok) {
       await markFailure(admin, scanId, {
         message: `Orchestrator returned HTTP ${resp.status}`,

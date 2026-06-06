@@ -17,6 +17,9 @@ export const ENGINE_HANDSHAKE_TIMEOUT_MS = 60_000;
 export const GROQ_PRECISION_PACING_DELAY_MS = 10_000;
 export const GROQ_PRECISION_PACING_ATTEMPTS = 5;
 
+/** Marine Swarm — Product Hunt AI scrape window (hours). */
+export const WAR_MACHINE_SCRAPE_HOURS = 24;
+
 /** Global production engine standard when env vars are unset. */
 export const CANONICAL_ENGINE_URL = "https://engine.forgeguard-ai.com";
 

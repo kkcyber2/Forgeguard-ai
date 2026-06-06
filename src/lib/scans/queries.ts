@@ -9,16 +9,20 @@ type AleRow = {
   financial_liability_usd: number | null;
 };
 
-/** Sum ALE ($) from scan_reports.financial_liability_usd for the user's scans. */
+/** Sum ALE ($) from sealed scans only — scan_reports.financial_liability_usd. */
 export async function fetchTotalAleRisk(
   supabase: ServerSupabase,
   userId: string,
 ): Promise<number> {
   try {
     const { data: scanRows } = await safeQueryRows<{ id: string }>(
-      "scans/ids",
+      "scans/sealed-ids",
       () =>
-        supabase.from("scans").select("id").eq("user_id", userId),
+        supabase
+          .from("scans")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("status", "sealed"),
     );
 
     const scanIds = scanRows.map((s) => s.id);

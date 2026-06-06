@@ -21,6 +21,7 @@ import {
 } from "@/components/admin/mission-control-panel";
 import type { VerificationQueueRow } from "@/app/admin/verification/verification-row";
 import { PanelErrorBoundary } from "@/components/admin/panel-error-boundary";
+import { FireMarineSwarmButton } from "@/components/admin/fire-marine-swarm-button";
 
 export interface CommandCenterProps {
   activeScans: number;
@@ -68,6 +69,9 @@ export function CommandCenter({
               autoComplete="off"
               className="w-full rounded border border-white/[0.08] bg-black/50 py-2.5 pl-9 pr-3 font-mono text-[11px] text-white placeholder:text-white/25 focus:border-[#D1FF00]/40 focus:outline-none"
             />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <FireMarineSwarmButton />
           </div>
           <div className="flex flex-wrap gap-2 font-mono text-[8px] uppercase tracking-widest">
             <span className="rounded border border-[#D1FF00]/25 bg-[#D1FF00]/5 px-2 py-1 text-[#D1FF00]/90">

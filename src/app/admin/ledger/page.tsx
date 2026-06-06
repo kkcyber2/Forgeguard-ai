@@ -17,6 +17,7 @@ export const metadata = { title: "Financial Ledger" };
 const TX_LABELS: Record<string, string> = {
   bazaar_purchase: "Bazaar purchase",
   bounty_release: "Bounty release",
+  kinetic_bounty_paid: "Kinetic bounty paid",
   escrow_hold: "Escrow hold",
   top_up: "Top-up",
   refund: "Refund",
@@ -202,7 +203,8 @@ export default async function AdminLedgerPage() {
                 {txRows.map((tx) => {
                   const buyer = tx.buyer_id ? profileMap.get(tx.buyer_id) : null;
                   const seller = tx.seller_id ? profileMap.get(tx.seller_id) : null;
-                  const isRelease = tx.tx_type === "bounty_release";
+                  const isRelease =
+                    tx.tx_type === "bounty_release" || tx.tx_type === "kinetic_bounty_paid";
                   const isHold = tx.tx_type === "escrow_hold";
                   return (
                     <tr

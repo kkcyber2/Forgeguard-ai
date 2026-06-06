@@ -139,6 +139,7 @@ export default async function UserDashboardPage({
 
       <OverviewKpis
         viewMode={viewMode}
+        userId={user.id}
         hacker={{
           reputation: overview.reputation,
           activeMissions: overview.activeMissionCount,

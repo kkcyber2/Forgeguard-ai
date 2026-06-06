@@ -14,6 +14,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { triggerBazaarAudit } from "@/lib/bazaar/trigger-bazaar-audit";
+import { syncBazaarAuditResult } from "@/lib/bazaar/sync-audit-result";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -93,6 +94,12 @@ export async function POST(req: NextRequest) {
 
   const audit = await triggerBazaarAudit(script.id);
 
+  try {
+    await syncBazaarAuditResult(script.id, audit, price_usd);
+  } catch (syncErr) {
+    console.error("[bazaar/upload] audit sync error:", syncErr);
+  }
+
   if (audit.verdict === "rejected") {
     return NextResponse.json(
       {
@@ -112,17 +119,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const qualityScore = Math.max(0, Math.min(10, Math.round((100 - audit.risk_score) / 10)));
+  const isCertified =
+    (audit.risk_score > 8 || qualityScore > 8) && audit.verdict === "cleared";
+
   return NextResponse.json({
     ok:           true,
     script_id:    script.id,
     name:         script.name,
     verdict:      audit.verdict,
     risk_score:   audit.risk_score,
+    quality_score: qualityScore,
     findings:     audit.findings,
     reason:       audit.reason,
     remediation_advice: audit.remediation_advice,
-    is_published: audit.is_published ?? audit.verdict === "cleared",
-    is_certified: audit.is_certified ?? audit.verdict === "cleared",
+    is_published: audit.is_published ?? (isCertified && audit.verdict === "cleared"),
+    is_certified: audit.is_certified ?? isCertified,
+    custom_price_usd: price_usd,
     metadata:     audit.metadata,
     audit: {
       verdict: audit.verdict,

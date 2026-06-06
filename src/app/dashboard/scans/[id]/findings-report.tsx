@@ -344,10 +344,10 @@ export function AegisShieldSection({
         <SectionHead icon={ShieldCheck} label="Section D — THE AEGIS RULE" />
         {scanId && (
           <ExportAegisRuleButton
-            pattern={code}
             scanId={scanId}
             findingId="report-snippet"
             description="Report-level remediation_code_snippet"
+            hasSnippet
           />
         )}
       </div>
@@ -785,30 +785,29 @@ function CWEChip({ cwe }: { cwe: string }) {
 const AEGIS_TOAST_EVENT = "forgeguard:aegis-export-toast";
 
 function ExportAegisRuleButton({
-  pattern,
   scanId,
   findingId,
   description,
   compact,
+  hasSnippet,
 }: {
-  pattern: string;
   scanId: string;
   findingId: string;
   description?: string;
   compact?: boolean;
+  hasSnippet?: boolean;
 }) {
   const [loading, setLoading] = React.useState(false);
 
   async function handleExport(e: React.MouseEvent) {
     e.stopPropagation();
-    if (loading || !pattern.trim()) return;
+    if (loading) return;
     setLoading(true);
     try {
       const res = await fetch("/api/v1/aegis/rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pattern,
           scanId,
           findingId,
           description,
@@ -826,7 +825,7 @@ function ExportAegisRuleButton({
       window.dispatchEvent(
         new CustomEvent(AEGIS_TOAST_EVENT, {
           detail: {
-            message: "Threat signature sealed in Aegis Firewall.",
+            message: "Remediation snippet sealed in Aegis Firewall.",
             type: "success",
           },
         }),
@@ -846,7 +845,12 @@ function ExportAegisRuleButton({
     <button
       type="button"
       onClick={(e) => void handleExport(e)}
-      disabled={loading || !pattern.trim()}
+      disabled={loading || hasSnippet === false}
+      title={
+        hasSnippet === false
+          ? "No remediation_code_snippet on this scan report"
+          : "Export remediation_code_snippet to aegis_rules"
+      }
       className={cn(
         "inline-flex items-center gap-1.5 rounded-xs border font-mono uppercase tracking-[0.1em] transition-colors",
         compact
@@ -909,12 +913,12 @@ function FindingCard({
   finding,
   index,
   scanId,
-  remediationSnippet,
+  hasRemediationSnippet,
 }: {
   finding: Finding;
   index: number;
   scanId?: string;
-  remediationSnippet?: string | null;
+  hasRemediationSnippet?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [pocTab, setPocTab] = React.useState<"curl" | "python">("curl");
@@ -926,8 +930,6 @@ function FindingCard({
   const familyLabel = FAMILY_LABEL[finding.family] ?? finding.family ?? finding.attack;
   const poc = finding.proof_of_concept;
   const pocCode = poc ? (pocTab === "curl" ? poc.curl : poc.python) : undefined;
-  const exportPattern =
-    remediationSnippet?.trim() || finding.remediation?.trim() || "";
 
   return (
     <div
@@ -990,13 +992,13 @@ function FindingCard({
 
         {/* CVSS + export + chevron */}
         <div className="flex shrink-0 items-center gap-3">
-          {scanId && exportPattern && (
+          {scanId && (
             <ExportAegisRuleButton
-              pattern={exportPattern}
               scanId={scanId}
               findingId={finding.id}
               description={`${finding.attack} · ${finding.family}`}
               compact
+              hasSnippet={hasRemediationSnippet}
             />
           )}
           <div className="text-right">
@@ -1389,6 +1391,10 @@ ${(() => {
     : "";
 })()}
 
+${report.technical_proof_of_concept ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section C — Technical Proof of Concept</h2><pre style="background:#f9fafb;border:1px solid #e5e7eb;padding:14px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">${escapeHTML(String(report.technical_proof_of_concept))}</pre></div>` : ""}
+
+${report.remediation_code_snippet || report.optimization_suggestions_md ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section D — Aegis Remediation</h2>${report.remediation_code_snippet ? `<pre style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0 0 12px">${escapeHTML(String(report.remediation_code_snippet))}</pre>` : ""}${report.optimization_suggestions_md ? `<div style="font-size:12px;line-height:1.65;color:#374151;white-space:pre-wrap">${escapeHTML(String(report.optimization_suggestions_md).replace(/^#+\s*/gm, ""))}</div>` : ""}</div>` : ""}
+
 ${findings.length > 0 ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Findings (${findings.length})</h2>${findingsHTML}</div>` : ""}
 
 ${owaspHTML ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">OWASP LLM Coverage</h2><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:7px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:2px solid #e5e7eb">Category</th><th style="padding:7px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:2px solid #e5e7eb">Findings</th><th style="padding:7px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:2px solid #e5e7eb">Max CVSS</th></tr></thead><tbody>${owaspHTML}</tbody></table></div>` : ""}
@@ -1451,10 +1457,10 @@ function DownloadReportButton({
   return (
     <button
       onClick={handleDownload}
-      className="flex items-center gap-1.5 rounded-sm border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-foreground-muted transition-colors hover:border-white/[0.15] hover:text-foreground"
+      className="flex items-center gap-1.5 rounded-sm border border-acid/30 bg-acid/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-acid transition-colors hover:border-acid/50 hover:bg-acid/15"
     >
-      <Download size={11} strokeWidth={1.75} />
-      Download PDF
+      <Download size={12} strokeWidth={1.75} />
+      Generate PDF Audit
     </button>
   );
 }
@@ -1619,7 +1625,7 @@ export function FindingsReport({
                 finding={finding}
                 index={i}
                 scanId={scanId}
-                remediationSnippet={report.remediation_code_snippet}
+                hasRemediationSnippet={Boolean(report.remediation_code_snippet?.trim())}
               />
             ))}
           </div>

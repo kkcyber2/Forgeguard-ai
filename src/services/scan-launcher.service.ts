@@ -79,7 +79,10 @@ async function enforceScanQuota(userId: string, userEmail: string | null): Promi
 
   if (!quota) return null;
 
-  const isActive = quota.status === "active" || quota.status === "on_trial";
+  const isActive =
+    quota.status === "active" ||
+    quota.status === "trialing" ||
+    quota.status === "on_trial";
   const periodOk = !periodExpired(quota.period_ends_at);
   const allowed = scansAllowedForPlan(quota.plan);
   const underLimit =
@@ -168,6 +171,25 @@ export async function launchScan(ctx: LaunchScanContext): Promise<LaunchScanResu
   }
 
   try {
+    // #region agent log
+    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0b9c56" },
+      body: JSON.stringify({
+        sessionId: "0b9c56",
+        hypothesisId: "B",
+        location: "scan-launcher.service.ts:pre-runScan",
+        message: "dispatching runScan",
+        data: {
+          scanId: scan.id,
+          engineUrl: engineUrl ?? "<unset>",
+          hasToken: Boolean(engineToken),
+          healthOk: !isEngineLockdown(health),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     await runScan({ scanId: scan.id, userId: ctx.userId });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

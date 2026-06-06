@@ -2,14 +2,17 @@ import Link from "next/link";
 import { Activity, DollarSign, Radar, ShieldCheck, Store, Swords, Trophy } from "lucide-react";
 import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { StatTile } from "@/components/ui/stat-tile";
+import { LiveAleRiskTile } from "@/components/dashboard/live-ale-risk-tile";
 import type { ViewMode } from "@/lib/access/parallel-sovereignty";
 
 export function OverviewKpis({
   viewMode,
   hacker,
   client,
+  userId,
 }: {
   viewMode: ViewMode;
+  userId?: string;
   hacker: {
     reputation: number;
     activeMissions: number;
@@ -108,24 +111,28 @@ export function OverviewKpis({
         />
       </StaggerItem>
       <StaggerItem>
-        <StatTile
-          label="Total $ALE risk"
-          value={
-            client.totalAleRisk > 0
-              ? `$${client.totalAleRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-              : "—"
-          }
-          tone={client.totalAleRisk > 50_000 ? "threat" : "neutral"}
-          icon={DollarSign}
-          footer={
-            <Link
-              href="/dashboard/scans"
-              className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 hover:text-white/70"
-            >
-              Financial risk
-            </Link>
-          }
-        />
+        {userId ? (
+          <LiveAleRiskTile userId={userId} initialTotal={client.totalAleRisk} />
+        ) : (
+          <StatTile
+            label="Total $ALE risk"
+            value={
+              client.totalAleRisk > 0
+                ? `$${client.totalAleRisk.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                : "—"
+            }
+            tone={client.totalAleRisk > 50_000 ? "threat" : "neutral"}
+            icon={DollarSign}
+            footer={
+              <Link
+                href="/dashboard/scans"
+                className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 hover:text-white/70"
+              >
+                Financial risk
+              </Link>
+            }
+          />
+        )}
       </StaggerItem>
     </Stagger>
   );

@@ -52,12 +52,13 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { sealCredential } from "@/lib/crypto/credentials";
 import { launchScan } from "@/services/scan-launcher.service";
+import {
+  normalizeSurfaceKind,
+} from "@/lib/scans/surface-kind";
 
 export const runtime = "nodejs"; // needs crypto module
 
 // ── Validation ──────────────────────────────────────────────────────────────
-
-const SURFACE_KINDS = ["llm", "web", "code", "mobile"] as const;
 
 const ScanSchema = z.object({
   target_model: z.string().min(2).max(80),
@@ -65,9 +66,19 @@ const ScanSchema = z.object({
     .string()
     .url("Must be a full URL — e.g. https://api.openai.com/v1/chat/completions"),
   api_key: z.string().min(8).max(2048),
-  surface_kind: z.enum(SURFACE_KINDS).default("llm"),
+  surface_kind: z
+    .string()
+    .optional()
+    .transform((v) => normalizeSurfaceKind(v)),
+  target_type: z
+    .string()
+    .optional()
+    .transform((v) => (v ? normalizeSurfaceKind(v) : undefined)),
   notes: z.string().max(2000).optional().nullable(),
-});
+}).transform((data) => ({
+  ...data,
+  surface_kind: data.target_type ?? data.surface_kind ?? "llm",
+}));
 
 // ── Route handler ────────────────────────────────────────────────────────────
 
@@ -188,6 +199,7 @@ export async function POST(req: NextRequest) {
       surface_kind,
       status: "queued",
       progress_pct: 0,
+      intensity: "standard",
       notes: notes ?? null,
     })
     .select("id")
@@ -207,28 +219,29 @@ export async function POST(req: NextRequest) {
     .eq("id", keyRow.id)
     .then(() => {/* ignore */});
 
-  // 7. Kick the runner via shared launcher (no session cookies required)
-  let launchStatus = "queued";
-  let launchError: string | undefined;
-  try {
-    if (isSovereign) {
-      console.log("DIRECT_DISPATCH_TRIGGERED_FOR_SOVEREIGN");
-    }
-    const launch = await launchScan({ scanId, userId, userEmail });
-    if (!launch.ok) {
-      launchError = launch.error;
-      console.warn(
-        "[api/v1/scans] runner kickoff:",
-        launch.status,
-        launch.error.slice(0, 200),
-      );
-    } else {
-      launchStatus = "probing";
-    }
-  } catch (e) {
-    launchError = e instanceof Error ? e.message : String(e);
-    console.warn("[api/v1/scans] runner unreachable:", e);
+  // 7. Dispatch scan via shared launcher (no session cookies required)
+  const launch = await launchScan({ scanId, userId, userEmail });
+  if (!launch.ok) {
+    console.warn(
+      "[api/v1/scans] launchScan failed:",
+      launch.status,
+      launch.error.slice(0, 200),
+    );
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ??
+      `https://${req.headers.get("host") ?? "localhost:3000"}`;
+    return json(
+      {
+        scan_id: scanId,
+        status: "queued",
+        error: launch.error,
+        code: launch.code ?? "DISPATCH_FAILED",
+        url: `${appUrl}/dashboard/scans/${scanId}`,
+      },
+      launch.status >= 400 && launch.status < 600 ? launch.status : 502,
+    );
   }
+  const launchStatus = launch.alreadyRunning ? "probing" : "probing";
 
   // 8. Return scan reference
   const appUrl =
@@ -239,10 +252,9 @@ export async function POST(req: NextRequest) {
     {
       scan_id: scanId,
       status: launchStatus,
-      ...(launchError ? { dispatch_error: launchError } : {}),
       url: `${appUrl}/dashboard/scans/${scanId}`,
     },
-    launchError ? 201 : 201,
+    201,
   );
 }
 

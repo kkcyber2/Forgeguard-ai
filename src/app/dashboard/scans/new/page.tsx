@@ -2,7 +2,8 @@ import * as React from "react";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/shell";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
-import { getSessionUser } from "@/lib/supabase/server";
+import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import { getPlanMeta, type PlanId } from "@/lib/plans";
 import { NewScanForm } from "./form";
 
 /**
@@ -21,6 +22,22 @@ export default async function NewScanPage() {
 
   const isSovereign = isSovereignOperator(user.email);
 
+  const supabase = await createServerSupabase();
+  const { data: quotaRow } = await supabase
+    .from("my_scan_quota")
+    .select("plan, scans_used_this_period, scans_allowed")
+    .maybeSingle();
+
+  const plan = (quotaRow?.plan as PlanId | undefined) ?? "free";
+  const quota = isSovereign
+    ? null
+    : {
+        plan,
+        scansUsed: quotaRow?.scans_used_this_period ?? 0,
+        scansAllowed:
+          quotaRow?.scans_allowed ?? getPlanMeta(plan).scansPerMonth,
+      };
+
   return (
     <>
       <PageHeader
@@ -29,7 +46,7 @@ export default async function NewScanPage() {
         description="Paste the endpoint you want hardened and the API key ForgeGuard should use while probing. Credentials are sealed with AES-256-GCM before they touch the database."
       />
       <div className="mx-auto max-w-2xl">
-        <NewScanForm isSovereign={isSovereign} />
+        <NewScanForm isSovereign={isSovereign} quota={quota} />
       </div>
     </>
   );

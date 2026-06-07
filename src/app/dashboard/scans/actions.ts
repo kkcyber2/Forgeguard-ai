@@ -10,6 +10,7 @@ import { headers } from "next/headers";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { ENGINE_HANDSHAKE_TIMEOUT_MS } from "@/lib/agathon-config";
 import { verifyScanOwnership } from "./ownership-actions";
+import { normalizeSurfaceKind, SURFACE_KINDS } from "@/lib/scans/surface-kind";
 
 /**
  * Scan Server Actions.
@@ -31,24 +32,6 @@ export interface CreateScanState {
       string
     >
   >;
-}
-
-const SURFACE_KINDS = ["llm", "web", "code", "mobile"] as const;
-
-/** Map UI / engine aliases → scan_surface_kind enum values. */
-function normalizeSurfaceKind(raw: string | null | undefined): (typeof SURFACE_KINDS)[number] {
-  const key = String(raw ?? "llm").trim().toLowerCase();
-  const aliases: Record<string, (typeof SURFACE_KINDS)[number]> = {
-    llm: "llm",
-    web: "web",
-    code: "code",
-    mobile: "mobile",
-    api: "code",
-    bot: "mobile",
-    gateway: "code",
-    chatbot: "mobile",
-  };
-  return aliases[key] ?? "llm";
 }
 
 const CreateScanSchema = z.object({

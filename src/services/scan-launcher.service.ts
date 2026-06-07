@@ -10,6 +10,7 @@ import {
   getEngineHealthSnapshot,
   isEngineLockdown,
 } from "@/lib/engine/probe-engine-health";
+import { getPlanMeta, type PlanId } from "@/lib/plans";
 import { runScan } from "@/lib/runner/runner";
 
 export type LaunchScanContext = {
@@ -38,14 +39,11 @@ type QuotaRow = {
   period_ends_at: string | null;
 };
 
-const SCANS_ALLOWED: Record<string, number> = {
-  free: 2,
-  startup: 20,
-  enterprise: 999_999,
-};
-
 function scansAllowedForPlan(plan: string): number {
-  return SCANS_ALLOWED[plan] ?? 2;
+  const id = (["free", "startup", "enterprise"].includes(plan)
+    ? plan
+    : "free") as PlanId;
+  return getPlanMeta(id).scansPerMonth;
 }
 
 function periodExpired(periodEndsAt: string | null): boolean {
@@ -78,6 +76,8 @@ async function enforceScanQuota(userId: string, userEmail: string | null): Promi
     .maybeSingle()) as { data: QuotaRow | null };
 
   if (!quota) return null;
+
+  if (quota.plan === "enterprise") return null;
 
   const isActive =
     quota.status === "active" ||

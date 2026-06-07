@@ -124,7 +124,19 @@ const INTENSITY_OPTIONS: {
   },
 ];
 
-export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) {
+export type ScanQuotaSnapshot = {
+  plan: string;
+  scansUsed: number;
+  scansAllowed: number;
+};
+
+export function NewScanForm({
+  isSovereign = false,
+  quota = null,
+}: {
+  isSovereign?: boolean;
+  quota?: ScanQuotaSnapshot | null;
+}) {
   const [state, formAction, pending] = useActionState(createScan, initial);
   const [showKey,    setShowKey]    = React.useState(false);
   const [preset,     setPreset]     = React.useState<string>("OpenAI");
@@ -245,9 +257,18 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
           Configure probe
         </h2>
         <p className="mt-1 text-sm text-foreground-muted">
-          Select an LLM provider or paste a custom endpoint. ForgeGuard
+          Select a target integration or paste a custom endpoint. ForgeGuard
           runs the full jailbreak + prompt-injection suite against it.
         </p>
+        {!isSovereign && quota && quota.scansAllowed < 999_999 && (
+          <p className="mt-3 font-mono text-[11px] text-foreground-subtle">
+            Scan quota:{" "}
+            <span className="text-acid tabular-nums">
+              {quota.scansUsed} / {quota.scansAllowed}
+            </span>{" "}
+            this period ({quota.plan === "startup" ? "Startup" : quota.plan === "enterprise" ? "Enterprise" : "Free"})
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-5 px-6 py-6">
@@ -340,7 +361,7 @@ export function NewScanForm({ isSovereign = false }: { isSovereign?: boolean }) 
 
         {/* Preset picker */}
         <div>
-          <Label>Provider</Label>
+          <Label>Target Integration</Label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PRESET_ENDPOINTS.map((p) => {
               const active = preset === p.label;

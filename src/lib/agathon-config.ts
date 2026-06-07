@@ -3,8 +3,8 @@
  * Prefer PYTHON_ENGINE_URL / INTERNAL_SCAN_TOKEN; fall back to legacy names.
  *
  * Engine repo: https://github.com/valosd453-bit/AI-red-team
- * HF Spaces: Docker SDK, port 7860. Railway bunker: public root domain only.
- * Vercel: set PYTHON_ENGINE_URL to Railway public URL — no trailing slash, no :7860.
+ * Railway bunker: public root domain only (no trailing :7860 on production URL).
+ * Vercel: set PYTHON_ENGINE_URL to Railway public URL — no trailing slash.
  */
 
 /** Vercel → Railway engine fetch budget (health + scan dispatch). */

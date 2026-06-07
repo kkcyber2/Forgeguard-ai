@@ -56,7 +56,7 @@ cp .env.example .env.local
 Required environment variables:
 
 ```env
-# Agathon engine (Railway bunker or Hugging Face — github.com/valosd453-bit/AI-red-team)
+# Agathon engine (Railway — github.com/valosd453-bit/AI-red-team)
 PYTHON_ENGINE_URL=https://your-bunker.up.railway.app
 INTERNAL_SCAN_TOKEN=shared-secret-with-engine
 

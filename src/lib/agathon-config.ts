@@ -8,7 +8,7 @@
  */
 
 /** Vercel → Railway engine fetch budget (health + scan dispatch). */
-export const ENGINE_HANDSHAKE_TIMEOUT_MS = 60_000;
+export const ENGINE_HANDSHAKE_TIMEOUT_MS = 90_000;
 
 /**
  * Groq free-tier precision pacing — mirrors AI-red-team/agathon/pacing_lock.py.
@@ -19,6 +19,18 @@ export const GROQ_PRECISION_PACING_ATTEMPTS = 5;
 
 /** Marine Swarm — Product Hunt AI scrape window (hours). */
 export const WAR_MACHINE_SCRAPE_HOURS = 24;
+
+/** War Machine microservice URL (separate from Agathon engine). */
+export const CANONICAL_WAR_MACHINE_URL = "https://war-machine.forgeguard-ai.com";
+
+export function resolveWarMachineBaseUrl(): string | null {
+  const raw =
+    process.env.WAR_MACHINE_URL?.trim() ??
+    process.env.PYTHON_WAR_MACHINE_URL?.trim() ??
+    CANONICAL_WAR_MACHINE_URL;
+  if (!raw) return null;
+  return ensureHttpsEngineUrl(raw).replace(/\/+$/, "");
+}
 
 /** Global production engine standard when env vars are unset. */
 export const CANONICAL_ENGINE_URL = "https://engine.forgeguard-ai.com";

@@ -10,7 +10,7 @@ import { ArrowUpRight, Menu, X } from "lucide-react";
 
 const navItems = [
   { label: "Platform", href: "/#platform" },
-  { label: "Red Team", href: "/#redteam" },
+  { label: "Data Integrity", href: "/#data-integrity" },
   { label: "Guardrails", href: "/#guardrails" },
   { label: "Demo", href: "/demo" },
   { label: "Guidelines", href: "/resources/guidelines" },

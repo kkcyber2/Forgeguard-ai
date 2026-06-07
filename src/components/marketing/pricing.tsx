@@ -63,7 +63,7 @@ export function PricingSection({
 
         {/* Fine-print */}
         <p className="mt-8 text-center text-[11px] text-foreground-subtle">
-          All plans include full OWASP LLM Top-10 coverage · Cancel anytime ·
+          All plans include full data-integrity assessment coverage · Cancel anytime ·
           No contracts
         </p>
       </div>

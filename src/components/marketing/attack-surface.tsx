@@ -4,30 +4,30 @@ import { Reveal } from "@/components/ui/reveal";
 import { Badge } from "@/components/ui/badge";
 
 /**
- * Attack surface map — a typographic table of threats ForgeGuard handles.
+ * Data integrity coverage map — compliance findings ForgeGuard validates.
  * No iconography, because density is the point. Every row should feel like
- * a line item in a penetration-test report.
+ * a line item in an audit-ready compliance report.
  */
 
 const rows = [
-  { atlas: "AML.T0051", category: "Prompt injection", technique: "Indirect injection via retrieved tool output", coverage: "secure" },
-  { atlas: "AML.T0048", category: "Prompt injection", technique: "Base64 / rot13 / zalgo encoding payloads", coverage: "secure" },
-  { atlas: "AML.T0054", category: "Jailbreak", technique: "Persona escalation · DAN-style role swap", coverage: "secure" },
-  { atlas: "AML.T0057", category: "Data exfil", technique: "Markdown-image callback exfiltration", coverage: "secure" },
-  { atlas: "AML.T0043", category: "Data exfil", technique: "Function-calling parameter smuggling", coverage: "partial" },
-  { atlas: "AML.T0059", category: "Tool abuse", technique: "Shell escape via sandboxed code-interpreter", coverage: "secure" },
-  { atlas: "AML.T0053", category: "Tool abuse", technique: "Cross-agent authority confusion", coverage: "partial" },
-  { atlas: "AML.T0046", category: "Model theft", technique: "Logits extraction via adversarial prompts", coverage: "secure" },
+  { atlas: "AML.T0051", category: "Input integrity", technique: "Indirect injection via retrieved tool output", coverage: "secure" },
+  { atlas: "AML.T0048", category: "Input integrity", technique: "Encoded payload normalization (Base64 / rot13)", coverage: "secure" },
+  { atlas: "AML.T0054", category: "Compliance boundary", technique: "Persona escalation · role-policy drift", coverage: "secure" },
+  { atlas: "AML.T0057", category: "Data integrity", technique: "Markdown-image callback leakage", coverage: "secure" },
+  { atlas: "AML.T0043", category: "Data integrity", technique: "Function-calling parameter smuggling", coverage: "partial" },
+  { atlas: "AML.T0059", category: "Tool compliance", technique: "Sandboxed code-interpreter boundary checks", coverage: "secure" },
+  { atlas: "AML.T0053", category: "Tool compliance", technique: "Cross-agent authority confusion", coverage: "partial" },
+  { atlas: "AML.T0046", category: "Model integrity", technique: "Output fingerprinting via structured prompts", coverage: "secure" },
 ] as const;
 
 export function AttackSurface() {
   return (
-    <Section id="redteam" className="border-t-[0.5px] border-white/[0.04]">
+    <Section id="data-integrity" className="border-t-[0.5px] border-white/[0.04]">
       <Reveal>
         <SectionHeading
-          eyebrow="Red-team coverage"
-          title="Every attack your governance already lists. Mapped, probed, logged."
-          lede="Coverage is framed against the MITRE ATLAS matrix so auditors and security teams share a vocabulary with engineering."
+          eyebrow="Data integrity coverage"
+          title="Every compliance control your governance already lists. Mapped, validated, logged."
+          lede="Coverage is framed against the MITRE ATLAS matrix so compliance officers, researchers, and engineering share a single audit vocabulary."
         />
       </Reveal>
 
@@ -57,7 +57,7 @@ export function AttackSurface() {
             ))}
           </ul>
           <div className="border-t-[0.5px] border-white/[0.06] bg-obsidian-900/40 px-5 py-3 text-xs text-foreground-subtle">
-            + 612 further probes covering ATLAS tactics TA0043 → TA0059. Run your own on the <span className="text-foreground">/demo</span> page.
+            + 612 further compliance checks covering ATLAS tactics TA0043 → TA0059. Researchers can run samples on the <span className="text-foreground">/demo</span> page.
           </div>
         </div>
       </Reveal>

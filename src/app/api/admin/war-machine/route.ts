@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   ENGINE_HANDSHAKE_TIMEOUT_MS,
   engineAuthHeaders,
-  resolveEngineBaseUrl,
+  resolveWarMachineBaseUrl,
   WAR_MACHINE_SCRAPE_HOURS,
 } from "@/lib/agathon-config";
 import { requireAdminProfile } from "@/lib/supabase/server";
@@ -20,16 +20,16 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
   }
 
-  const base = resolveEngineBaseUrl();
+  const base = resolveWarMachineBaseUrl();
   const headers = engineAuthHeaders();
   if (!base || !headers) {
     return NextResponse.json(
-      { ok: false, error: "Engine URL or INTERNAL_SCAN_TOKEN not configured" },
+      { ok: false, error: "WAR_MACHINE_URL or INTERNAL_SCAN_TOKEN not configured" },
       { status: 503 },
     );
   }
 
-  const url = `${base.replace(/\/+$/, "")}/war-machine/scrape`;
+  const url = `${base.replace(/\/+$/, "")}/scrape`;
 
   try {
     const resp = await fetch(url, {

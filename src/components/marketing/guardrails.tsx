@@ -17,10 +17,10 @@ const yaml = `guardrails:
       - match: classifier("pii.sensitive") > 0.8
         action: block
 
-  - id: jailbreak.intent
+  - id: policy-violation.intent
     phase: input
     rules:
-      - match: classifier("jailbreak") > 0.72
+      - match: classifier("policy-violation") > 0.72
         action: deny
         audit:
           severity: high

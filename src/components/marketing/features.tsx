@@ -50,7 +50,7 @@ const FEATURES = [
     icon: ShieldCheck,
     title: "Aegis Prompt Shields",
     body:
-      "Instant immunity code generation from audit findings. Drop-in middleware, SDK snippets, and policy-as-code rules that block jailbreaks, injection chains, and exfiltration paths at inference time.",
+      "Instant immunity code generation from audit findings. Drop-in middleware, SDK snippets, and policy-as-code rules that enforce data-integrity controls at inference time.",
   },
 ] as const;
 

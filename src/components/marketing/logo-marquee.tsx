@@ -20,7 +20,7 @@ export function LogoMarquee() {
     <div className="relative border-y-[0.5px] border-white/[0.06] bg-obsidian-950/60 py-8 overflow-hidden">
       <div className="mx-auto max-w-6xl px-6 md:px-8">
         <p className="text-eyebrow text-foreground-subtle mb-6">
-          Trusted by security teams at
+          Trusted by compliance and research teams at
         </p>
       </div>
       <div className="relative">

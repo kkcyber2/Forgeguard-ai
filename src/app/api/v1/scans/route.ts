@@ -215,26 +215,6 @@ export async function POST(req: NextRequest) {
       console.log("DIRECT_DISPATCH_TRIGGERED_FOR_SOVEREIGN");
     }
     const launch = await launchScan({ scanId, userId, userEmail });
-    // #region agent log
-    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0b9c56" },
-      body: JSON.stringify({
-        sessionId: "0b9c56",
-        hypothesisId: "A",
-        location: "v1/scans/route.ts:launch",
-        message: "v1 launchScan result",
-        data: {
-          scanId,
-          ok: launch.ok,
-          status: launch.ok ? 202 : launch.status,
-          code: launch.ok ? undefined : launch.code,
-          errorPrefix: launch.ok ? undefined : launch.error.slice(0, 120),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!launch.ok) {
       launchError = launch.error;
       console.warn(

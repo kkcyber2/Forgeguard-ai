@@ -258,6 +258,11 @@ export async function POST(request: NextRequest) {
         err instanceof Error ? err.message : String(err);
       persistOk = false;
       persistError = detail;
+      console.error("[webhook_persist_failed]", {
+        scanId: event.scanId,
+        kind: event.kind,
+        error: detail.slice(0, 500),
+      });
       console.warn("[webhook:agathon] scan.completed persist skipped:", detail);
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -274,6 +279,38 @@ export async function POST(request: NextRequest) {
       } catch {
         /* best-effort production evidence */
       }
+    }
+  }
+
+  if (event.kind === "status_update" && event.scanId && body.payload) {
+    const p = body.payload;
+    const progressRaw = p.progress_pct;
+    const progressPct =
+      progressRaw != null ? Number.parseFloat(String(progressRaw)) : null;
+    try {
+      if (
+        progressPct != null &&
+        !Number.isNaN(progressPct) &&
+        progressPct > 0
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (admin as any)
+          .from("scans")
+          .update({
+            status: "probing",
+            progress_pct: Math.round(progressPct),
+          })
+          .eq("id", event.scanId);
+      }
+      persistOk = true;
+    } catch (err) {
+      persistOk = false;
+      persistError = err instanceof Error ? err.message : String(err);
+      console.error("[webhook_persist_failed]", {
+        scanId: event.scanId,
+        kind: event.kind,
+        error: persistError.slice(0, 500),
+      });
     }
   }
 
@@ -348,6 +385,11 @@ export async function POST(request: NextRequest) {
       persistOk = false;
       persistError =
         err instanceof Error ? err.message : String(err);
+      console.error("[webhook_persist_failed]", {
+        scanId: event.scanId,
+        kind: event.kind,
+        error: persistError.slice(0, 500),
+      });
       console.warn(
         "[webhook:agathon] scan.vector.breach persist skipped:",
         persistError,

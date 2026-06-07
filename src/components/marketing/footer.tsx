@@ -11,7 +11,7 @@ const columns: Array<{ title: string; items: { label: string; href: string }[] }
     title: "Product",
     items: [
       { label: "Platform", href: "/#platform" },
-      { label: "Red-team", href: "/#redteam" },
+      { label: "Data integrity", href: "/#data-integrity" },
       { label: "Guardrails", href: "/#guardrails" },
       { label: "Live demo", href: "/demo" },
     ],
@@ -20,8 +20,8 @@ const columns: Array<{ title: string; items: { label: string; href: string }[] }
     title: "Resources",
     items: [
       { label: "Docs", href: "/#docs" },
-      { label: "ATLAS coverage", href: "/#redteam" },
-      { label: "Red-Team Guidelines", href: "/resources/guidelines" },
+      { label: "ATLAS coverage", href: "/#data-integrity" },
+      { label: "Researcher guidelines", href: "/resources/guidelines" },
       { label: "Security", href: "/contact" },
     ],
   },

@@ -3,7 +3,7 @@ import "server-only";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import {
-  getBazaarCheckoutUrl,
+  resolveBazaarCheckout,
   type BazaarPurchaseResult,
 } from "@/lib/payments/lemon-squeezy";
 
@@ -49,9 +49,35 @@ export async function purchaseBazaarScript(
   }
 
   if (!isFree) {
-    return {
-      redirectUrl: getBazaarCheckoutUrl(scriptId, user.id, priceUsd),
-    };
+    const checkout = resolveBazaarCheckout({
+      scriptId,
+      userId: user.id,
+      priceUsd,
+      userEmail: user.email ?? "",
+    });
+
+    if (checkout.mode === "redirect") {
+      return { redirectUrl: checkout.redirectUrl };
+    }
+
+    const { error: paidInsertErr } = await supabase.from("bazaar_purchases").insert({
+      script_id: scriptId,
+      buyer_id: user.id,
+      author_id: script.author_id,
+      amount_usd: priceUsd,
+    });
+
+    if (paidInsertErr) {
+      return { error: paidInsertErr.message };
+    }
+
+    const adminPaid = createAdminSupabase();
+    await adminPaid.rpc("increment_purchase", {
+      p_script_id: scriptId,
+      p_revenue: priceUsd,
+    });
+
+    return { ok: true, code: scriptCode, simulated: true };
   }
 
   const { error: insertErr } = await supabase.from("bazaar_purchases").insert({

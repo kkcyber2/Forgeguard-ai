@@ -29,7 +29,7 @@ export type LaunchScanResult =
       plan?: string;
     };
 
-type ScanRow = { id: string; user_id: string; status: string };
+type ScanRow = { id: string; user_id: string; status: string; intensity: string | null };
 
 type QuotaRow = {
   plan: string;
@@ -120,7 +120,7 @@ export async function launchScan(ctx: LaunchScanContext): Promise<LaunchScanResu
 
   const { data: scan, error: fetchErr } = (await admin
     .from("scans")
-    .select("id, user_id, status")
+    .select("id, user_id, status, intensity")
     .eq("id", ctx.scanId)
     .maybeSingle()) as { data: ScanRow | null; error: { message: string } | null };
 
@@ -171,25 +171,18 @@ export async function launchScan(ctx: LaunchScanContext): Promise<LaunchScanResu
   }
 
   try {
-    // #region agent log
-    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "0b9c56" },
-      body: JSON.stringify({
-        sessionId: "0b9c56",
-        hypothesisId: "B",
-        location: "scan-launcher.service.ts:pre-runScan",
-        message: "dispatching runScan",
-        data: {
-          scanId: scan.id,
-          engineUrl: engineUrl ?? "<unset>",
-          hasToken: Boolean(engineToken),
-          healthOk: !isEngineLockdown(health),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    const highIntensity =
+      scan.intensity === "greasy" || scan.intensity === "aggressive";
+    if (highIntensity) {
+      void runScan({ scanId: scan.id, userId: ctx.userId }).catch((err) => {
+        console.error("[scan-launcher] async runScan failed:", err);
+      });
+      return {
+        ok: true,
+        scanId: scan.id,
+        message: "Runner dispatched (non-blocking high-intensity)",
+      };
+    }
     await runScan({ scanId: scan.id, userId: ctx.userId });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -3,6 +3,7 @@ import {
   normalizeRiskLabel,
   prepareScanReportUpsert,
 } from "@/lib/agathon/payload-numerics";
+import { revalidateScansCache } from "@/lib/scans/revalidate";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
   applyFortressBlock,
@@ -158,6 +159,13 @@ export async function POST(request: NextRequest) {
         throw new Error(`scans.update: ${scanUpdateErr.message}`);
       }
 
+      const { data: scanOwner } = await (admin as any)
+        .from("scans")
+        .select("user_id")
+        .eq("id", event.scanId)
+        .maybeSingle();
+      revalidateScansCache(scanOwner?.user_id as string | undefined);
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: existing } = await (admin as any)
         .from("scan_reports")
@@ -301,6 +309,12 @@ export async function POST(request: NextRequest) {
             progress_pct: Math.round(progressPct),
           })
           .eq("id", event.scanId);
+        const { data: scanOwner } = await (admin as any)
+          .from("scans")
+          .select("user_id")
+          .eq("id", event.scanId)
+          .maybeSingle();
+        revalidateScansCache(scanOwner?.user_id as string | undefined);
       }
       persistOk = true;
     } catch (err) {
@@ -378,6 +392,12 @@ export async function POST(request: NextRequest) {
           .from("scans")
           .update({ progress_pct: Math.round(progressPct) })
           .eq("id", event.scanId);
+        const { data: scanOwner } = await (admin as any)
+          .from("scans")
+          .select("user_id")
+          .eq("id", event.scanId)
+          .maybeSingle();
+        revalidateScansCache(scanOwner?.user_id as string | undefined);
       }
 
       persistOk = true;

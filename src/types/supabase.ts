@@ -2717,6 +2717,27 @@ export type Database = {
         }
         Relationships: []
       }
+      hacker_wallets: {
+        Row: {
+          user_id: string
+          credits: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          credits?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          credits?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       otp_logs: {
         Row: {
           id: string
@@ -2870,6 +2891,10 @@ export type Database = {
       }
       increment_purchase: {
         Args: { p_revenue: number; p_script_id: string }
+        Returns: undefined
+      }
+      increment_hacker_credits: {
+        Args: { p_user_id: string; p_credits: number }
         Returns: undefined
       }
       increment_wallet:

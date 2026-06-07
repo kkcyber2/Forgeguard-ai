@@ -6,7 +6,7 @@ import { requireAdminProfile } from "@/lib/supabase/server";
 
 export async function releaseBountyFunds(
   escrowId: string,
-): Promise<{ error?: string; payout?: number; event?: string }> {
+): Promise<{ error?: string; payout?: number; credits?: number; fee?: number; event?: string }> {
   const adminProfile = await requireAdminProfile();
   if (!adminProfile) return { error: "Unauthorized." };
 
@@ -34,6 +34,8 @@ export async function releaseBountyFunds(
     ok?: boolean;
     error?: string;
     payout?: number;
+    credits?: number;
+    platform_fee?: number;
     event?: string;
   } | null;
 
@@ -42,9 +44,11 @@ export async function releaseBountyFunds(
   }
 
   console.info(
-    "[ledger] KINETIC_BOUNTY_PAID escrow=%s payout=%s operator=%s",
+    "[ledger] KINETIC_BOUNTY_PAID escrow=%s payout=%s credits=%s fee=%s operator=%s",
     escrowId,
     result.payout,
+    result.credits,
+    result.platform_fee,
     adminProfile.email,
   );
 
@@ -52,6 +56,8 @@ export async function releaseBountyFunds(
   revalidatePath("/admin/ledger");
   return {
     payout: result.payout,
+    credits: result.credits,
+    fee: result.platform_fee,
     event: result.event ?? "KINETIC_BOUNTY_PAID",
   };
 }

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import type { Database } from "@/types/supabase";
 import { safeQueryRows } from "@/lib/supabase/safe-query";
+import { SCANS_CACHE_TAG, scansUserTag } from "@/lib/scans/cache-tags";
 
 type ServerSupabase = SupabaseClient<Database>;
 
@@ -68,6 +70,33 @@ export type ScanRow = Pick<
 >;
 
 export async function fetchRecentScans(
+  supabase: ServerSupabase,
+  userId: string,
+  limit = 8,
+): Promise<ScanRow[]> {
+  return fetchRecentScansDirect(supabase, userId, limit);
+}
+
+/** Cached scan list — revalidateTag('scans') busts within 5s of engine DB writes. */
+export async function fetchRecentScansCached(
+  userId: string,
+  limit = 8,
+): Promise<ScanRow[]> {
+  return unstable_cache(
+    async () => {
+      const { createAdminSupabase } = await import("@/lib/supabase/admin");
+      const admin = createAdminSupabase();
+      return fetchRecentScansDirect(admin, userId, limit);
+    },
+    ["scans-recent", userId, String(limit)],
+    {
+      tags: [SCANS_CACHE_TAG, scansUserTag(userId)],
+      revalidate: 5,
+    },
+  )();
+}
+
+async function fetchRecentScansDirect(
   supabase: ServerSupabase,
   userId: string,
   limit = 8,

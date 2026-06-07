@@ -7,7 +7,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminProfile } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { buttonStyles } from "@/components/ui/button";
-import { ReleaseFundsButton } from "../bounties/release-button";
+import { PayoutButton } from "./payout-button";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -28,7 +28,8 @@ export default async function AdminLedgerPage() {
 
   const db = createAdminSupabase();
 
-  const [{ data: escrows }, { data: transactions }, { data: wallets }] = await Promise.all([
+  const [{ data: escrows }, { data: transactions }, { data: wallets }, { data: hackerWallets }] =
+    await Promise.all([
     db
       .from("bounty_escrow")
       .select("id, user_id, amount_usd, status, held_at, mission_id, submission_id")
@@ -37,15 +38,20 @@ export default async function AdminLedgerPage() {
       .limit(50),
     db
       .from("platform_transactions")
-      .select("id, buyer_id, seller_id, amount_usd, tx_type, created_at")
+      .select("id, buyer_id, seller_id, amount_usd, platform_fee, tx_type, created_at")
       .order("created_at", { ascending: false })
       .limit(100),
     db.from("user_wallets").select("balance_usd"),
+    db.from("hacker_wallets").select("credits"),
   ]);
 
   const heldRows = escrows ?? [];
   const txRows = transactions ?? [];
   const totalHeld = heldRows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
+  const totalHackerCredits = (hackerWallets ?? []).reduce(
+    (sum, w) => sum + Number(w.credits ?? 0),
+    0,
+  );
   const totalCirculation = (wallets ?? []).reduce(
     (sum, w) => sum + Number(w.balance_usd ?? 0),
     0,
@@ -97,24 +103,24 @@ export default async function AdminLedgerPage() {
           }
         />
         <StatTile
-          label="Wallet circulation"
-          value={`$${totalCirculation.toFixed(2)}`}
+          label="Hacker credits"
+          value={totalHackerCredits.toLocaleString()}
           tone="secure"
           icon={Landmark}
           footer={
             <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-              {(wallets ?? []).length} wallets tracked
+              {(hackerWallets ?? []).length} researcher wallets
             </span>
           }
         />
         <StatTile
-          label="Ledger entries"
-          value={txRows.length}
+          label="USD circulation"
+          value={`$${totalCirculation.toFixed(2)}`}
           tone="neutral"
           icon={Landmark}
           footer={
             <span className="font-mono text-[10px] uppercase tracking-[0.14em]">
-              Last 100 transactions
+              {(wallets ?? []).length} client wallets
             </span>
           }
         />
@@ -122,7 +128,7 @@ export default async function AdminLedgerPage() {
 
       <section className="mb-8">
         <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-          Escrow holds — release funds
+          Escrow holds — sovereign payout (10% platform fee)
         </h2>
         {heldRows.length === 0 ? (
           <EmptyState
@@ -166,7 +172,7 @@ export default async function AdminLedgerPage() {
                         {new Date(row.held_at).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <ReleaseFundsButton escrowId={row.id} />
+                        <PayoutButton escrowId={row.id} />
                       </td>
                     </tr>
                   );

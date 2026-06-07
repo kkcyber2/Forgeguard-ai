@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-import { fetchTotalAleRisk, fetchRecentScans } from "@/lib/scans/queries";
+import { fetchTotalAleRisk, fetchRecentScansCached } from "@/lib/scans/queries";
 import { safeQueryRows } from "@/lib/supabase/safe-query";
 import type { RedTeamLog } from "@/components/dashboard/red-team-feed";
 
@@ -17,7 +17,7 @@ export interface DashboardOverviewData {
   aegisRuleCount: number;
   activeBountySpend: number;
   totalAleRisk: number;
-  scanRows: Awaited<ReturnType<typeof fetchRecentScans>>;
+  scanRows: Awaited<ReturnType<typeof fetchRecentScansCached>>;
   rawLogs: Array<{
     id: number;
     scan_id: string;
@@ -142,7 +142,7 @@ export async function fetchDashboardOverview(
     );
 
     const totalAleRisk = await fetchTotalAleRisk(supabase, userId);
-    const scanRows = await fetchRecentScans(supabase, userId, 8);
+    const scanRows = await fetchRecentScansCached(userId, 8);
 
     let rawLogs: DashboardOverviewData["rawLogs"] = [];
     try {

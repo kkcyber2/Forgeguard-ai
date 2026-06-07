@@ -30,7 +30,7 @@ import {
  * Defensive rendering: all Supabase fetches are wrapped; failures degrade to []/0.
  */
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 5;
 
 const GATE_COPY: Record<string, { title: string; body: string }> = {
   forge: {

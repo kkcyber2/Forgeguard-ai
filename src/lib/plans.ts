@@ -60,7 +60,7 @@ export const PLANS: PlanMeta[] = [
   },
   {
     id: "enterprise",
-    name: "Enterprise",
+    name: "Sovereign",
     price: 199,
     scansPerMonth: 999_999,
     engine: "DeepSeek-R1 (High Reasoning)",

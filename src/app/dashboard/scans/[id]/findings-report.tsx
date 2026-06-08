@@ -20,6 +20,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TacticalTargetError } from "./tactical-target-error";
 
 type PlanId = "free" | "startup" | "enterprise";
 
@@ -1249,6 +1250,9 @@ interface FindingsReportProps {
   targetUrl?: string;
   userPlan?: PlanId;
   isSovereign?: boolean;
+  failureReason?: string | null;
+  targetDiagnosticLogs?: string | null;
+  findingCount?: number;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -1530,18 +1534,37 @@ export function FindingsReport({
   targetUrl = "",
   userPlan = "free",
   isSovereign = false,
+  failureReason = null,
+  targetDiagnosticLogs = null,
+  findingCount = 0,
 }: FindingsReportProps) {
-  if (scanStatus !== "sealed") {
-    return null; // only render when scan is done
+  if (scanStatus !== "sealed" && scanStatus !== "failed") {
+    return null;
   }
+
+  const reportFindingCount = report?.findings?.length ?? 0;
+  const effectiveFindingCount = Math.max(findingCount, reportFindingCount);
+
+  const tacticalError = (
+    <TacticalTargetError
+      failureReason={failureReason}
+      targetDiagnosticLogs={targetDiagnosticLogs}
+      findingCount={effectiveFindingCount}
+    />
+  );
 
   if (!report) {
     return (
-      <div className="mt-4 rounded-sm border border-white/[0.06] bg-surface p-6 text-center">
-        <AlertOctagon size={20} className="mx-auto mb-2 text-foreground-subtle" />
-        <p className="text-xs text-foreground-muted">
-          Report generation failed or is still processing. Refresh in a moment.
-        </p>
+      <div className="mt-4 space-y-4">
+        {tacticalError}
+        {!failureReason?.trim() && !targetDiagnosticLogs?.trim() && (
+          <div className="rounded-sm border border-white/[0.06] bg-surface p-6 text-center">
+            <AlertOctagon size={20} className="mx-auto mb-2 text-foreground-subtle" />
+            <p className="text-xs text-foreground-muted">
+              Report generation failed or is still processing. Refresh in a moment.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -1556,6 +1579,7 @@ export function FindingsReport({
 
   return (
     <div className="mt-4 space-y-4">
+      {tacticalError}
       <AegisExportToast />
       {/* ── Report header ── */}
       <div className="flex items-center gap-3 rounded-sm border border-white/[0.06] bg-surface p-5">

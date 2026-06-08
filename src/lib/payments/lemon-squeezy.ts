@@ -8,6 +8,7 @@
 
 import type { PlanId } from "@/lib/plans";
 import { buildCheckoutUrl, getLSVariantIds } from "@/lib/lemonsqueezy-client";
+import { buildStripeCheckoutUrl } from "@/lib/payments/stripe";
 
 const PLACEHOLDER_BASE = "https://checkout.lemonsqueezy.com/placeholder";
 
@@ -87,6 +88,11 @@ export function resolveCheckoutUrl(
   userId: string,
 ): string | null {
   if (planId === "free") return null;
+
+  if (planId === "startup" || planId === "enterprise") {
+    const stripe = buildStripeCheckoutUrl(planId, userId, userEmail);
+    if (stripe) return stripe;
+  }
 
   const { variantStartup, variantEnterprise } = getLSVariantIds();
   const variantId =

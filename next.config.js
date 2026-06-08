@@ -48,6 +48,8 @@ const nextConfig = {
     return [
       { source: "/legal/privacy", destination: "/privacy", permanent: true },
       { source: "/legal/terms", destination: "/terms", permanent: true },
+      { source: "/favicon.ico", destination: "/icons/icon.svg", permanent: true },
+      { source: "/apple-touch-icon.png", destination: "/icons/icon.svg", permanent: true },
     ];
   },
 

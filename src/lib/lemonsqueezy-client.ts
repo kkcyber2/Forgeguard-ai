@@ -5,6 +5,11 @@
 export type { PlanId, PlanMeta } from "@/lib/plans";
 export { PLANS } from "@/lib/plans";
 
+import {
+  getStripeHostedCheckoutUrl,
+  type PaidPlanId,
+} from "@/lib/payments/stripe";
+
 const FALLBACK_VARIANT_STARTUP =
   process.env.NEXT_PUBLIC_LEMONSQUEEZY_VARIANT_STARTUP ??
   process.env.LEMONSQUEEZY_VARIANT_STARTUP ??
@@ -49,7 +54,10 @@ export function buildMarketingCheckoutUrl(variantId: string): string {
   return `${base}?${params.toString()}`;
 }
 
-export function resolveMarketingPlanCheckout(planId: "startup" | "enterprise"): string | null {
+export function resolveMarketingPlanCheckout(planId: PaidPlanId): string | null {
+  const stripe = getStripeHostedCheckoutUrl(planId);
+  if (stripe) return stripe;
+
   const { variantStartup, variantEnterprise } = getLSVariantIds();
   const variantId =
     planId === "startup"
@@ -59,4 +67,15 @@ export function resolveMarketingPlanCheckout(planId: "startup" | "enterprise"): 
         : "";
   if (!variantId) return null;
   return buildMarketingCheckoutUrl(variantId);
+}
+
+/** Startup ($49) and Sovereign ($199) checkout URLs — Stripe primary, LS fallback. */
+export function getConfiguredPlanCheckouts(): {
+  startup: string | null;
+  sovereign: string | null;
+} {
+  return {
+    startup: resolveMarketingPlanCheckout("startup"),
+    sovereign: resolveMarketingPlanCheckout("enterprise"),
+  };
 }

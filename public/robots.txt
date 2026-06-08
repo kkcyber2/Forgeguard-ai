@@ -1,0 +1,5 @@
+# ForgeGuard AI — allow all search crawlers
+User-agent: *
+Allow: /
+
+Sitemap: https://www.forgeguard-ai.com/sitemap.xml

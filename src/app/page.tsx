@@ -7,6 +7,7 @@ import { Guardrails } from "@/components/marketing/guardrails";
 import { PricingSection } from "@/components/marketing/pricing";
 import { CtaBanner } from "@/components/marketing/cta";
 import { MarketingFooter } from "@/components/marketing/footer";
+import { ComplianceChatBubble } from "@/components/marketing/compliance-chat";
 import { getSessionUser } from "@/lib/supabase/server";
 
 /**
@@ -37,6 +38,7 @@ export default async function HomePage() {
       <PricingSection isAuthenticated={isAuthenticated} />
       <CtaBanner isAuthenticated={isAuthenticated} primaryCta={primaryCta} />
       <MarketingFooter />
+      <ComplianceChatBubble />
     </main>
   );
 }

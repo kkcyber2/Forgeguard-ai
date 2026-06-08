@@ -74,6 +74,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
     high_severity_count: number | null;
     notes: string | null;
     failure_reason: string | null;
+    target_diagnostic_logs: string | null;
     created_at: string | null;
     started_at: string | null;
     completed_at: string | null;
@@ -81,7 +82,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
   const { data: scan, error: scanErr } = (await supabase
     .from("scans")
     .select(
-      "id, target_model, target_url, status, intensity, progress_pct, finding_count, high_severity_count, notes, failure_reason, created_at, started_at, completed_at",
+      "id, target_model, target_url, status, intensity, progress_pct, finding_count, high_severity_count, notes, failure_reason, target_diagnostic_logs, created_at, started_at, completed_at",
     )
     .eq("id", id)
     .maybeSingle()) as {
@@ -262,6 +263,9 @@ export default async function ScanDetailPage({ params }: PageProps) {
         targetUrl={scan.target_url}
         userPlan={userPlan}
         isSovereign={isSovereign}
+        failureReason={scan.failure_reason}
+        targetDiagnosticLogs={scan.target_diagnostic_logs}
+        findingCount={scan.finding_count ?? 0}
       />
 
       <GenesisTabs

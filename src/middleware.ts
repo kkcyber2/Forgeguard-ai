@@ -74,15 +74,22 @@ function isKnownDashboardRoute(pathname: string): boolean {
   );
 }
 
-/** Static/metadata assets — skip burst limiter (parallel browser fetches). */
+/** Static/metadata assets — skip middleware (favicon, icons, SEO). */
 function isStaticAssetPath(pathname: string): boolean {
   if (
+    pathname === "/favicon.ico" ||
     pathname === "/opengraph-image" ||
     pathname === "/twitter-image" ||
     pathname === "/icon" ||
+    pathname === "/icon.svg" ||
+    pathname === "/apple-icon" ||
+    pathname === "/apple-icon.png" ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname === "/apple-touch-icon-precomposed.png" ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
-    pathname === "/manifest.json"
+    pathname === "/manifest.json" ||
+    pathname === "/site.webmanifest"
   ) {
     return true;
   }
@@ -93,7 +100,9 @@ function isStaticAssetPath(pathname: string): boolean {
   ) {
     return true;
   }
-  return /\.(svg|png|ico|webp|jpg|jpeg|gif|woff2?)$/i.test(pathname);
+  return /\.(svg|png|ico|webp|jpg|jpeg|gif|woff2?|xml|txt|webmanifest)$/i.test(
+    pathname,
+  );
 }
 
 function getClientKey(request: NextRequest, bucket: string): string {
@@ -424,6 +433,10 @@ async function enforcePowChallenge(
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (isStaticAssetPath(pathname)) {
+    return NextResponse.next();
+  }
+
   const honeypotBlock = enforceKineticHoneypot(request);
   if (honeypotBlock) return honeypotBlock;
 
@@ -522,7 +535,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/:path((?!_next|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.json|icons/).*)",
     "/.env",
     "/.env.local",
     "/wp-admin",

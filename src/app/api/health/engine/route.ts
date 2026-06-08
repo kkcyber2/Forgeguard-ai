@@ -1,55 +1,119 @@
 import { NextResponse } from "next/server";
 import {
-  directPingEngine,
-  logEngineHandshakeDiagnostics,
-  logEngineProbeTarget,
+  buildEngineHealthUrl,
+  engineAuthHeaders,
   resolveEngineBaseUrl,
 } from "@/lib/agathon-config";
-import { getEngineHealthSnapshot } from "@/lib/engine/probe-engine-health";
-import { BUNKER_SHIELDING_MESSAGE } from "@/lib/engine/bunker-shielding";
 
 /**
- * GET /api/health/engine — cached liveness probe with SWR + coalescing.
- * Always returns JSON (200) so the dashboard poller never crashes on 503/500.
+ * GET /api/health/engine — fail-fast bunker liveness (5s max).
+ * Returns BUNKER_SLEEP when Railway does not answer — never blocks Vercel for 60s.
  */
-export const maxDuration = 60;
+export const maxDuration = 10;
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SWR_HEADER = "private, max-age=0, stale-while-revalidate=60";
+const FAILFAST_MS = 5_000;
+const SWR_HEADER = "private, max-age=0, stale-while-revalidate=30";
+
+function isTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    err.name === "TimeoutError" ||
+    err.name === "AbortError" ||
+    msg.includes("timeout") ||
+    msg.includes("aborted")
+  );
+}
 
 export async function GET() {
-  try {
-    const snapshot = await getEngineHealthSnapshot();
+  const t0 = Date.now();
+  const baseUrl = resolveEngineBaseUrl();
 
-    const body = {
-      ok: snapshot.ok,
-      status: snapshot.status,
-      latencyMs: snapshot.latencyMs,
-      reason: snapshot.reason,
-      httpStatus: snapshot.httpStatus,
-      error: snapshot.error,
-    };
-
-    if (!snapshot.ok && snapshot.status !== "unconfigured") {
-      logEngineHandshakeDiagnostics();
-      logEngineProbeTarget(resolveEngineBaseUrl());
-      await directPingEngine();
-    }
-
-    return NextResponse.json(body, {
-      headers: { "Cache-Control": SWR_HEADER },
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[api/health/engine] unhandled:", message);
+  if (!baseUrl) {
     return NextResponse.json(
       {
         ok: false,
-        status: "offline",
+        status: "unconfigured",
         latencyMs: 0,
-        reason: BUNKER_SHIELDING_MESSAGE,
-        error: message,
+        reason: "PYTHON_ENGINE_URL not set",
+      },
+      { headers: { "Cache-Control": SWR_HEADER } },
+    );
+  }
+
+  const auth = engineAuthHeaders();
+  if (!auth) {
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "unconfigured",
+        latencyMs: 0,
+        reason: "INTERNAL_SCAN_TOKEN not set",
+      },
+      { headers: { "Cache-Control": SWR_HEADER } },
+    );
+  }
+
+  const healthUrl = buildEngineHealthUrl(baseUrl);
+
+  try {
+    const resp = await fetch(healthUrl, {
+      method: "GET",
+      headers: { ...auth, "Cache-Control": "no-store" },
+      signal: AbortSignal.timeout(FAILFAST_MS),
+      cache: "no-store",
+    });
+
+    const latencyMs = Date.now() - t0;
+
+    if (resp.ok) {
+      let engineMeta: Record<string, unknown> = {};
+      try {
+        engineMeta = (await resp.json()) as Record<string, unknown>;
+      } catch {
+        /* body optional */
+      }
+      return NextResponse.json(
+        {
+          ok: true,
+          status: "healthy",
+          latencyMs,
+          engine: engineMeta,
+        },
+        { headers: { "Cache-Control": SWR_HEADER } },
+      );
+    }
+
+    const bodySnippet = (await resp.text().catch(() => "")).slice(0, 300);
+    const bunkerSleep = resp.status === 499 || resp.status === 502 || resp.status === 503 || resp.status === 504;
+
+    return NextResponse.json(
+      {
+        ok: false,
+        status: bunkerSleep ? "BUNKER_SLEEP" : "lockdown",
+        latencyMs,
+        httpStatus: resp.status,
+        reason: bunkerSleep
+          ? "Engine bunker asleep or unreachable"
+          : "Engine returned non-OK status",
+        error: bodySnippet || undefined,
+      },
+      { headers: { "Cache-Control": SWR_HEADER } },
+    );
+  } catch (err) {
+    const latencyMs = Date.now() - t0;
+    const timedOut = isTimeoutError(err);
+    return NextResponse.json(
+      {
+        ok: false,
+        status: "BUNKER_SLEEP",
+        latencyMs,
+        reason: timedOut
+          ? `No engine response within ${FAILFAST_MS / 1000}s`
+          : "Engine probe failed",
+        error: err instanceof Error ? err.message : "Unknown error",
       },
       { headers: { "Cache-Control": SWR_HEADER } },
     );

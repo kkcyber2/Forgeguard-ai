@@ -23,11 +23,11 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL ?? "https://www.forgeguard-ai.com",
   ),
   title: {
-    default: "ForgeGuard AI | Enterprise Data Protection & AI Compliance",
+    default: "ForgeGuard AI | Adversarial Risk Quantification",
     template: "%s · ForgeGuard AI",
   },
   description:
-    "Enterprise data protection, AI compliance auditing, runtime guardrails, and prompt-injection defense for production LLM deployments.",
+    "Adversarial risk quantification ($ALE) for LLM deployments — automated compliance scans, runtime guardrails, and prompt-injection defense.",
   keywords: [
     "LLM security",
     "AI red teaming",
@@ -45,16 +45,16 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "ForgeGuard AI",
-    title: "ForgeGuard AI | Enterprise Data Protection & AI Compliance",
+    title: "ForgeGuard AI | Adversarial Risk Quantification",
     description:
-      "Enterprise data protection, AI compliance auditing, and runtime guardrails for production LLM deployments.",
+      "Adversarial risk quantification ($ALE) for LLM deployments — automated compliance scans and runtime guardrails.",
     url: "https://www.forgeguard-ai.com",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ForgeGuard AI | Enterprise Data Protection & AI Compliance",
+    title: "ForgeGuard AI | Adversarial Risk Quantification",
     description:
-      "Enterprise data protection, AI compliance auditing, and runtime guardrails for production LLM deployments.",
+      "Adversarial risk quantification ($ALE) for LLM deployments — automated compliance scans and runtime guardrails.",
   },
   robots: {
     index: true,

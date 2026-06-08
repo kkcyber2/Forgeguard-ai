@@ -40,13 +40,9 @@ export function PricingSection({
             <span className="text-acid">Audit-ready pricing.</span>
           </h2>
           <p className="mt-3 text-sm text-foreground-muted">
-            Pay via{" "}
-            <span className="text-foreground/70">LemonSqueezy</span>
-            {" · "}Withdraw via{" "}
-            <span className="text-foreground/70">Payoneer</span> or{" "}
-            <span className="text-foreground/70">Wise</span>
-            {" · "}Works worldwide including{" "}
-            <span className="text-foreground/70">Pakistan</span>.
+            Secure checkout via{" "}
+            <span className="text-foreground/70">Stripe</span>
+            {" · "}Startup $49/mo · Sovereign $199/mo
           </p>
         </div>
 

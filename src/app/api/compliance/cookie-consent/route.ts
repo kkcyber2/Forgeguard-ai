@@ -91,15 +91,31 @@ export async function POST(_request: NextRequest) {
         );
       }
 
-      if (existing?.cookie_consent_at) {
+      const now = new Date().toISOString();
+
+      // User-scoped update first (RLS) — persists consent on the profile row.
+      const { error: userUpdateErr } = await supabase
+        .from("profiles")
+        .update({
+          cookie_consent_at: existing?.cookie_consent_at ?? now,
+          cookie_consent_version: COOKIE_CONSENT_VERSION,
+        })
+        .eq("id", user.id);
+
+      if (!userUpdateErr) {
         return okResponse();
       }
 
-      const now = new Date().toISOString();
+      if (isMissingCookieColumn(userUpdateErr)) {
+        profileWarning = MIGRATION_WARNING;
+        console.warn("[cookie-consent]", profileWarning);
+        return okResponse(profileWarning);
+      }
+
       const { error: updateErr } = await admin
         .from("profiles")
         .update({
-          cookie_consent_at: now,
+          cookie_consent_at: existing?.cookie_consent_at ?? now,
           cookie_consent_version: COOKIE_CONSENT_VERSION,
         })
         .eq("id", user.id);

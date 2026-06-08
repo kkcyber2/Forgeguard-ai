@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, CreditCard, Lock, ShieldCheck, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanId, PlanMeta } from "@/lib/lemonsqueezy-client";
-import { resolveCheckoutUrl } from "@/lib/payments/lemon-squeezy";
+import { resolveStripeCheckoutUrl } from "@/lib/payments/stripe";
 
 /* ─────────────────────────── helpers ─────────────────────────────────── */
 
@@ -166,7 +166,7 @@ function CardFace({
           </div>
           <div className="absolute inset-x-5 bottom-4">
             <p className="font-mono text-[8px] text-white/20 text-center">
-              Payments processed securely by LemonSqueezy
+              Payments processed securely by Stripe
             </p>
           </div>
         </div>
@@ -281,18 +281,18 @@ function PaymentForm({
       <div className="flex items-center gap-2 rounded-[4px] border border-white/[0.06] bg-white/[0.02] px-3 py-2">
         <Lock size={11} strokeWidth={1.5} className="shrink-0 text-acid/60" />
         <p className="font-mono text-[10px] text-foreground-subtle">
-          Your card details are not stored. Checkout is secured by LemonSqueezy.
+          Your card details are not stored. Checkout is secured by Stripe.
         </p>
       </div>
 
-      {/* CTA — redirect to LemonSqueezy */}
+      {/* CTA — redirect to Stripe Hosted Checkout */}
       <a
         href={checkoutUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="flex w-full items-center justify-center gap-2 rounded-[4px] border border-acid/50 bg-acid/10 px-4 py-2.5 font-mono text-[12px] font-semibold text-acid transition-colors hover:bg-acid/20"
       >
-        Continue to Checkout — {planName} &rarr;
+        Continue to Stripe Checkout — {planName} &rarr;
       </a>
     </div>
   );
@@ -400,23 +400,22 @@ function PlanCardClient({
 export function PlanSelector({
   plans,
   currentPlan,
-  variantMap: _variantMap,
   userEmail,
   userId,
 }: {
   plans: PlanMeta[];
   currentPlan: PlanId;
-  variantMap: Record<PlanId, string>;
   userEmail: string;
   userId: string;
 }) {
-  void _variantMap;
   const [selectedPlan, setSelectedPlan] = React.useState<PlanId | null>(null);
 
   const activePlan = selectedPlan ?? null;
   const activeMeta = activePlan ? plans.find((p) => p.id === activePlan) : null;
   const checkoutUrl =
-    activePlan ? resolveCheckoutUrl(activePlan, userEmail, userId) : null;
+    activePlan && (activePlan === "startup" || activePlan === "enterprise")
+      ? resolveStripeCheckoutUrl(activePlan, userId, userEmail)
+      : null;
 
   const showPayment = !!activePlan && activePlan !== "free" && !!checkoutUrl;
 

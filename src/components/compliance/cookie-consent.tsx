@@ -17,12 +17,14 @@ function readLocalConsent(): boolean {
 export type CookieConsentProps = {
   /** Server-side hint (profile cookie or httpOnly cookie). */
   initialConsented?: boolean;
+  /** When true, sync httpOnly cookie from an existing profile consent record. */
+  syncProfileConsent?: boolean;
 };
 
 /**
  * Essential-only cookie consent — optimistic dismiss + localStorage backup.
  */
-export function CookieConsent({ initialConsented = false }: CookieConsentProps) {
+export function CookieConsent({ initialConsented = false, syncProfileConsent = false }: CookieConsentProps) {
   const [mounted, setMounted] = React.useState(false);
   const [hasAccepted, setHasAccepted] = React.useState(initialConsented);
   const [pending, setPending] = React.useState(false);
@@ -33,6 +35,16 @@ export function CookieConsent({ initialConsented = false }: CookieConsentProps) 
     }
     setMounted(true);
   }, [initialConsented]);
+
+  React.useEffect(() => {
+    if (!syncProfileConsent || !initialConsented) return;
+    void fetch("/api/compliance/cookie-consent", {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => {
+      /* best-effort cookie sync from profile */
+    });
+  }, [syncProfileConsent, initialConsented]);
 
   if (!mounted) return null;
   if (hasAccepted) return null;

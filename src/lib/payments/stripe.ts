@@ -67,3 +67,21 @@ export function isStripeCheckoutConfigured(): boolean {
       getStripeHostedCheckoutUrl("enterprise"),
   );
 }
+
+/** Stripe Customer Portal (manage/cancel) — optional hosted link from Dashboard. */
+export function getStripeBillingPortalUrl(): string | null {
+  const url = readEnv(
+    "NEXT_PUBLIC_STRIPE_BILLING_PORTAL",
+    "STRIPE_BILLING_PORTAL_URL",
+  );
+  return url || null;
+}
+
+/** Resolve checkout URL for dashboard billing — Stripe only. */
+export function resolveStripeCheckoutUrl(
+  planId: PaidPlanId,
+  userId: string,
+  userEmail: string,
+): string | null {
+  return buildStripeCheckoutUrl(planId, userId, userEmail);
+}

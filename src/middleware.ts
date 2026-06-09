@@ -367,8 +367,19 @@ function enforceKineticHoneypot(request: NextRequest): NextResponse | null {
 async function enforcePowChallenge(
   request: NextRequest,
 ): Promise<NextResponse | null> {
-  if (request.nextUrl.pathname.startsWith("/_next/")) return null;
-  if (request.nextUrl.pathname.startsWith("/api/v1/webhooks/")) return null;
+  const { pathname } = request.nextUrl;
+
+  // Liveness + launch audit — never gate behind PoW (monitoring must reach engine status).
+  if (
+    pathname === "/api/health" ||
+    pathname === "/api/health/engine" ||
+    pathname === "/api/debug/launch-check"
+  ) {
+    return null;
+  }
+
+  if (pathname.startsWith("/_next/")) return null;
+  if (pathname.startsWith("/api/v1/webhooks/")) return null;
 
   const ip = getClientIp(request);
   const volumeKey = `${ip}:powVolume`;

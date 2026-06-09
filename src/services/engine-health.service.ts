@@ -21,7 +21,7 @@ export type ClientEngineHealth = {
 
 type Listener = (health: ClientEngineHealth) => void;
 
-const POLL_MS = 30_000;
+const POLL_MS = 5_000;
 
 let health: ClientEngineHealth | null = null;
 let inflight: Promise<ClientEngineHealth> | null = null;

@@ -10,6 +10,7 @@ import {
   getStripeBillingPortalUrl,
   isStripeCheckoutConfigured,
 } from "@/lib/payments/stripe";
+import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import { RedeemCodeBox } from "./redeem-code-box";
 import { PlanSelector } from "./plan-selector";
 
@@ -181,6 +182,7 @@ export default async function BillingPage({
             currentPlan={currentPlan}
             userEmail={user.email ?? ""}
             userId={user.id}
+            revenueSimulation={isRevenueSimulationMode()}
           />
         </>
       )}

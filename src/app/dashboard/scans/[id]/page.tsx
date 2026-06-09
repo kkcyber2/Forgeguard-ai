@@ -19,12 +19,12 @@ import { ScanLiveLog } from "./live-log";
 import { ScanDispatchError } from "./scan-dispatch-error";
 import { ScanStatusTracker } from "./scan-status-tracker";
 import { ScanResult } from "./findings-report";
+import type { ScanReport } from "./findings-report-types";
 import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemoryRow } from "./genesis-tabs";
 import { deleteScan } from "../actions";
 import { fetchDashboardAnalytics } from "@/lib/analytics/dashboard-metrics";
 import { SCAN_REPORT_SELECT } from "@/lib/scans/queries";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
-import type { ScanReport } from "./findings-report";
 
 /**
  * /dashboard/scans/[id] — single-scan detail.

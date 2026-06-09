@@ -5,7 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, CreditCard, Lock, ShieldCheck, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanId, PlanMeta } from "@/lib/lemonsqueezy-client";
-import { resolveStripeCheckoutUrl } from "@/lib/payments/stripe";
+import {
+  getStripeHostedCheckoutUrl,
+  resolveStripeCheckoutUrl,
+} from "@/lib/payments/stripe";
+import { simulateSubscriptionCheckout } from "./checkout-actions";
 
 /* ─────────────────────────── helpers ─────────────────────────────────── */
 
@@ -180,9 +184,13 @@ function CardFace({
 function PaymentForm({
   checkoutUrl,
   planName,
+  simulation,
+  onSimulate,
 }: {
   checkoutUrl: string;
   planName: string;
+  simulation?: boolean;
+  onSimulate?: () => void;
 }) {
   const [cardNumber, setCardNumber] = React.useState("");
   const [cardName, setCardName] = React.useState("");
@@ -285,15 +293,25 @@ function PaymentForm({
         </p>
       </div>
 
-      {/* CTA — redirect to Stripe Hosted Checkout */}
-      <a
-        href={checkoutUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex w-full items-center justify-center gap-2 rounded-[4px] border border-acid/50 bg-acid/10 px-4 py-2.5 font-mono text-[12px] font-semibold text-acid transition-colors hover:bg-acid/20"
-      >
-        Continue to Stripe Checkout — {planName} &rarr;
-      </a>
+      {/* CTA — Stripe Hosted Checkout or simulation */}
+      {simulation ? (
+        <button
+          type="button"
+          onClick={onSimulate}
+          className="flex w-full items-center justify-center gap-2 rounded-[4px] border border-acid/50 bg-acid/10 px-4 py-2.5 font-mono text-[12px] font-semibold text-acid transition-colors hover:bg-acid/20"
+        >
+          Simulate Upgrade — {planName} (REVENUE_SIMULATION_MODE)
+        </button>
+      ) : (
+        <a
+          href={checkoutUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex w-full items-center justify-center gap-2 rounded-[4px] border border-acid/50 bg-acid/10 px-4 py-2.5 font-mono text-[12px] font-semibold text-acid transition-colors hover:bg-acid/20"
+        >
+          Continue to Stripe Checkout — {planName} &rarr;
+        </a>
+      )}
     </div>
   );
 }
@@ -305,16 +323,28 @@ function PlanCardClient({
   current,
   selected,
   onSelect,
+  onCheckout,
+  checkoutPending,
 }: {
   plan: PlanMeta;
   current: boolean;
   selected: boolean;
   onSelect: () => void;
+  onCheckout: () => void;
+  checkoutPending: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={plan.price > 0 && !current ? onSelect : undefined}
+      onClick={
+        plan.price > 0 && !current
+          ? () => {
+              onSelect();
+              onCheckout();
+            }
+          : undefined
+      }
+      disabled={checkoutPending && plan.price > 0 && !current}
       className={cn(
         "relative flex w-full flex-col rounded-sm border p-5 text-left transition-all",
         current
@@ -402,25 +432,71 @@ export function PlanSelector({
   currentPlan,
   userEmail,
   userId,
+  revenueSimulation = false,
 }: {
   plans: PlanMeta[];
   currentPlan: PlanId;
   userEmail: string;
   userId: string;
+  revenueSimulation?: boolean;
 }) {
   const [selectedPlan, setSelectedPlan] = React.useState<PlanId | null>(null);
+  const [checkoutPending, setCheckoutPending] = React.useState(false);
+  const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
 
   const activePlan = selectedPlan ?? null;
   const activeMeta = activePlan ? plans.find((p) => p.id === activePlan) : null;
+
+  async function handlePlanCheckout(planId: PlanId) {
+    if (planId === "free" || planId === currentPlan) return;
+
+    setCheckoutError(null);
+    setCheckoutPending(true);
+
+    try {
+      if (revenueSimulation && (planId === "startup" || planId === "enterprise")) {
+        const result = await simulateSubscriptionCheckout(planId);
+        if (!result.ok) {
+          setCheckoutError(result.error);
+          return;
+        }
+        window.location.href = "/dashboard/billing?upgraded=1";
+        return;
+      }
+
+      const url = resolveStripeCheckoutUrl(planId, userId, userEmail);
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+
+      const startup = getStripeHostedCheckoutUrl("startup");
+      const sovereign = getStripeHostedCheckoutUrl("enterprise");
+      setCheckoutError(
+        planId === "startup"
+          ? `Configure NEXT_PUBLIC_STRIPE_CHECKOUT_STARTUP${startup ? "" : " on Vercel"}`
+          : `Configure NEXT_PUBLIC_STRIPE_CHECKOUT_SOVEREIGN${sovereign ? "" : " on Vercel"}`,
+      );
+    } finally {
+      setCheckoutPending(false);
+    }
+  }
+
   const checkoutUrl =
     activePlan && (activePlan === "startup" || activePlan === "enterprise")
       ? resolveStripeCheckoutUrl(activePlan, userId, userEmail)
       : null;
 
-  const showPayment = !!activePlan && activePlan !== "free" && !!checkoutUrl;
+  const showPayment =
+    !!activePlan && activePlan !== "free" && (!!checkoutUrl || revenueSimulation);
 
   return (
     <div className="space-y-6">
+      {checkoutError && (
+        <div className="rounded-sm border border-amber-400/30 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-300">
+          {checkoutError}
+        </div>
+      )}
       {/* Plan grid */}
       <div className="grid gap-4 md:grid-cols-3">
         {plans.map((plan) => (
@@ -429,16 +505,18 @@ export function PlanSelector({
             plan={plan}
             current={plan.id === currentPlan}
             selected={selectedPlan === plan.id}
+            checkoutPending={checkoutPending}
             onSelect={() =>
               setSelectedPlan((prev) => (prev === plan.id ? null : plan.id))
             }
+            onCheckout={() => void handlePlanCheckout(plan.id)}
           />
         ))}
       </div>
 
       {/* Payment card — slides in when paid plan is selected */}
       <AnimatePresence>
-        {showPayment && activeMeta && checkoutUrl && (
+        {showPayment && activeMeta && (checkoutUrl || revenueSimulation) && (
           <motion.div
             key="payment-card"
             initial={{ opacity: 0, y: 16 }}
@@ -460,7 +538,17 @@ export function PlanSelector({
             <div className="grid gap-0 md:grid-cols-2">
               {/* Left: form */}
               <div className="border-b border-white/[0.06] p-6 md:border-b-0 md:border-r">
-                <PaymentForm checkoutUrl={checkoutUrl} planName={activeMeta.name} />
+                <PaymentForm
+                  checkoutUrl={
+                    checkoutUrl ??
+                    (activePlan === "startup"
+                      ? (process.env.NEXT_PUBLIC_STRIPE_CHECKOUT_STARTUP ?? "#")
+                      : (process.env.NEXT_PUBLIC_STRIPE_CHECKOUT_SOVEREIGN ?? "#"))
+                  }
+                  planName={activeMeta.name}
+                  simulation={revenueSimulation}
+                  onSimulate={() => void handlePlanCheckout(activePlan!)}
+                />
               </div>
 
               {/* Right: plan summary */}

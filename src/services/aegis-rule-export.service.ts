@@ -1,7 +1,17 @@
 import "server-only";
 
+import {
+  attackStringToRegex,
+  buildDefenseExport,
+  type AegisDefenseExport,
+} from "@/lib/aegis/attack-regex";
 import { defaultAegisAppId, snippetToShieldPattern } from "@/lib/aegis/shield-rules";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import type { Finding } from "@/app/dashboard/scans/[id]/findings-report-types";
+import {
+  attackStringForFinding,
+  isSuccessfulBreach,
+} from "@/app/dashboard/scans/[id]/findings-report-types";
 
 export type ExportAegisRuleContext = {
   scanId: string;
@@ -9,17 +19,25 @@ export type ExportAegisRuleContext = {
   findingId?: string;
   appId?: string;
   description?: string;
+  attackString?: string;
 };
 
 export type ExportAegisRuleResult =
-  | { ok: true; ruleId: string; appId: string }
+  | { ok: true; ruleId: string; appId: string; download: AegisDefenseExport }
   | { ok: false; status: number; error: string };
 
 type ScanRow = { id: string; user_id: string; status: string };
 
+function findingFromReport(
+  findings: Finding[] | null | undefined,
+  findingId?: string,
+): Finding | null {
+  if (!findings?.length || !findingId) return null;
+  return findings.find((f) => f.id === findingId) ?? null;
+}
+
 /**
- * Export remediation_code_snippet from scan_reports into aegis_rules.
- * Uses admin client for insert (RLS bypass) — mirrors scan-launcher.service.ts.
+ * Export breach attack string → regex into aegis_rules (aegis firewall rules table).
  */
 export async function exportAegisRule(
   ctx: ExportAegisRuleContext,
@@ -45,7 +63,7 @@ export async function exportAegisRule(
 
   const { data: report, error: reportErr } = await admin
     .from("scan_reports")
-    .select("remediation_code_snippet")
+    .select("remediation_code_snippet, findings")
     .eq("scan_id", ctx.scanId)
     .maybeSingle();
 
@@ -54,18 +72,30 @@ export async function exportAegisRule(
     return { ok: false, status: 500, error: "Report lookup failed" };
   }
 
-  const ruleContent = String(report?.remediation_code_snippet ?? "").trim();
-  if (!ruleContent) {
+  const findings = (report?.findings as Finding[] | null) ?? [];
+  const finding = findingFromReport(findings, ctx.findingId);
+
+  if (finding && !isSuccessfulBreach(finding)) {
+    return { ok: false, status: 422, error: "Finding is not a confirmed breach" };
+  }
+
+  const attackRaw =
+    ctx.attackString?.trim() ||
+    (finding ? attackStringForFinding(finding) : "");
+
+  let shieldPattern = attackRaw ? attackStringToRegex(attackRaw) : "";
+
+  if (!shieldPattern) {
+    const ruleContent = String(report?.remediation_code_snippet ?? "").trim();
+    shieldPattern = snippetToShieldPattern(ruleContent);
+  }
+
+  if (!shieldPattern) {
     return {
       ok: false,
       status: 422,
-      error: "No remediation_code_snippet on this scan report",
+      error: "No attack string or remediation snippet to derive a rule",
     };
-  }
-
-  const shieldPattern = snippetToShieldPattern(ruleContent);
-  if (!shieldPattern) {
-    return { ok: false, status: 422, error: "Could not derive shield pattern" };
   }
 
   const appId = ctx.appId ?? defaultAegisAppId(ctx.userId);
@@ -73,9 +103,21 @@ export async function exportAegisRule(
   const ruleId = `fg-aegis-${findingSuffix}-${Date.now().toString(36)}`;
   const description =
     ctx.description?.trim() ||
-    (ctx.findingId
-      ? `Finding ${ctx.findingId} · scan ${ctx.scanId.slice(0, 8)}`
-      : `Scan ${ctx.scanId.slice(0, 8)} remediation export`);
+    (finding
+      ? `Breach block · ${finding.attack} · ${finding.family}`
+      : `Scan ${ctx.scanId.slice(0, 8)} breach rule`);
+
+  const ruleContent =
+    String(report?.remediation_code_snippet ?? "").trim() ||
+    `# ForgeGuard Aegis regex\npattern = r"${shieldPattern}"\n`;
+
+  const download = buildDefenseExport({
+    scanId: ctx.scanId,
+    findingId: ctx.findingId ?? "scan",
+    ruleId,
+    description,
+    pattern: shieldPattern,
+  });
 
   const { error: insertErr } = await admin.from("aegis_rules").upsert(
     {
@@ -85,7 +127,7 @@ export async function exportAegisRule(
       rule_content: ruleContent.slice(0, 8000),
       description: description.slice(0, 500),
       action: "block",
-      format: "python",
+      format: "cloudflare",
       enabled: true,
       app_id: appId,
       finding_id: ctx.findingId ?? null,
@@ -98,5 +140,5 @@ export async function exportAegisRule(
     return { ok: false, status: 500, error: insertErr.message };
   }
 
-  return { ok: true, ruleId, appId };
+  return { ok: true, ruleId, appId, download };
 }

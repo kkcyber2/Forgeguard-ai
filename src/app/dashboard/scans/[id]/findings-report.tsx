@@ -21,67 +21,22 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TacticalTargetError } from "./tactical-target-error";
+import {
+  type Finding,
+  type OWASPBucket,
+  type PoC,
+  type ScanReport,
+  attackStringForFinding,
+  isSuccessfulBreach,
+} from "./findings-report-types";
+
+export type { Finding, OWASPBucket, PoC, ScanReport } from "./findings-report-types";
 
 type PlanId = "free" | "startup" | "enterprise";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/*  Types                                                                       */
+/*  Types re-exported from findings-report-types.ts                             */
 /* ─────────────────────────────────────────────────────────────────────────── */
-
-export interface PoC {
-  curl?: string;
-  python?: string;
-}
-
-export interface Finding {
-  id: string;
-  attack: string;
-  family: string;
-  level?: string;
-  severity: "critical" | "high" | "medium" | "low" | "info";
-  cvss: number;
-  exploitability?: number;
-  impact?: number;
-  reliability?: number;
-  evidence?: string;
-  rationale?: string;
-  summary?: string;
-  verdict?: boolean;
-  cwe_references?: string[];
-  remediation?: string;
-  proof_of_concept?: PoC;
-  remediation_snippet_key?: string;
-  observed_at?: string;
-  ale_usd?: number | null;
-  financial_liability_usd?: number | null;
-}
-
-export interface OWASPBucket {
-  families: string[];
-  max_cvss: number;
-  count: number;
-}
-
-export interface ScanReport {
-  executive_summary_md?: string;
-  executive_summary?: string | null;
-  audit_report_md?: string;
-  cvss_overall?: number;
-  risk_label?: "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  findings?: Finding[];
-  optimization_suggestions_md?: string;
-  owasp_coverage?: Record<string, OWASPBucket>;
-  attacks_run?: number;
-  wall_seconds?: number;
-  generation_cost_usd?: number;
-  discovery_report?: Record<string, unknown> | null;
-  ale_usd?: number | null;
-  financial_liability_usd?: number | null;
-  technical_proof_of_concept?: string | null;
-  remediation_code_snippet?: string | null;
-  social_templates?: Record<string, unknown>[] | null;
-  aegis_zip_b64?: string | null;
-}
 
 function formatUsd(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -348,7 +303,8 @@ export function AegisShieldSection({
             scanId={scanId}
             findingId="report-snippet"
             description="Report-level remediation_code_snippet"
-            hasSnippet
+            attackString={code.slice(0, 500)}
+            isBreach
           />
         )}
       </div>
@@ -789,16 +745,20 @@ function ExportAegisRuleButton({
   scanId,
   findingId,
   description,
+  attackString,
   compact,
-  hasSnippet,
+  isBreach,
 }: {
   scanId: string;
   findingId: string;
   description?: string;
+  attackString?: string;
   compact?: boolean;
-  hasSnippet?: boolean;
+  isBreach: boolean;
 }) {
   const [loading, setLoading] = React.useState(false);
+
+  if (!isBreach) return null;
 
   async function handleExport(e: React.MouseEvent) {
     e.stopPropagation();
@@ -812,9 +772,15 @@ function ExportAegisRuleButton({
           scanId,
           findingId,
           description,
+          attackString,
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        download?: Record<string, unknown>;
+        ruleId?: string;
+      };
       if (!res.ok || !data.ok) {
         window.dispatchEvent(
           new CustomEvent(AEGIS_TOAST_EVENT, {
@@ -823,10 +789,23 @@ function ExportAegisRuleButton({
         );
         return;
       }
+
+      if (data.download) {
+        const blob = new Blob([JSON.stringify(data.download, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `aegis-rule-${data.ruleId ?? findingId}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
       window.dispatchEvent(
         new CustomEvent(AEGIS_TOAST_EVENT, {
           detail: {
-            message: "Remediation snippet sealed in Aegis Firewall.",
+            message: "Aegis rule saved — Cloudflare/Nginx JSON downloaded.",
             type: "success",
           },
         }),
@@ -846,12 +825,8 @@ function ExportAegisRuleButton({
     <button
       type="button"
       onClick={(e) => void handleExport(e)}
-      disabled={loading || hasSnippet === false}
-      title={
-        hasSnippet === false
-          ? "No remediation_code_snippet on this scan report"
-          : "Export remediation_code_snippet to aegis_rules"
-      }
+      disabled={loading}
+      title="Generate regex from attack string → aegis_rules + download WAF config"
       className={cn(
         "inline-flex items-center gap-1.5 rounded-xs border font-mono uppercase tracking-[0.1em] transition-colors",
         compact
@@ -914,12 +889,10 @@ function FindingCard({
   finding,
   index,
   scanId,
-  hasRemediationSnippet,
 }: {
   finding: Finding;
   index: number;
   scanId?: string;
-  hasRemediationSnippet?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [pocTab, setPocTab] = React.useState<"curl" | "python">("curl");
@@ -993,13 +966,14 @@ function FindingCard({
 
         {/* CVSS + export + chevron */}
         <div className="flex shrink-0 items-center gap-3">
-          {scanId && (
+          {scanId && isSuccessfulBreach(finding) && (
             <ExportAegisRuleButton
               scanId={scanId}
               findingId={finding.id}
               description={`${finding.attack} · ${finding.family}`}
+              attackString={attackStringForFinding(finding)}
               compact
-              hasSnippet={hasRemediationSnippet}
+              isBreach
             />
           )}
           <div className="text-right">
@@ -1649,7 +1623,6 @@ export function FindingsReport({
                 finding={finding}
                 index={i}
                 scanId={scanId}
-                hasRemediationSnippet={Boolean(report.remediation_code_snippet?.trim())}
               />
             ))}
           </div>

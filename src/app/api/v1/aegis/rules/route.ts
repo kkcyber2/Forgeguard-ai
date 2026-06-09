@@ -11,6 +11,7 @@ const ExportSchema = z.object({
   findingId: z.string().max(64).optional(),
   appId: z.string().min(1).max(128).optional(),
   description: z.string().max(500).optional(),
+  attackString: z.string().max(4000).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
     findingId: parsed.data.findingId,
     appId: parsed.data.appId,
     description: parsed.data.description,
+    attackString: parsed.data.attackString,
   });
 
   if (!result.ok) {
@@ -57,5 +59,6 @@ export async function POST(req: NextRequest) {
     ok: true,
     ruleId: result.ruleId,
     appId: result.appId,
+    download: result.download,
   });
 }

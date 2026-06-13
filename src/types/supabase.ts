@@ -669,7 +669,9 @@ export type Database = {
           user_id: string
           plan_name: string
           plan_id: string
+          deposit_type: string
           amount_usdt: number
+          credit_amount: number | null
           deposit_address: string
           pay_currency: string
           payment_id: string | null
@@ -684,7 +686,9 @@ export type Database = {
           user_id: string
           plan_name: string
           plan_id: string
+          deposit_type?: string
           amount_usdt: number
+          credit_amount?: number | null
           deposit_address: string
           pay_currency?: string
           payment_id?: string | null
@@ -699,7 +703,9 @@ export type Database = {
           user_id?: string
           plan_name?: string
           plan_id?: string
+          deposit_type?: string
           amount_usdt?: number
+          credit_amount?: number | null
           deposit_address?: string
           pay_currency?: string
           payment_id?: string | null

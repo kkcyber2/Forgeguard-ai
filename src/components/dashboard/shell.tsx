@@ -4,6 +4,7 @@ import { SovereignMasterSidebar } from "@/components/dashboard/sovereign-master-
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { CommandBar } from "@/components/dashboard/command-bar";
 import { EngineStatus } from "@/components/dashboard/engine-status";
+import { ComplianceChatBubble } from "@/components/dashboard/compliance-chat";
 import { DashboardHolographicMonolith } from "@/components/dashboard/holographic-monolith";
 import type { SovereignRole, ViewMode } from "@/lib/access/parallel-sovereignty";
 import { cn } from "@/lib/utils";
@@ -184,6 +185,7 @@ export function DashboardShell({
           </div>
         </div>
       </main>
+      {scope === "user" && <ComplianceChatBubble />}
     </div>
   );
 }

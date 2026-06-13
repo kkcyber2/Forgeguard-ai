@@ -463,7 +463,7 @@ export function NewScanForm({
 
         {/* ── Intensity selector ──────────────────────────────────── */}
         <div>
-          <Label>Scan intensity</Label>
+          <Label>Strike Power</Label>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {INTENSITY_OPTIONS.map((opt) => {
               const active = intensity === opt.value;

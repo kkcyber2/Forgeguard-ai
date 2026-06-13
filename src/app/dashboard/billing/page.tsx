@@ -10,6 +10,7 @@ import { isCryptoCheckoutConfigured } from "@/lib/payments/crypto";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import { RedeemCodeBox } from "./redeem-code-box";
 import { PlanSelector } from "./plan-selector";
+import { CreditPackCard } from "./credit-pack-card";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -168,6 +169,7 @@ export default async function BillingPage({
       {!isSovereign && (
         <>
           <RedeemCodeBox />
+          <CreditPackCard />
           <PlanSelector
             plans={PLANS}
             currentPlan={currentPlan}

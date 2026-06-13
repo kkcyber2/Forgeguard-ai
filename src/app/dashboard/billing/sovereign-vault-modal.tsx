@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Copy, Loader2, Terminal, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanMeta } from "@/lib/plans";
-import { generateDepositAddress, verifyCryptoDeposit } from "./crypto-actions";
+import { generateDepositAddress, generateCreditPackDeposit, verifyCryptoDeposit } from "./crypto-actions";
 
 export interface SovereignVaultModalProps {
   open: boolean;
@@ -14,6 +14,8 @@ export interface SovereignVaultModalProps {
   onConfirmed: () => void;
   revenueSimulation?: boolean;
   onSimulate?: () => Promise<void>;
+  /** Subscription plans vs Bazaar credit pack top-ups. */
+  depositKind?: "subscription" | "credit_pack";
 }
 
 export function SovereignVaultModal({
@@ -23,6 +25,7 @@ export function SovereignVaultModal({
   onConfirmed,
   revenueSimulation = false,
   onSimulate,
+  depositKind = "subscription",
 }: SovereignVaultModalProps) {
   const [loading, setLoading] = React.useState(false);
   const [verifying, setVerifying] = React.useState(false);
@@ -47,7 +50,10 @@ export function SovereignVaultModal({
     setQrCode(null);
     setAmountUsdt(plan.price);
 
-    void generateDepositAddress(plan.name).then((result) => {
+    void (depositKind === "credit_pack"
+      ? generateCreditPackDeposit(plan.name)
+      : generateDepositAddress(plan.name)
+    ).then((result) => {
       if (cancelled) return;
       setLoading(false);
       if (!result.ok) {
@@ -64,7 +70,7 @@ export function SovereignVaultModal({
     return () => {
       cancelled = true;
     };
-  }, [open, plan.name, plan.price, revenueSimulation]);
+  }, [open, plan.name, plan.price, revenueSimulation, depositKind]);
 
   async function handleVerify() {
     if (revenueSimulation && onSimulate) {

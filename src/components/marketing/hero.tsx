@@ -296,7 +296,7 @@ export function MarketingHero({ isAuthenticated, primaryCta }: MarketingHeroProp
 
 export function HeroSection({
   isAuthenticated = false,
-  primaryCta = { href: "/auth/signup", label: "Deploy Now" },
+  primaryCta = { href: "/auth/signup", label: "Get Started" },
 }: {
   isAuthenticated?: boolean;
   primaryCta?: { href: string; label: string };

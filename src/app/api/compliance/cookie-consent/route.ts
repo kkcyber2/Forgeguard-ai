@@ -103,21 +103,6 @@ export async function POST(_request: NextRequest) {
         .eq("id", user.id);
 
       if (!userUpdateErr) {
-        // #region agent log
-        fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
-          body: JSON.stringify({
-            sessionId: "c20499",
-            hypothesisId: "H3",
-            location: "api/compliance/cookie-consent:POST:userUpdate",
-            message: "Profile consent persisted via user RLS",
-            data: { userId: user.id.slice(0, 8) },
-            timestamp: Date.now(),
-            runId: "launch-check",
-          }),
-        }).catch(() => {});
-        // #endregion
         return okResponse();
       }
 
@@ -141,21 +126,6 @@ export async function POST(_request: NextRequest) {
           console.warn("[cookie-consent]", profileWarning);
           return okResponse(profileWarning);
         }
-        // #region agent log
-        fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
-          body: JSON.stringify({
-            sessionId: "c20499",
-            hypothesisId: "H3",
-            location: "api/compliance/cookie-consent:POST:adminUpdateFail",
-            message: "Profile consent admin update failed",
-            data: { code: updateErr.code, msg: updateErr.message?.slice(0, 120) },
-            timestamp: Date.now(),
-            runId: "launch-check",
-          }),
-        }).catch(() => {});
-        // #endregion
         console.error("[cookie-consent] profile update:", updateErr.message);
         return okResponse(
           "Profile consent not persisted — update failed; guest cookie set.",

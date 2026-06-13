@@ -92,7 +92,7 @@ export function MarketingNav({ session }: { session: MarketingNavSession }) {
                   href="/auth/signup"
                   className={buttonStyles({ variant: "primary", size: "sm" })}
                 >
-                  Deploy
+                  Get Started
                 </Link>
               </>
             )}

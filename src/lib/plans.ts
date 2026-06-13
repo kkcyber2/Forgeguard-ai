@@ -9,6 +9,25 @@
 
 export type PlanId = "free" | "startup" | "enterprise";
 
+export interface CreditPackMeta {
+  id: "starter";
+  name: string;
+  priceUsd: number;
+  credits: number;
+  description: string;
+}
+
+/** Bazaar wallet credits — not subscription plans. */
+export const CREDIT_PACKS: CreditPackMeta[] = [
+  {
+    id: "starter",
+    name: "Starter Pack",
+    priceUsd: 10,
+    credits: 100,
+    description: "100 Bazaar credits for script purchases and mission escrow.",
+  },
+];
+
 export interface PlanMeta {
   id: PlanId;
   name: string;
@@ -81,4 +100,8 @@ export const PLANS: PlanMeta[] = [
 
 export function getPlanMeta(id: PlanId): PlanMeta {
   return PLANS.find((p) => p.id === id) ?? PLANS[0];
+}
+
+export function getCreditPack(id: CreditPackMeta["id"]): CreditPackMeta {
+  return CREDIT_PACKS.find((p) => p.id === id) ?? CREDIT_PACKS[0];
 }

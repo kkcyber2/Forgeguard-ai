@@ -31,22 +31,6 @@ export async function GET() {
   const t0 = Date.now();
   const baseUrl = resolveEngineBaseUrl();
 
-  // #region agent log
-  fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
-    body: JSON.stringify({
-      sessionId: "c20499",
-      hypothesisId: "H1",
-      location: "api/health/engine:GET:entry",
-      message: "Engine health probe start",
-      data: { baseUrlSet: Boolean(baseUrl), tokenSet: Boolean(engineAuthHeaders()) },
-      timestamp: Date.now(),
-      runId: "launch-check",
-    }),
-  }).catch(() => {});
-  // #endregion
-
   if (!baseUrl) {
     return NextResponse.json(
       {
@@ -83,22 +67,6 @@ export async function GET() {
     });
 
     const latencyMs = Date.now() - t0;
-
-    // #region agent log
-    fetch("http://127.0.0.1:7434/ingest/9739fdfe-4a94-4d0e-8d13-8449868d349d", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c20499" },
-      body: JSON.stringify({
-        sessionId: "c20499",
-        hypothesisId: "H1",
-        location: "api/health/engine:GET:result",
-        message: "Engine health probe result",
-        data: { ok: resp.ok, httpStatus: resp.status, latencyMs },
-        timestamp: Date.now(),
-        runId: "launch-check",
-      }),
-    }).catch(() => {});
-    // #endregion
 
     if (resp.ok) {
       let engineMeta: Record<string, unknown> = {};

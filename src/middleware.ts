@@ -372,8 +372,7 @@ async function enforcePowChallenge(
   // Liveness + launch audit — never gate behind PoW (monitoring must reach engine status).
   if (
     pathname === "/api/health" ||
-    pathname === "/api/health/engine" ||
-    pathname === "/api/debug/launch-check"
+    pathname === "/api/health/engine"
   ) {
     return null;
   }

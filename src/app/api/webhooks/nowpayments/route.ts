@@ -14,7 +14,7 @@ interface NowPaymentsIpnPayload {
 
 /**
  * POST /api/webhooks/nowpayments
- * NOWPayments IPN — sync crypto_deposits status; DB trigger grants wallet credits on confirmed.
+ * NOWPayments IPN — sync crypto_deposits status; DB trigger activates subscription OR wallet credits by deposit_type.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let payload: NowPaymentsIpnPayload;

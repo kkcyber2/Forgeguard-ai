@@ -32,7 +32,17 @@ type WebhookBody = {
   scan_id?: string;
   kind?: string;
   payload?: Record<string, unknown>;
+  deposit_type?: "subscription" | "credit_pack";
 };
+
+const VALID_DEPOSIT_TYPES = new Set(["subscription", "credit_pack"]);
+
+function parseDepositType(raw: unknown): "subscription" | "credit_pack" | null {
+  const value = String(raw ?? "").trim();
+  return VALID_DEPOSIT_TYPES.has(value)
+    ? (value as "subscription" | "credit_pack")
+    : null;
+}
 
 function verifyWebhook(request: NextRequest): boolean {
   return verifyWebhookToken(request);
@@ -434,6 +444,34 @@ export async function POST(request: NextRequest) {
         /* idempotent — row may already be current via Realtime writer */
       }
     }
+  }
+
+  if (event.kind.includes("crypto_deposits") && body.record) {
+    const depositType =
+      parseDepositType(body.record.deposit_type) ??
+      parseDepositType(body.deposit_type) ??
+      parseDepositType(body.payload?.deposit_type);
+
+    if (!depositType) {
+      return NextResponse.json(
+        {
+          error: "Missing or invalid deposit_type — expected subscription | credit_pack",
+          received: body.record.deposit_type ?? body.deposit_type ?? null,
+        },
+        { status: 400 },
+      );
+    }
+
+    const status = String(body.record.status ?? "");
+    persistOk = true;
+    return NextResponse.json({
+      ok: true,
+      persist_ok: true,
+      received: event.kind,
+      deposit_type: depositType,
+      status,
+      note: "Wallet/subscription grants handled by DB trigger — no double increment",
+    });
   }
 
   return NextResponse.json({

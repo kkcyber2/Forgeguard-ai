@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
-import { publicEnv } from "@/lib/env";
+import { resolveAppUrl } from "@/lib/app-url";
 import {
   buildCryptoQrCodeUrl,
   createNowPayment,
@@ -12,6 +12,7 @@ import {
   isCryptoCheckoutConfigured,
   mapNowPaymentStatus,
   resolveCryptoPlan,
+  resolveCreditPack,
 } from "@/lib/payments/crypto";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";
@@ -66,7 +67,7 @@ export async function generateDepositAddress(planName: string): Promise<Generate
   let payAmount = planMeta.amountUsdt;
 
   try {
-    const appUrl = publicEnv.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const appUrl = resolveAppUrl();
     const payment = await createNowPayment({
       amountUsdt: planMeta.amountUsdt,
       orderId,
@@ -93,6 +94,7 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     user_id: user.id,
     plan_name: planMeta.planName,
     plan_id: planMeta.planId,
+    deposit_type: "subscription",
     amount_usdt: payAmount,
     deposit_address: depositAddress,
     pay_currency: payCurrency,
@@ -112,6 +114,90 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount),
     amountUsdt: payAmount,
     planName: planMeta.planName,
+    payCurrency,
+  };
+}
+
+/** Generate a credit-pack deposit ($10 → 100 Bazaar credits). */
+export async function generateCreditPackDeposit(
+  packName = "Starter Pack",
+): Promise<GenerateDepositResult> {
+  const user = await getSessionUser();
+  if (!user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  if (!isCryptoCheckoutConfigured() && !isRevenueSimulationMode()) {
+    return {
+      ok: false,
+      error: "Configure NOWPAYMENTS_API_KEY or SOVEREIGN_CRYPTO_WALLET",
+    };
+  }
+
+  let packMeta: ReturnType<typeof resolveCreditPack>;
+  try {
+    packMeta = resolveCreditPack(packName);
+  } catch {
+    return { ok: false, error: `Unknown credit pack: ${packName}` };
+  }
+
+  const admin = createAdminSupabase();
+  const depositId = crypto.randomUUID();
+  const orderId = `fg-credits-${user.id.slice(0, 8)}-${depositId.slice(0, 8)}`;
+
+  let depositAddress = getSovereignCryptoWallet() ?? "";
+  let paymentId: string | null = null;
+  let payCurrency = "usdttrc20";
+  let payAmount = packMeta.amountUsdt;
+
+  try {
+    const appUrl = resolveAppUrl();
+    const payment = await createNowPayment({
+      amountUsdt: packMeta.amountUsdt,
+      orderId,
+      orderDescription: `ForgeGuard ${packMeta.packName} (${packMeta.creditAmount} credits)`,
+      ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
+    });
+    depositAddress = payment.depositAddress;
+    paymentId = payment.paymentId;
+    payCurrency = payment.payCurrency;
+    payAmount = payment.payAmount;
+  } catch (err) {
+    if (!depositAddress) {
+      console.error("[crypto/generateCreditPackDeposit]", err);
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : "Failed to create credit deposit",
+      };
+    }
+  }
+
+  const { error } = await admin.from("crypto_deposits").insert({
+    id: depositId,
+    user_id: user.id,
+    plan_name: packMeta.packName,
+    plan_id: "credit_pack",
+    deposit_type: "credit_pack",
+    amount_usdt: payAmount,
+    credit_amount: packMeta.creditAmount,
+    deposit_address: depositAddress,
+    pay_currency: payCurrency,
+    payment_id: paymentId,
+    status: "pending",
+  });
+
+  if (error) {
+    console.error("[crypto/generateCreditPackDeposit/db]", error.message);
+    return { ok: false, error: "Failed to record deposit" };
+  }
+
+  return {
+    ok: true,
+    depositId,
+    depositAddress,
+    qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount),
+    amountUsdt: payAmount,
+    planName: packMeta.packName,
     payCurrency,
   };
 }
@@ -201,6 +287,7 @@ export async function simulateCryptoDeposit(
     user_id: user.id,
     plan_name: planMeta.planName,
     plan_id: planMeta.planId,
+    deposit_type: "subscription",
     amount_usdt: planMeta.amountUsdt,
     deposit_address: getSovereignCryptoWallet() ?? "SIMULATED-VAULT",
     pay_currency: "usdttrc20",

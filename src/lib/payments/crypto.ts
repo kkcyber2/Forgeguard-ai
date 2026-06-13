@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getPlanMeta, type PlanId } from "@/lib/plans";
+import { getCreditPack, getPlanMeta, type PlanId } from "@/lib/plans";
 
 const NOWPAYMENTS_API = "https://api.nowpayments.io/v1";
 
@@ -20,7 +20,7 @@ export interface NowPaymentResult {
   status: string;
 }
 
-/** Map display plan name → plan id + USDT amount. */
+/** Map display plan name → plan id + USDT amount (subscription checkout). */
 export function resolveCryptoPlan(planName: string): CryptoPlanMeta {
   const key = planName.trim().toLowerCase();
   const planId: Extract<PlanId, "startup" | "enterprise"> =
@@ -30,6 +30,29 @@ export function resolveCryptoPlan(planName: string): CryptoPlanMeta {
 
   const meta = getPlanMeta(planId);
   return { planId, planName: meta.name, amountUsdt: meta.price };
+}
+
+export interface CryptoCreditPackMeta {
+  packId: "starter";
+  packName: string;
+  amountUsdt: number;
+  creditAmount: number;
+}
+
+/** Credit pack checkout — wallet credits only (Bazaar). */
+export function resolveCreditPack(planName: string): CryptoCreditPackMeta {
+  const key = planName.trim().toLowerCase();
+  const packId: "starter" =
+    key === "starter" || key === "starter pack" || key === "credit pack" ? "starter" : (() => {
+      throw new Error(`Unknown credit pack: ${planName}`);
+    })();
+  const pack = getCreditPack(packId);
+  return {
+    packId,
+    packName: pack.name,
+    amountUsdt: pack.priceUsd,
+    creditAmount: pack.credits,
+  };
 }
 
 /** Lime-on-obsidian QR for terminal checkout. */

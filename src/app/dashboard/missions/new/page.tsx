@@ -212,7 +212,7 @@ export default function NewMissionPage() {
                     color: "#38BDF8",
                   }}
                 >
-                  [{form.company_tag.toUpperCase()}]
+                  [{String(form.company_tag ?? "").toUpperCase()}]
                 </span>
               )}
             </Field>

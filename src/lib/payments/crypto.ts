@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHmac, timingSafeEqual } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCreditPack, getPlanMeta, type PlanId } from "@/lib/plans";
 
 const NOWPAYMENTS_API = "https://api.nowpayments.io/v1";
@@ -168,6 +170,49 @@ export async function fetchNowPaymentStatus(paymentId: string): Promise<string |
   return data.payment_status ?? null;
 }
 
+function sortIpnPayload(value: unknown): unknown {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+  const obj = value as Record<string, unknown>;
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(obj).sort()) {
+    sorted[key] = sortIpnPayload(obj[key]);
+  }
+  return sorted;
+}
+
+/** Verify NOWPayments IPN HMAC-SHA512 signature (x-nowpayments-sig). */
+export function verifyNowPaymentsIpnSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+): boolean {
+  const secret = process.env.NOWPAYMENTS_IPN_SECRET?.trim();
+  if (!secret) {
+    console.warn("[nowpayments] NOWPAYMENTS_IPN_SECRET unset — rejecting IPN in production");
+    return process.env.NODE_ENV !== "production";
+  }
+  if (!signatureHeader?.trim()) return false;
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return false;
+  }
+
+  const sorted = JSON.stringify(sortIpnPayload(payload));
+  const expected = createHmac("sha512", secret).update(sorted).digest("hex");
+
+  try {
+    const a = Buffer.from(expected, "utf8");
+    const b = Buffer.from(signatureHeader.trim(), "utf8");
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return expected === signatureHeader.trim();
+  }
+}
+
 /** Map NOWPayments status strings → crypto_deposits.status */
 export function mapNowPaymentStatus(raw: string): "pending" | "confirming" | "confirmed" | "expired" | "failed" {
   const s = raw.toLowerCase();
@@ -176,4 +221,92 @@ export function mapNowPaymentStatus(raw: string): "pending" | "confirming" | "co
   if (["expired"].includes(s)) return "expired";
   if (["failed", "refunded"].includes(s)) return "failed";
   return "pending";
+}
+
+type CryptoDepositGrantRow = {
+  id: string;
+  user_id: string;
+  status: string;
+  deposit_type?: string | null;
+  plan_id?: string | null;
+  credit_amount?: number | null;
+  amount_usdt?: number | null;
+  credits_granted?: boolean | null;
+};
+
+/**
+ * Application-level grant when crypto_deposits → confirmed.
+ * Subscription → plan row only. Credit pack → wallet increment only.
+ * Idempotent via credits_granted (mirrors DB trigger in 20260616 migration).
+ */
+export async function grantConfirmedCryptoDeposit(
+  admin: SupabaseClient,
+  depositId: string,
+): Promise<{ ok: true; granted?: boolean } | { ok: false; error: string }> {
+  const { data: row, error: fetchErr } = await admin
+    .from("crypto_deposits")
+    .select(
+      "id, user_id, status, deposit_type, plan_id, credit_amount, amount_usdt, credits_granted",
+    )
+    .eq("id", depositId)
+    .maybeSingle();
+
+  if (fetchErr) {
+    return { ok: false, error: fetchErr.message };
+  }
+  if (!row) {
+    return { ok: false, error: "Deposit not found" };
+  }
+
+  const deposit = row as CryptoDepositGrantRow;
+  if (deposit.status !== "confirmed") {
+    return { ok: true };
+  }
+  if (deposit.credits_granted) {
+    return { ok: true, granted: false };
+  }
+
+  const depositType = deposit.deposit_type ?? "subscription";
+
+  if (depositType === "credit_pack") {
+    const amount = Number(deposit.credit_amount ?? deposit.amount_usdt ?? 0);
+    if (amount <= 0) {
+      return { ok: false, error: "Invalid credit pack amount" };
+    }
+    const { error: walletErr } = await admin.rpc("increment_wallet", {
+      p_user_id: deposit.user_id,
+      p_amount: amount,
+    });
+    if (walletErr) {
+      return { ok: false, error: walletErr.message };
+    }
+  } else {
+    const planId = (deposit.plan_id === "enterprise" ? "enterprise" : "startup") as PlanId;
+    const { error: subErr } = await admin.from("subscriptions").upsert(
+      {
+        user_id: deposit.user_id,
+        plan: planId,
+        status: "active",
+        scans_used_this_period: 0,
+        period_starts_at: new Date().toISOString(),
+        period_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+    if (subErr) {
+      return { ok: false, error: subErr.message };
+    }
+  }
+
+  const { error: flagErr } = await admin
+    .from("crypto_deposits")
+    .update({ credits_granted: true, confirmed_at: new Date().toISOString() })
+    .eq("id", deposit.id);
+
+  if (flagErr) {
+    return { ok: false, error: flagErr.message };
+  }
+
+  return { ok: true, granted: true };
 }

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { CheckCircle2, Layers, Lock, Terminal } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
-import { PLANS, type PlanId } from "@/lib/plans";
+import { PLANS, CREDIT_PACKS, type PlanId } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { isCryptoCheckoutConfigured } from "@/lib/payments/crypto";
@@ -32,6 +32,16 @@ async function getSubscription(userId: string): Promise<SubRow | null> {
   return data;
 }
 
+async function getWalletBalance(userId: string): Promise<number> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from("user_wallets")
+    .select("balance_usd")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return Number(data?.balance_usd ?? 0);
+}
+
 export default async function BillingPage({
   searchParams,
 }: {
@@ -43,6 +53,8 @@ export default async function BillingPage({
   const isSovereign = isSovereignOperator(user.email);
   const { upgraded, gate } = await searchParams;
   const sub = await getSubscription(user.id);
+  const walletBalance = await getWalletBalance(user.id);
+  const creditPack = CREDIT_PACKS[0];
   const currentPlan: PlanId = sub?.plan ?? "free";
   const cryptoConfigured = isCryptoCheckoutConfigured();
 
@@ -135,24 +147,37 @@ export default async function BillingPage({
             </p>
           </div>
 
-          <div className="w-full max-w-xs">
-            <div className="mb-1.5 flex items-center justify-between text-[11px] text-foreground-muted">
-              <span>Scans this period</span>
-              <span className="font-mono">
-                {scansUsed} / {scansAllowed >= 999_999 ? "∞" : scansAllowed}
-              </span>
-            </div>
-            {scansAllowed < 999_999 && (
-              <div className="h-1.5 w-full rounded-full bg-white/[0.06]">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    scanPct >= 90 ? "bg-threat" : scanPct >= 70 ? "bg-amber-400" : "bg-acid",
-                  )}
-                  style={{ width: `${scanPct}%` }}
-                />
+          <div className="w-full max-w-xs space-y-3">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-[11px] text-foreground-muted">
+                <span>Scans this period</span>
+                <span className="font-mono">
+                  {scansUsed} / {scansAllowed >= 999_999 ? "∞" : scansAllowed}
+                </span>
               </div>
-            )}
+              {scansAllowed < 999_999 && (
+                <div className="h-1.5 w-full rounded-full bg-white/[0.06]">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      scanPct >= 90 ? "bg-threat" : scanPct >= 70 ? "bg-amber-400" : "bg-acid",
+                    )}
+                    style={{ width: `${scanPct}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="rounded-sm border border-white/[0.06] bg-obsidian-900/40 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-widest text-foreground-subtle">
+                Bazaar wallet
+              </p>
+              <p className="font-mono text-lg font-semibold text-lime-400">
+                ${walletBalance.toFixed(2)}
+              </p>
+              <p className="text-[10px] text-foreground-muted">
+                Credit packs from ${creditPack.priceUsd} ({creditPack.credits} credits) · scan overage debits wallet
+              </p>
+            </div>
           </div>
         </div>
 

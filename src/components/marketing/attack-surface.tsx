@@ -57,7 +57,7 @@ export function AttackSurface() {
             ))}
           </ul>
           <div className="border-t-[0.5px] border-white/[0.06] bg-obsidian-900/40 px-5 py-3 text-xs text-foreground-subtle">
-            + 450 high-precision probes covering ATLAS tactics TA0043 → TA0059. Researchers can run samples on the <span className="text-foreground">/demo</span> page.
+            + 450 high-precision probes covering ATLAS tactics TA0043 → TA0059. Full coverage map available after signup.
           </div>
         </div>
       </Reveal>

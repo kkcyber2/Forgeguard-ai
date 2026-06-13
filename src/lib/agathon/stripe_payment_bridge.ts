@@ -141,6 +141,7 @@ const INTENSITY_TO_PLAN: Record<AgathonIntensity, AgathonPlan[]> = {
   greasy: ["enterprise"],
 };
 
+/** Map ForgeGuard plan tier to allowed scan intensity (Assassin gate). */
 export function planAllowsIntensity(
   plan: AgathonPlan,
   intensity: AgathonIntensity,

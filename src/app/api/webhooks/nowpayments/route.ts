@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { mapNowPaymentStatus } from "@/lib/payments/crypto";
+import {
+  grantConfirmedCryptoDeposit,
+  mapNowPaymentStatus,
+  verifyNowPaymentsIpnSignature,
+} from "@/lib/payments/crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,12 +18,20 @@ interface NowPaymentsIpnPayload {
 
 /**
  * POST /api/webhooks/nowpayments
- * NOWPayments IPN — sync crypto_deposits status; DB trigger activates subscription OR wallet credits by deposit_type.
+ * NOWPayments IPN — HMAC-SHA512 verified; grants subscription OR wallet by deposit_type.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const rawBody = await req.text();
+  const signature = req.headers.get("x-nowpayments-sig");
+
+  if (!verifyNowPaymentsIpnSignature(rawBody, signature)) {
+    console.warn("[nowpayments/webhook] invalid IPN signature");
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
   let payload: NowPaymentsIpnPayload;
   try {
-    payload = (await req.json()) as NowPaymentsIpnPayload;
+    payload = JSON.parse(rawBody) as NowPaymentsIpnPayload;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -36,7 +48,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { data: deposit, error: fetchErr } = await admin
     .from("crypto_deposits")
-    .select("id, status")
+    .select("id, status, deposit_type")
     .eq("payment_id", paymentId)
     .maybeSingle();
 
@@ -50,18 +62,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, skipped: true });
   }
 
-  if (deposit.status === status) {
-    return NextResponse.json({ ok: true, unchanged: true });
+  if (deposit.status !== status) {
+    const { error: updateErr } = await admin
+      .from("crypto_deposits")
+      .update({ status })
+      .eq("id", deposit.id);
+
+    if (updateErr) {
+      console.error("[nowpayments/webhook] update", updateErr.message);
+      return NextResponse.json({ error: "Update failed" }, { status: 500 });
+    }
   }
 
-  const { error: updateErr } = await admin
-    .from("crypto_deposits")
-    .update({ status })
-    .eq("id", deposit.id);
-
-  if (updateErr) {
-    console.error("[nowpayments/webhook] update", updateErr.message);
-    return NextResponse.json({ error: "Update failed" }, { status: 500 });
+  if (status === "confirmed") {
+    const grant = await grantConfirmedCryptoDeposit(admin, deposit.id);
+    if (!grant.ok) {
+      console.error("[nowpayments/webhook] grant", grant.error);
+      return NextResponse.json({ error: "Grant failed" }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true, status });

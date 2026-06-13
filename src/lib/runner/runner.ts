@@ -143,7 +143,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   }
 
   // 5. Mark scan as probing + emit a kickoff log -------------------------
-  await transitionStatus(admin, scanId, "probing", { progress_pct: 1 });
+  await transitionStatus(admin, scanId, "probing", { progress_pct: 3 });
   await emit(admin, scanId, {
     type: "info",
     severity: "info",

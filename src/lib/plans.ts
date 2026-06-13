@@ -17,14 +17,14 @@ export interface CreditPackMeta {
   description: string;
 }
 
-/** Bazaar wallet credits — not subscription plans. */
+/** Bazaar wallet credits — not subscription plans. Env-overridable. */
 export const CREDIT_PACKS: CreditPackMeta[] = [
   {
     id: "starter",
     name: "Starter Pack",
-    priceUsd: 10,
-    credits: 100,
-    description: "100 Bazaar credits for script purchases and mission escrow.",
+    priceUsd: Number(process.env.CREDIT_PACK_USD ?? 10) || 10,
+    credits: Number(process.env.CREDIT_PACK_AMOUNT ?? 100) || 100,
+    description: `${Number(process.env.CREDIT_PACK_AMOUNT ?? 100) || 100} Bazaar credits for script purchases and mission escrow.`,
   },
 ];
 

@@ -1,4 +1,8 @@
 /**
+ * @module agathon/payload-numerics
+ * Assassin engine → Supabase bridge. Normalizes webhook payloads from Railway
+ * before upserting scan_reports (executive_summary_md, financial_liability_usd, etc.).
+ *
  * Cast numeric values in log/finding payloads to strings for Supabase JSON safety.
  * Mirrors AI-red-team/agathon/supabase_sync.py stringify_payload_numerics.
  */
@@ -53,7 +57,7 @@ export function stringifyPayloadNumerics(value: unknown): unknown {
 }
 
 /**
- * Stringify numerics inside findings JSON only — preserve top-level DB numeric columns.
+ * Upsert scan_reports from Agathon webhook — preserves numeric columns, fills Secure summary.
  */
 export function prepareScanReportUpsert(
   patch: Record<string, unknown>,
@@ -76,11 +80,19 @@ export function prepareScanReportUpsert(
     out.executive_summary_md == null ||
     String(out.executive_summary_md).trim() === ""
   ) {
-    out.executive_summary_md =
+    const attacksRun = Number(out.attacks_run ?? 0);
+    const hasFindings =
+      Array.isArray(out.findings) && out.findings.length > 0;
+    if (!hasFindings && attacksRun > 0) {
+      out.executive_summary_md = `Status: Secure. ${attacksRun} attack vectors tested. No exploitable vulnerabilities at current intensity.`;
+    } else if (
       typeof out.technical_proof_of_concept === "string" &&
       out.technical_proof_of_concept.trim()
-        ? out.technical_proof_of_concept
-        : "Scan complete — no executive summary supplied.";
+    ) {
+      out.executive_summary_md = out.technical_proof_of_concept;
+    } else {
+      out.executive_summary_md = "Scan complete — no executive summary supplied.";
+    }
   }
 
   if (out.findings == null) {

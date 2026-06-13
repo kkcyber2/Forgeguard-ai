@@ -39,6 +39,18 @@ type QuotaRow = {
   period_ends_at: string | null;
 };
 
+/** Wallet debit per scan when subscription quota is exhausted (USD). */
+function scanOverageDebitUsd(): number {
+  const raw = process.env.SCAN_OVERAGE_WALLET_DEBIT_USD?.trim();
+  const parsed = raw ? Number(raw) : 1;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+type ScanPayment =
+  | { mode: "none" }
+  | { mode: "quota"; userId: string }
+  | { mode: "wallet"; userId: string; debitUsd: number };
+
 function scansAllowedForPlan(plan: string): number {
   const id = (["free", "startup", "enterprise"].includes(plan)
     ? plan
@@ -65,8 +77,11 @@ async function resolveUserEmail(
   return (data?.email as string | undefined) ?? null;
 }
 
-async function enforceScanQuota(userId: string, userEmail: string | null): Promise<LaunchScanResult | null> {
-  if (isSovereignOperator(userEmail)) return null;
+async function resolveScanPayment(
+  userId: string,
+  userEmail: string | null,
+): Promise<LaunchScanResult | ScanPayment> {
+  if (isSovereignOperator(userEmail)) return { mode: "none" };
 
   const admin = createAdminSupabase();
   const { data: quota } = (await admin
@@ -75,9 +90,9 @@ async function enforceScanQuota(userId: string, userEmail: string | null): Promi
     .eq("user_id", userId)
     .maybeSingle()) as { data: QuotaRow | null };
 
-  if (!quota) return null;
+  if (!quota) return { mode: "none" };
 
-  if (quota.plan === "enterprise") return null;
+  if (quota.plan === "enterprise") return { mode: "none" };
 
   const isActive =
     quota.status === "active" ||
@@ -89,26 +104,83 @@ async function enforceScanQuota(userId: string, userEmail: string | null): Promi
     allowed >= 999_999 || quota.scans_used_this_period < allowed;
 
   if (isActive && periodOk && underLimit) {
-    await admin
-      .from("subscriptions")
-      .update({ scans_used_this_period: quota.scans_used_this_period + 1 })
-      .eq("user_id", userId);
-    return null;
+    return { mode: "quota", userId };
   }
 
-  const reason = !isActive
-    ? `Subscription is ${quota.status}. Renew your plan to run more scans.`
-    : !periodOk
-      ? "Your billing period has expired. Please renew to continue scanning."
-      : `Scan limit reached (${quota.scans_used_this_period}/${allowed} this period). Upgrade for more.`;
+  if (!isActive || !periodOk) {
+    const reason = !isActive
+      ? `Subscription is ${quota.status}. Renew your plan to run more scans.`
+      : "Your billing period has expired. Please renew to continue scanning.";
+    return {
+      ok: false,
+      status: 402,
+      error: reason,
+      code: "QUOTA_EXCEEDED",
+      plan: quota.plan,
+    };
+  }
+
+  const debitUsd = scanOverageDebitUsd();
+  const { data: wallet } = await admin
+    .from("user_wallets")
+    .select("balance_usd, is_frozen")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (wallet?.is_frozen) {
+    return {
+      ok: false,
+      status: 402,
+      error: "Wallet frozen — contact support to restore scan access.",
+      code: "WALLET_FROZEN",
+      plan: quota.plan,
+    };
+  }
+
+  const balance = Number(wallet?.balance_usd ?? 0);
+  if (balance >= debitUsd) {
+    return { mode: "wallet", userId, debitUsd };
+  }
 
   return {
     ok: false,
     status: 402,
-    error: reason,
+    error: `Scan limit reached (${quota.scans_used_this_period}/${allowed}). Buy Bazaar credits ($${debitUsd}/scan overage) or upgrade your plan.`,
     code: "QUOTA_EXCEEDED",
     plan: quota.plan,
   };
+}
+
+async function commitScanPayment(payment: ScanPayment): Promise<void> {
+  if (payment.mode === "none") return;
+
+  const admin = createAdminSupabase();
+
+  if (payment.mode === "quota") {
+    const { data: quota } = (await admin
+      .from("subscriptions")
+      .select("scans_used_this_period")
+      .eq("user_id", payment.userId)
+      .maybeSingle()) as { data: { scans_used_this_period: number } | null };
+
+    if (!quota) return;
+
+    await admin
+      .from("subscriptions")
+      .update({ scans_used_this_period: quota.scans_used_this_period + 1 })
+      .eq("user_id", payment.userId);
+    return;
+  }
+
+  const { error } = await admin.rpc("increment_wallet", {
+    p_user_id: payment.userId,
+    p_amount: -payment.debitUsd,
+  });
+
+  if (error) {
+    console.error("[scan-launcher] wallet overage debit failed:", error.message);
+    throw new Error(`Wallet debit failed: ${error.message}`);
+  }
 }
 
 /**
@@ -144,8 +216,11 @@ export async function launchScan(ctx: LaunchScanContext): Promise<LaunchScanResu
   }
 
   const userEmail = await resolveUserEmail(ctx.userId, ctx.userEmail);
-  const quotaBlock = await enforceScanQuota(ctx.userId, userEmail);
-  if (quotaBlock) return quotaBlock;
+  const paymentOrBlock = await resolveScanPayment(ctx.userId, userEmail);
+  if ("ok" in paymentOrBlock && !paymentOrBlock.ok) {
+    return paymentOrBlock;
+  }
+  const payment = paymentOrBlock as ScanPayment;
 
   const health = await getEngineHealthSnapshot();
   if (isEngineLockdown(health)) {
@@ -174,9 +249,11 @@ export async function launchScan(ctx: LaunchScanContext): Promise<LaunchScanResu
     const highIntensity =
       scan.intensity === "greasy" || scan.intensity === "aggressive";
     if (highIntensity) {
-      void runScan({ scanId: scan.id, userId: ctx.userId }).catch((err) => {
-        console.error("[scan-launcher] async runScan failed:", err);
-      });
+      void runScan({ scanId: scan.id, userId: ctx.userId })
+        .then(() => commitScanPayment(payment))
+        .catch((err) => {
+          console.error("[scan-launcher] async runScan failed:", err);
+        });
       return {
         ok: true,
         scanId: scan.id,
@@ -184,6 +261,7 @@ export async function launchScan(ctx: LaunchScanContext): Promise<LaunchScanResu
       };
     }
     await runScan({ scanId: scan.id, userId: ctx.userId });
+    await commitScanPayment(payment);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;

@@ -125,9 +125,19 @@ export function ExecutiveSummarySection({ md }: { md?: string | null }) {
   const text = (md?.trim() || "").replace(/^#+\s*/gm, "");
   if (!text) return null;
 
+  const isSecure = /status:\s*secure/i.test(text);
+
   return (
     <div className="rounded-sm border border-white/[0.08] bg-black/50 p-5">
       <SectionHead icon={FileText} label="Section A — Executive · What Happened" />
+      {isSecure && (
+        <div className="mb-3 inline-flex items-center gap-2 rounded-sm border border-acid/30 bg-acid/10 px-3 py-1.5">
+          <ShieldCheck size={12} className="text-acid" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-acid">
+            Status: Secure
+          </span>
+        </div>
+      )}
       <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-[1.65] tracking-tight text-white/85">
         {text}
       </pre>
@@ -1544,7 +1554,9 @@ export function FindingsReport({
   }
 
   const findings = report.findings ?? [];
+  const breachFindings = findings.filter((f) => isSuccessfulBreach(f));
   const riskCfg = RISK_LABEL_CONFIG[report.risk_label ?? "NONE"] ?? RISK_LABEL_CONFIG.NONE;
+  const vectorsTested = report.attacks_run ?? 0;
 
   const critCount = findings.filter((f) => f.severity === "critical").length;
   const highCount = findings.filter((f) => f.severity === "high").length;
@@ -1563,8 +1575,8 @@ export function FindingsReport({
             Enterprise Intelligence Report
           </p>
           <p className="text-[11px] text-foreground-muted">
-            4-section compliance briefing · {findings.length} findings ·{" "}
-            {report.attacks_run ?? 0} threat signatures tested
+            4-section compliance briefing · {breachFindings.length} findings ·{" "}
+            {vectorsTested} vectors tested
             {report.wall_seconds ? ` · ${Math.round(report.wall_seconds / 60)}m scan` : ""}
           </p>
         </div>
@@ -1585,6 +1597,20 @@ export function FindingsReport({
           </div>
         </div>
       </div>
+
+      {breachFindings.length === 0 && vectorsTested > 0 && (
+        <div className="rounded-sm border border-acid/30 bg-acid/5 p-5">
+          <div className="flex items-center gap-3">
+            <ShieldCheck size={18} className="shrink-0 text-acid" />
+            <div>
+              <p className="font-mono text-sm font-semibold text-acid">Status: Secure</p>
+              <p className="mt-1 text-xs text-foreground-muted">
+                {vectorsTested} attack vectors tested — no exploitable breaches at current intensity.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Four-section enterprise report (A → D) ── */}
       <ExecutiveSummarySection md={report.executive_summary_md} />

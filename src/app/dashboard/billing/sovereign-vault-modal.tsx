@@ -64,7 +64,7 @@ export function SovereignVaultModal({
       setDepositAddress(result.depositAddress);
       setQrCode(result.qrCode);
       setAmountUsdt(result.amountUsdt);
-      setPayCurrency(result.payCurrency.toUpperCase());
+      setPayCurrency(String(result.payCurrency ?? "USDT").toUpperCase());
     });
 
     return () => {

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { CheckCircle2, Zap, Shield } from "lucide-react";
-import { PLANS, type PlanMeta } from "@/lib/plans";
+import { PLANS, CREDIT_PACKS, type PlanMeta } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -59,7 +59,7 @@ export function PricingSection({
         {/* Fine-print */}
         <p className="mt-8 text-center text-[11px] text-foreground-subtle">
           All plans include full data-integrity assessment coverage · Cancel anytime ·
-          No contracts
+          No contracts · Credit packs ${CREDIT_PACKS[0].priceUsd} → {CREDIT_PACKS[0].credits} Bazaar credits (USDT / SOL / BTC)
         </p>
       </div>
     </section>

@@ -8,13 +8,14 @@
 
 ## Pre-flight
 
-1. **Confirm Supabase project** — Open [Supabase Dashboard](https://supabase.com/dashboard) for your live ForgeGuard project.
-2. **Compare migrations** — Local migrations live in `supabase/migrations/`. If live DB was patched manually, run the reconciliation file first:
-   ```bash
-   # In Supabase SQL Editor, run in order if not already applied:
-   # 1. supabase/migrations/20260524_genesis30_reconcile.sql
-   # 2. CITADEL_LAUNCH_VAULT/master-schema.sql
+1. **Confirm Supabase project** — Open [Supabase Dashboard](https://supabase.com/dashboard) for your live ForgeGuard project (`nlginrukltrwpkyujzzx`).
+2. **One-shot schema bootstrap (recommended):**
+   ```text
+   Run ONCE in Supabase SQL Editor:
+   CITADEL_LAUNCH_VAULT/LAUNCH_ALL.sql
    ```
+   See `CITADEL_LAUNCH_VAULT/LAUNCH_DIFF_REPORT.md` for live-vs-repo gaps before running.
+3. **Compare migrations** — Local migrations live in `supabase/migrations/`. Live DB currently tracks only 8 genesis migrations; most schema was never applied via CLI.
 3. **Service role key** — Ensure `.env.local` has:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -22,19 +23,17 @@
 
 ---
 
-## 1. Database — Run Master Schema
+## 1. Database — Run LAUNCH_ALL.sql (primary)
 
-**⚠️ Cursor is NOT connected to your Supabase project. You must run SQL manually.**
+**⚠️ Do not apply via MCP/CI without review. Run manually in Supabase SQL Editor.**
 
-**Recommended — one file, everything included:**
+**File:** `CITADEL_LAUNCH_VAULT/LAUNCH_ALL.sql`
 
-**File:** `CITADEL_LAUNCH_VAULT/RUN_IN_SUPABASE.sql`
+Merges all 47 local migrations + `sql/api_keys.sql` + `sql/scheduled_scans.sql` + verification SELECTs from `sql/verify-live-schema.sql`. Idempotent (`IF NOT EXISTS`, `CREATE OR REPLACE`).
 
-In **Supabase → SQL Editor → New query**, paste the **full** contents of `RUN_IN_SUPABASE.sql` and execute once.
+**Alternative (legacy):** `CITADEL_LAUNCH_VAULT/RUN_IN_SUPABASE.sql` or `master-schema.sql` — partial; prefer `LAUNCH_ALL.sql` for launch.
 
-This single script includes Admin Command Center schema, Persona Switcher, Iron Wall verification repair, Ghost Protocol, and **Stronghold completion** (`verification_otps`, `code_hash`, wallet Realtime).
-
-**Alternative (legacy):** `CITADEL_LAUNCH_VAULT/master-schema.sql` — same content, kept in sync; prefer `RUN_IN_SUPABASE.sql` for new deploys.
+**Pre-read:** `CITADEL_LAUNCH_VAULT/LAUNCH_DIFF_REPORT.md`
 
 This adds:
 | Feature | Schema change |

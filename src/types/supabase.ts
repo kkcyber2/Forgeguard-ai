@@ -663,6 +663,54 @@ export type Database = {
         }
         Relationships: []
       }
+      crypto_deposits: {
+        Row: {
+          id: string
+          user_id: string
+          plan_name: string
+          plan_id: string
+          amount_usdt: number
+          deposit_address: string
+          pay_currency: string
+          payment_id: string | null
+          status: string
+          credits_granted: boolean
+          created_at: string
+          updated_at: string
+          confirmed_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plan_name: string
+          plan_id: string
+          amount_usdt: number
+          deposit_address: string
+          pay_currency?: string
+          payment_id?: string | null
+          status?: string
+          credits_granted?: boolean
+          created_at?: string
+          updated_at?: string
+          confirmed_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plan_name?: string
+          plan_id?: string
+          amount_usdt?: number
+          deposit_address?: string
+          pay_currency?: string
+          payment_id?: string | null
+          status?: string
+          credits_granted?: boolean
+          created_at?: string
+          updated_at?: string
+          confirmed_at?: string | null
+        }
+        Relationships: []
+      }
       custom_tools: {
         Row: {
           created_at: string

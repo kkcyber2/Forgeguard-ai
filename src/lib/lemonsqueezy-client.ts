@@ -1,81 +1,33 @@
 /**
- * Client-safe LemonSqueezy helpers (no server-only, no Node crypto).
+ * Client-safe checkout helpers — Sovereign Vault (crypto) only.
  */
 
 export type { PlanId, PlanMeta } from "@/lib/plans";
 export { PLANS } from "@/lib/plans";
 
-import {
-  getStripeHostedCheckoutUrl,
-  type PaidPlanId,
-} from "@/lib/payments/stripe";
-
-const FALLBACK_VARIANT_STARTUP =
-  process.env.NEXT_PUBLIC_LEMONSQUEEZY_VARIANT_STARTUP ??
-  process.env.LEMONSQUEEZY_VARIANT_STARTUP ??
-  "";
-
-const FALLBACK_VARIANT_ENTERPRISE =
-  process.env.NEXT_PUBLIC_LEMONSQUEEZY_VARIANT_ENTERPRISE ??
-  process.env.LEMONSQUEEZY_VARIANT_ENTERPRISE ??
-  "";
-
-export function getLSVariantIds() {
-  return {
-    variantStartup: FALLBACK_VARIANT_STARTUP,
-    variantEnterprise: FALLBACK_VARIANT_ENTERPRISE,
-  };
+/** Marketing CTAs route to billing vault — no external Stripe/LS checkout. */
+export function resolveMarketingPlanCheckout(_planId: "startup" | "enterprise"): string | null {
+  return null;
 }
 
-export function buildCheckoutUrl(
-  variantId: string,
-  userEmail: string,
-  userId: string,
-): string {
-  const base = `https://forgeguard.lemonsqueezy.com/buy/${variantId}`;
-  const params = new URLSearchParams({
-    "checkout[email]": userEmail,
-    "checkout[custom][user_id]": userId,
-    "checkout[success_url]": `${
-      process.env.NEXT_PUBLIC_APP_URL ?? "https://forgeguard.ai"
-    }/dashboard/billing?upgraded=1`,
-  });
-  return `${base}?${params.toString()}`;
-}
-
-/** Marketing-page checkout — variant ID only (no auth session required). */
-export function buildMarketingCheckoutUrl(variantId: string): string {
-  const base = `https://forgeguard.lemonsqueezy.com/buy/${variantId}`;
-  const params = new URLSearchParams({
-    "checkout[success_url]": `${
-      process.env.NEXT_PUBLIC_APP_URL ?? "https://www.forgeguard-ai.com"
-    }/auth/signup?upgraded=1`,
-  });
-  return `${base}?${params.toString()}`;
-}
-
-export function resolveMarketingPlanCheckout(planId: PaidPlanId): string | null {
-  const stripe = getStripeHostedCheckoutUrl(planId);
-  if (stripe) return stripe;
-
-  const { variantStartup, variantEnterprise } = getLSVariantIds();
-  const variantId =
-    planId === "startup"
-      ? variantStartup?.trim()
-      : planId === "enterprise"
-        ? variantEnterprise?.trim()
-        : "";
-  if (!variantId) return null;
-  return buildMarketingCheckoutUrl(variantId);
-}
-
-/** Startup ($49) and Sovereign ($199) checkout URLs — Stripe primary, LS fallback. */
 export function getConfiguredPlanCheckouts(): {
   startup: string | null;
   sovereign: string | null;
 } {
-  return {
-    startup: resolveMarketingPlanCheckout("startup"),
-    sovereign: resolveMarketingPlanCheckout("enterprise"),
-  };
+  return { startup: null, sovereign: null };
+}
+
+/** @deprecated Legacy LS variant IDs — no longer used for checkout. */
+export function getLSVariantIds() {
+  return { variantStartup: "", variantEnterprise: "" };
+}
+
+/** @deprecated Legacy LS checkout URL builder. */
+export function buildCheckoutUrl(variantId: string, _userEmail: string, _userId: string): string {
+  return `https://forgeguard.ai/dashboard/billing`;
+}
+
+/** @deprecated Legacy LS marketing checkout. */
+export function buildMarketingCheckoutUrl(_variantId: string): string {
+  return `/dashboard/billing`;
 }

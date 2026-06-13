@@ -1,15 +1,12 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
-import { CheckCircle2, CreditCard, Layers, Lock } from "lucide-react";
+import { CheckCircle2, Layers, Lock, Terminal } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { PLANS, type PlanId } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
-import {
-  getStripeBillingPortalUrl,
-  isStripeCheckoutConfigured,
-} from "@/lib/payments/stripe";
+import { isCryptoCheckoutConfigured } from "@/lib/payments/crypto";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import { RedeemCodeBox } from "./redeem-code-box";
 import { PlanSelector } from "./plan-selector";
@@ -46,8 +43,7 @@ export default async function BillingPage({
   const { upgraded, gate } = await searchParams;
   const sub = await getSubscription(user.id);
   const currentPlan: PlanId = sub?.plan ?? "free";
-  const stripePortalUrl = getStripeBillingPortalUrl();
-  const stripeConfigured = isStripeCheckoutConfigured();
+  const cryptoConfigured = isCryptoCheckoutConfigured();
 
   const scansAllowed = PLANS.find((p) => p.id === currentPlan)?.scansPerMonth ?? 2;
   const scansUsed = sub?.scans_used_this_period ?? 0;
@@ -103,11 +99,11 @@ export default async function BillingPage({
         </div>
       )}
 
-      {!stripeConfigured && !isSovereign && (
+      {!cryptoConfigured && !isSovereign && !isRevenueSimulationMode() && (
         <div className="mb-4 rounded-sm border border-amber-400/30 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-300">
-          Stripe checkout links not configured — set{" "}
-          <code className="text-acid">NEXT_PUBLIC_STRIPE_CHECKOUT_STARTUP</code> and{" "}
-          <code className="text-acid">NEXT_PUBLIC_STRIPE_CHECKOUT_SOVEREIGN</code> on Vercel.
+          Sovereign Vault not configured — set{" "}
+          <code className="text-lime-400">NOWPAYMENTS_API_KEY</code> or{" "}
+          <code className="text-lime-400">SOVEREIGN_CRYPTO_WALLET</code> on Vercel.
         </div>
       )}
 
@@ -159,17 +155,12 @@ export default async function BillingPage({
           </div>
         </div>
 
-        {stripePortalUrl && currentPlan !== "free" && (
+        {currentPlan !== "free" && (
           <div className="mt-4 border-t border-white/[0.06] pt-4">
-            <a
-              href={stripePortalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-foreground-muted transition-colors hover:text-foreground"
-            >
-              <CreditCard size={12} strokeWidth={1.75} />
-              Manage billing &amp; cancel subscription (Stripe)
-            </a>
+            <p className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+              <Terminal size={12} strokeWidth={1.75} />
+              Active via Sovereign Vault · USDT / SOL / BTC
+            </p>
           </div>
         )}
       </div>
@@ -187,8 +178,8 @@ export default async function BillingPage({
         </>
       )}
 
-      <p className="mt-6 text-center text-[11px] text-foreground-subtle">
-        Payments are processed securely by Stripe &middot; Cancel any time from the billing portal
+      <p className="mt-6 text-center font-mono text-[10px] uppercase tracking-widest text-zinc-700">
+        Sovereign Vault · Ghost Mode Checkout · USDT / SOL / BTC
       </p>
     </>
   );

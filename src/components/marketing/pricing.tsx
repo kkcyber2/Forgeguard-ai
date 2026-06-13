@@ -3,7 +3,6 @@
 import * as React from "react";
 import { CheckCircle2, Zap, Shield } from "lucide-react";
 import { PLANS, type PlanMeta } from "@/lib/plans";
-import { resolveMarketingPlanCheckout } from "@/lib/lemonsqueezy-client";
 import { cn } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -40,8 +39,8 @@ export function PricingSection({
             <span className="text-acid">Audit-ready pricing.</span>
           </h2>
           <p className="mt-3 text-sm text-foreground-muted">
-            Secure checkout via{" "}
-            <span className="text-foreground/70">Stripe</span>
+            Sovereign Vault checkout ·{" "}
+            <span className="text-lime-400/80">USDT / SOL / BTC</span>
             {" · "}Startup $49/mo · Sovereign $199/mo
           </p>
         </div>
@@ -80,19 +79,16 @@ function PricingCard({
 }) {
   const highlighted = plan.id === "startup";
 
-  const lsCheckout =
-    plan.id === "startup" || plan.id === "enterprise"
-      ? resolveMarketingPlanCheckout(plan.id)
-      : null;
-
   const ctaHref =
     plan.price === 0
       ? isAuthenticated
         ? "/dashboard"
         : "/auth/signup"
-      : lsCheckout ?? (isAuthenticated ? "/dashboard/billing" : "/auth/signup");
+      : isAuthenticated
+        ? "/dashboard/billing"
+        : "/auth/signup";
 
-  const ctaExternal = Boolean(lsCheckout && plan.price > 0);
+  const ctaExternal = false;
 
   const ctaLabel =
     plan.price === 0
@@ -100,7 +96,7 @@ function PricingCard({
         ? "Your current plan"
         : "Get started free"
       : isAuthenticated
-        ? `Upgrade to ${plan.name}`
+        ? `Vault — ${plan.name}`
         : `Start with ${plan.name}`;
 
   return (
@@ -227,7 +223,7 @@ function PricingCard({
               : "border-white/[0.1] text-foreground-muted hover:border-white/[0.2] hover:text-foreground",
         )}
       >
-        {ctaExternal ? `Subscribe — $${plan.price}/mo` : ctaLabel}
+        {ctaExternal ? `Vault — $${plan.price} USDT` : ctaLabel}
       </a>
     </div>
   );

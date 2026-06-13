@@ -5,11 +5,7 @@ import {
   resolveEngineBaseUrl,
   resolveEngineAuthToken,
 } from "@/lib/agathon-config";
-import {
-  getStripeBillingPortalUrl,
-  getStripeHostedCheckoutUrl,
-  isStripeCheckoutConfigured,
-} from "@/lib/payments/stripe";
+import { isCryptoCheckoutConfigured } from "@/lib/payments/crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,16 +44,13 @@ function debugLog(
 export async function GET() {
   const checks: Record<string, unknown> = {};
 
-  const stripeStartup = getStripeHostedCheckoutUrl("startup");
-  const stripeSovereign = getStripeHostedCheckoutUrl("enterprise");
-  const stripePortal = getStripeBillingPortalUrl();
-  checks.stripe = {
-    configured: isStripeCheckoutConfigured(),
-    startup: Boolean(stripeStartup),
-    sovereign: Boolean(stripeSovereign),
-    portal: Boolean(stripePortal),
+  const cryptoConfigured = isCryptoCheckoutConfigured();
+  checks.crypto = {
+    configured: cryptoConfigured,
+    nowpayments: Boolean(process.env.NOWPAYMENTS_API_KEY?.trim()),
+    sovereignWallet: Boolean(process.env.SOVEREIGN_CRYPTO_WALLET?.trim()),
   };
-  debugLog("H2", "launch-check:stripe", "Stripe env resolution", checks.stripe as Record<string, unknown>);
+  debugLog("H2", "launch-check:crypto", "Sovereign Vault env", checks.crypto as Record<string, unknown>);
 
   const engineUrl = resolveEngineBaseUrl();
   const engineToken = resolveEngineAuthToken();

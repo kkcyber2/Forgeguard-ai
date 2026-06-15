@@ -302,7 +302,7 @@ export function HeroSection({
   primaryCta?: { href: string; label: string };
 }) {
   return (
-    <section className="relative isolate flex min-h-[calc(100dvh-56px)] flex-col items-center justify-center overflow-hidden px-4 py-24 sm:py-32">
+    <section className="relative isolate flex min-h-[calc(100dvh-56px)] flex-col items-center justify-center overflow-x-hidden px-4 py-20 sm:py-32">
       {/* Background grid */}
       <GridBackground className="absolute inset-0 -z-10 opacity-40" />
 
@@ -339,7 +339,7 @@ export function HeroSection({
           </Badge>
         </motion.div>
 
-        <h1 className="font-display text-4xl font-semibold leading-[1.1] tracking-[-0.02em] text-white sm:text-5xl md:text-6xl">
+        <h1 className="font-display text-3xl font-semibold leading-[1.12] tracking-[-0.02em] text-white sm:text-5xl md:text-6xl">
           Enterprise data protection.{" "}
           <span
             className="text-transparent"

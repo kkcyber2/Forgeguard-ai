@@ -73,7 +73,7 @@ export function ClearanceProgress(props: ClearanceProgressProps) {
     {
       id: "document",
       icon: FileSearch,
-      label: "Identity documentation",
+      label: "Government ID uploaded",
       done: props.identityDocUploaded,
       href: "#clearance-audit",
     },

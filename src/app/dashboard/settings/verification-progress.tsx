@@ -5,11 +5,12 @@ import { motion } from "framer-motion";
 import {
   CheckCircle2,
   Circle,
-  Mail,
-  Phone,
+  FileSearch,
   Globe,
+  Mail,
   PenLine,
-  Camera,
+  Phone,
+  ScanFace,
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,7 @@ interface VerificationStep {
   label: string;
   detail: string;
   done: boolean;
-  href?: string; // anchor to scroll to
+  href?: string;
 }
 
 interface Props {
@@ -28,7 +29,8 @@ interface Props {
   hasPhone: boolean;
   domainVerified: boolean;
   hasSignature: boolean;
-  identityProofed: boolean;
+  faceLivenessVerified: boolean;
+  identityDocUploaded: boolean;
 }
 
 export function VerificationProgress({
@@ -36,7 +38,8 @@ export function VerificationProgress({
   hasPhone,
   domainVerified,
   hasSignature,
-  identityProofed,
+  faceLivenessVerified,
+  identityDocUploaded,
 }: Props) {
   const steps: VerificationStep[] = [
     {
@@ -47,10 +50,26 @@ export function VerificationProgress({
       done: emailVerified,
     },
     {
+      id: "liveness",
+      icon: ScanFace,
+      label: "Face liveness verified",
+      detail: "Multi-pose selfie scan",
+      done: faceLivenessVerified,
+      href: "#clearance-liveness",
+    },
+    {
+      id: "gov-id",
+      icon: FileSearch,
+      label: "Government ID uploaded",
+      detail: "Passport / license for AI audit",
+      done: identityDocUploaded,
+      href: "#clearance-audit",
+    },
+    {
       id: "phone",
       icon: Phone,
       label: "Phone number",
-      detail: "Added in Profile section",
+      detail: "Optional — profile only",
       done: hasPhone,
       href: "#profile",
     },
@@ -70,14 +89,6 @@ export function VerificationProgress({
       done: hasSignature,
       href: "#signature",
     },
-    {
-      id: "identity",
-      icon: Camera,
-      label: "Identity proofing",
-      detail: "Webcam confirmation",
-      done: identityProofed,
-      href: "#identity",
-    },
   ];
 
   const completed = steps.filter((s) => s.done).length;
@@ -87,20 +98,19 @@ export function VerificationProgress({
   const tier =
     completed === total
       ? { label: "Sovereign", color: "#D1FF00" }
-      : completed >= 3
+      : completed >= 4
         ? { label: "Operator", color: "#38BDF8" }
-        : completed >= 1
+        : completed >= 2
           ? { label: "Recruit", color: "#F59E0B" }
           : { label: "Unverified", color: "#6B7280" };
 
   return (
     <div className="rounded-sm border border-white/[0.06] bg-surface p-5 space-y-4">
-      {/* Header */}
       <div className="flex items-center gap-2">
         <ShieldCheck size={12} strokeWidth={1.75} className="text-foreground-subtle" />
         <p className="text-eyebrow text-foreground-subtle">Verification status</p>
         <span
-          className="ml-auto rounded px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest"
+          className="ml-auto rounded px-2 py-0.5 font-mono text-xs uppercase tracking-widest"
           style={{
             color: tier.color,
             background: `${tier.color}14`,
@@ -111,13 +121,12 @@ export function VerificationProgress({
         </span>
       </div>
 
-      {/* Progress bar */}
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="font-mono text-[10px] text-foreground-subtle">
+          <span className="font-mono text-xs text-foreground-subtle">
             {completed} / {total} complete
           </span>
-          <span className="font-mono text-[10px] text-foreground-subtle">{pct}%</span>
+          <span className="font-mono text-xs text-foreground-subtle">{pct}%</span>
         </div>
         <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
           <motion.div
@@ -130,7 +139,6 @@ export function VerificationProgress({
         </div>
       </div>
 
-      {/* Steps */}
       <ul className="space-y-2">
         {steps.map((step) => (
           <li key={step.id}>
@@ -151,30 +159,18 @@ export function VerificationProgress({
               <div className="min-w-0 flex-1">
                 <p
                   className={cn(
-                    "text-[11px] font-medium leading-none",
+                    "text-xs font-medium leading-none sm:text-[11px]",
                     step.done ? "text-zinc-300" : "text-zinc-500",
                   )}
                 >
                   {step.label}
                 </p>
-                <p className="mt-0.5 text-[10px] text-zinc-600 leading-none">{step.detail}</p>
+                <p className="mt-0.5 text-xs leading-none text-zinc-600">{step.detail}</p>
               </div>
-              {!step.done && step.href && (
-                <span className="shrink-0 font-mono text-[9px] text-zinc-600 hover:text-zinc-400">
-                  Set up →
-                </span>
-              )}
             </a>
           </li>
         ))}
       </ul>
-
-      {completed === total && (
-        <div className="flex items-center gap-2 rounded-[4px] border border-acid/20 bg-acid/[0.06] px-3 py-2">
-          <ShieldCheck size={11} className="shrink-0 text-acid" />
-          <p className="text-[10px] text-acid">Sovereign identity fully established.</p>
-        </div>
-      )}
     </div>
   );
 }

@@ -50,7 +50,7 @@ export function MarketingNav({ session }: { session: MarketingNavSession }) {
           "transition-shadow duration-200",
         )}
       >
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-6 md:px-8">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 overflow-x-hidden px-4 sm:px-6 md:px-8">
           <Link href="/" aria-label="ForgeGuard AI home">
             <Logo />
           </Link>

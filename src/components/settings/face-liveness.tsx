@@ -220,15 +220,15 @@ export function FaceLiveness({
   }
 
   return (
-    <div id="clearance-liveness" className="flex flex-col gap-4 scroll-mt-24">
+    <div id="clearance-liveness" className="flex flex-col gap-4 scroll-mt-24 overflow-x-hidden">
       <div className="flex items-center gap-2">
-        <ScanFace size={13} className="text-[#D1FF00]" />
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#D1FF00]">
+        <ScanFace size={14} className="text-[#D1FF00]" />
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-[#D1FF00] sm:text-sm">
           Hacker liveness
         </p>
       </div>
 
-      <p className="text-xs text-white/50">
+      <p className="text-xs leading-relaxed text-white/50 sm:text-sm">
         Required for Tactical clearance. Follow the guided poses — center, up, down, left, right.
         {isMobileDevice() ? " Front camera (selfie) is used on mobile." : ""}
       </p>
@@ -241,7 +241,7 @@ export function FaceLiveness({
           return (
             <li
               key={p.id}
-              className={`flex items-center gap-1.5 rounded-[3px] border px-2 py-1 font-mono text-[9px] uppercase tracking-wider ${
+              className={`flex items-center gap-1.5 rounded-[3px] border px-2 py-1.5 font-mono text-xs uppercase tracking-wider sm:text-[11px] ${
                 captured
                   ? "border-[#D1FF00]/40 text-[#D1FF00]"
                   : active
@@ -257,16 +257,15 @@ export function FaceLiveness({
       </ol>
 
       {currentPose && phase !== "idle" && (
-        <p className="font-mono text-[10px] text-violet-300/90">
+        <p className="font-mono text-xs text-violet-300/90 sm:text-sm">
           Step {stepIndex + 1}/{POSES.length}: {currentPose.hint}
         </p>
       )}
 
       <div
-        className="relative overflow-hidden rounded-[4px]"
+        className="relative w-full min-h-[240px] overflow-hidden rounded-[4px] sm:max-h-[320px]"
         style={{
-          aspectRatio: "3/2",
-          maxHeight: 260,
+          aspectRatio: "3/4",
           background: "rgba(0,0,0,0.5)",
           border: "0.5px solid rgba(209,255,0,0.2)",
         }}
@@ -304,7 +303,7 @@ export function FaceLiveness({
           <button
             type="button"
             onClick={() => void startCamera()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-[#D1FF00]/15 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#D1FF00]"
+            className="flex min-h-[44px] flex-1 touch-manipulation items-center justify-center gap-2 rounded-[3px] bg-[#D1FF00]/15 py-3 font-mono text-sm font-semibold uppercase tracking-[0.12em] text-[#D1FF00] sm:text-xs"
           >
             <Camera size={12} />
             Start liveness scan
@@ -315,7 +314,7 @@ export function FaceLiveness({
               type="button"
               onClick={captureFrame}
               disabled={Boolean(captures[currentPose?.id ?? "center"])}
-              className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-violet-500 py-2 font-mono text-[10px] font-semibold uppercase text-white disabled:opacity-40"
+              className="flex min-h-[44px] flex-1 touch-manipulation items-center justify-center gap-2 rounded-[3px] bg-violet-500 py-3 font-mono text-sm font-semibold uppercase text-white disabled:opacity-40 sm:text-xs"
             >
               Capture {currentPose?.label}
             </button>
@@ -324,7 +323,7 @@ export function FaceLiveness({
                 type="button"
                 onClick={handleSubmit}
                 disabled={pending}
-                className="flex flex-1 items-center justify-center gap-2 rounded-[3px] bg-[#D1FF00]/15 py-2 font-mono text-[10px] font-semibold uppercase text-[#D1FF00]"
+                className="flex min-h-[44px] flex-1 touch-manipulation items-center justify-center gap-2 rounded-[3px] bg-[#D1FF00]/15 py-3 font-mono text-sm font-semibold uppercase text-[#D1FF00] sm:text-xs"
               >
                 {pending ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                 Submit liveness

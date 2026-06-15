@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { buildCustodyHash } from "@/lib/verify/custody-hash";
+import { resolveDocumentMime } from "@/lib/verify/resolve-document-mime";
 import { sendOtpSms } from "@/lib/sms/send-otp-sms";
 import type { Database } from "@/types/supabase";
 
@@ -390,60 +391,13 @@ function isValidCaptureDataUrl(dataUrl: string): boolean {
 }
 
 export async function saveWebcamCapture(
-  dataUrl: string,
+  _dataUrl: string,
 ): Promise<{ error?: string; verified?: boolean; schemaSync?: boolean }> {
-  const user = await getSessionUser();
-  if (!user) return { error: "Not authenticated." };
-  if (!isValidCaptureDataUrl(dataUrl)) {
-    return { error: "Invalid capture. Retake photo with camera active." };
-  }
-
-  const path = `${user.id}/webcam-${Date.now()}.jpg`;
-  const base64 = dataUrl.split(",")[1]!;
-  const buffer = Buffer.from(base64, "base64");
-
-  let admin: ReturnType<typeof createAdminSupabase>;
-  try {
-    admin = createAdminSupabase();
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Admin client unavailable";
-    console.error("[verify:webcam] createAdminSupabase failed:", msg);
-    return { error: "Server misconfigured. SUPABASE_SERVICE_ROLE_KEY required." };
-  }
-
-  const { error: uploadErr } = await admin.storage
-    .from("verification-docs")
-    .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
-
-  if (uploadErr) {
-    console.error("[verify:webcam] storage:", uploadErr.message, uploadErr);
-    return { error: uploadErr.message || "Storage upload failed." };
-  }
-
-  const profileResult = await adminUpdateProfile(
-    user.id,
-    {
-      identity_proofed: true,
-      identity_document_path: path,
-      identity_verified: true,
-    },
-    {
-      identity_document_path: path,
-      identity_verified: true,
-    },
-  );
-
-  if (profileResult.error) {
-    console.error("[verify:webcam] profile update:", profileResult.error);
-    return {
-      error: profileResult.error,
-      schemaSync: profileResult.schemaSync,
-    };
-  }
-
-  revalidatePath("/dashboard/settings");
-  revalidatePath("/dashboard");
-  return { verified: true };
+  /** @deprecated Use FaceLiveness + submitFaceLiveness. Enterprise webcam proofing removed from clearance. */
+  return {
+    error:
+      "Webcam identity proofing is deprecated. Complete Face Liveness in Clearance settings, or upload a government ID below.",
+  };
 }
 
 export async function uploadIdentityDocument(
@@ -456,14 +410,32 @@ export async function uploadIdentityDocument(
   if (!file || file.size === 0) return { error: "No document selected." };
   if (file.size > 8 * 1024 * 1024) return { error: "Max file size is 8 MB." };
 
-  const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-  if (!allowed.includes(file.type)) {
-    return { error: "Upload PDF, JPEG, PNG, or WebP only." };
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const resolvedMime = resolveDocumentMime(file, buffer);
+  if (!resolvedMime) {
+    console.warn("[verify:upload] mime unresolved:", {
+      name: file.name,
+      reportedType: file.type || "(empty)",
+      size: file.size,
+    });
+    return { error: "Could not detect file type. Use PDF, PNG, or JPEG." };
   }
 
-  const ext = file.name.split(".").pop() ?? "bin";
+  console.info("[verify:upload] document:", {
+    name: file.name,
+    resolvedMime,
+    size: file.size,
+  });
+
+  const ext =
+    resolvedMime === "application/pdf"
+      ? "pdf"
+      : resolvedMime === "image/png"
+        ? "png"
+        : resolvedMime === "image/webp"
+          ? "webp"
+          : "jpg";
   const path = `${user.id}/identity-${Date.now()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
 
   let admin: ReturnType<typeof createAdminSupabase>;
   try {
@@ -476,7 +448,7 @@ export async function uploadIdentityDocument(
 
   const { error: uploadErr } = await admin.storage
     .from("verification-docs")
-    .upload(path, buffer, { contentType: file.type, upsert: true });
+    .upload(path, buffer, { contentType: resolvedMime, upsert: true });
 
   if (uploadErr) {
     console.error("[verify:upload] storage:", uploadErr.message);
@@ -486,7 +458,6 @@ export async function uploadIdentityDocument(
   const profileResult = await adminUpdateProfile(
     user.id,
     {
-      identity_proofed: true,
       identity_document_path: path,
       identity_audit_status: "pending",
       clearance_tier: "pending",

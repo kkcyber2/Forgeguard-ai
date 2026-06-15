@@ -169,8 +169,15 @@ export function DashboardShell({
       />
 
       <main
-        className={cn("relative z-10 pt-14", sovereignNav && "lg:pl-[220px]")}
-        style={systemDegraded ? { paddingTop: "calc(56px + 28px)" } : undefined}
+        className={cn(
+          "relative z-10 overflow-x-hidden pt-14",
+          sovereignNav && "lg:pl-[220px]",
+        )}
+        style={{
+          paddingTop: systemDegraded
+            ? "calc(56px + 28px + env(safe-area-inset-top, 0px))"
+            : "calc(3.5rem + env(safe-area-inset-top, 0px))",
+        }}
       >
         <div
           className={

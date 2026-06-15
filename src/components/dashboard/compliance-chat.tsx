@@ -67,7 +67,7 @@ export function ComplianceChatBubble() {
     <>
       {open && (
         <div
-          className="fixed bottom-20 right-4 z-50 flex w-[min(100vw-2rem,380px)] flex-col overflow-hidden rounded-sm border border-lime-500/25 bg-[#050505]/95 shadow-[0_0_40px_rgba(132,255,0,0.1)] backdrop-blur-md md:bottom-6 md:right-6"
+          className="fixed z-50 flex w-[min(100vw-2rem,380px)] flex-col overflow-hidden rounded-sm border border-lime-500/25 bg-[#050505]/95 shadow-[0_0_40px_rgba(132,255,0,0.1)] backdrop-blur-md max-sm:bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] max-sm:right-4 sm:bottom-6 sm:right-6"
           role="dialog"
           aria-label="ForgeGuard compliance chat"
         >
@@ -146,7 +146,7 @@ export function ComplianceChatBubble() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-lime-500/40 bg-lime-400 text-[#050505] shadow-[0_0_24px_rgba(132,255,0,0.25)] transition-transform hover:scale-105 md:bottom-6 md:right-6 md:h-14 md:w-14"
+        className="fixed z-50 flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-lime-500/40 bg-lime-400 text-[#050505] shadow-[0_0_24px_rgba(132,255,0,0.25)] transition-transform hover:scale-105 max-sm:bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] max-sm:right-4 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14"
         aria-label={open ? "Close compliance chat" : "Open compliance chat"}
       >
         <MessageCircle size={22} strokeWidth={1.75} />

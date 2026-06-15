@@ -1,6 +1,6 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
-import { KeyRound, ShieldAlert, User2, Globe, PenLine, Camera } from "lucide-react";
+import { KeyRound, ShieldAlert, User2, Globe, PenLine } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentProfile, getSessionUser } from "@/lib/supabase/server";
@@ -10,7 +10,6 @@ import { PasswordForm } from "./password-form";
 import { ApiKeysSection } from "./api-keys-section";
 import { SignaturePad } from "@/components/settings/signature-pad";
 import { DomainVerifier } from "@/components/settings/domain-verifier";
-import { WebcamIdentity } from "@/components/settings/webcam-identity";
 import {
   SettingsClearanceAside,
   SettingsClearanceProvider,
@@ -52,7 +51,23 @@ export default async function SettingsPage() {
 
       <SettingsClearanceProvider initialDocUploaded={!!data.docPath}>
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-6">
+        <aside className="order-1 space-y-4 lg:order-none lg:col-start-2 lg:row-span-2">
+          <div className="rounded-sm border-hairline border-white/[0.06] bg-surface p-5 lg:hidden">
+            <SettingsClearanceAside
+              emailVerified={data.emailVerified}
+              faceLivenessVerified={data.faceLivenessVerified}
+              domainVerified={data.domainVerified}
+              hasSignature={data.hasSignature}
+              identityDocUploaded={!!data.docPath}
+              identityVerified={data.identityVerified}
+              clearanceTier={data.clearanceTier}
+              auditScore={data.auditScore}
+              sovereignPending={data.sovereignPending}
+            />
+          </div>
+        </aside>
+
+        <div className="order-2 flex flex-col gap-6 lg:order-none lg:col-start-1">
           <Section id="profile" icon={User2} eyebrow="Identity" title="Profile">
             <ProfileForm
               initial={{
@@ -125,18 +140,9 @@ export default async function SettingsPage() {
               />
             </div>
           </Section>
-
-          <Section
-            id="identity"
-            icon={Camera}
-            eyebrow="Enterprise missions"
-            title="Identity Proofing"
-          >
-            <WebcamIdentity verified={data.identityProofed} />
-          </Section>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="order-3 hidden space-y-4 lg:order-none lg:col-start-2 lg:block">
           <div className="rounded-sm border-hairline border-white/[0.06] bg-surface p-5">
             <p className="text-eyebrow text-foreground-subtle mb-3">Stealth</p>
             <GhostProtocolToggle compact />

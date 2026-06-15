@@ -19,6 +19,7 @@ export interface SettingsPageData {
   domainVerified: boolean;
   hasSignature: boolean;
   identityProofed: boolean;
+  /** @deprecated alias — use faceLivenessVerified */
   identityVerified: boolean;
   clearanceTier: "pending" | "tactical" | "professional" | "sovereign";
   auditScore: number | null;
@@ -118,7 +119,9 @@ export async function fetchSettingsPageData(
       faceLivenessPoseCount: profile?.face_liveness_pose_count ?? 0,
       domainVerified: sovereign || (profile?.domain_verified ?? false),
       hasSignature: sovereign || !!profile?.signature_data,
-      identityProofed: sovereign || (profile?.identity_proofed ?? false),
+      identityProofed:
+        sovereign ||
+        (profile?.face_liveness_verified ?? profile?.identity_proofed ?? false),
       identityVerified: sovereign || (profile?.identity_verified ?? false),
       clearanceTier,
       auditScore: sovereign

@@ -58,30 +58,35 @@ type SurfaceKind = "llm" | "web" | "code" | "mobile";
 const TARGET_TYPES: {
   value: SurfaceKind;
   label: string;
+  badge?: string;
   icon: React.ElementType;
   modules: string[];
 }[] = [
   {
     value: "llm",
     label: "LLM ENDPOINT",
+    badge: "Industry Standard Red-Teaming",
     icon: Bot,
     modules: ["Prompt Hijacker", "Jailbreak Mutator", "Garak Catalogue (400+)"],
   },
   {
     value: "web",
     label: "WEB APPLICATION",
+    badge: "Beta Probe",
     icon: Globe,
     modules: ["Logic Discovery", "XSS Vector Scout", "Client Gateway Crawl"],
   },
   {
     value: "code",
     label: "API GATEWAY",
+    badge: "Beta Probe",
     icon: Server,
     modules: ["BOLA/IDOR Sweep", "UUID IDOR Fuzz", "Hidden User Exfiltration"],
   },
   {
     value: "mobile",
     label: "CHAT BOT",
+    badge: "Beta Probe",
     icon: MessageSquare,
     modules: ["Intent Drift Harness", "Tool-Call Injection", "PyRIT Scenarios"],
   },
@@ -300,15 +305,29 @@ export function NewScanForm({
                     className={active ? "text-acid" : "text-white/35"}
                     strokeWidth={1.75}
                   />
-                  <div>
-                    <p
-                      className={cn(
-                        "font-mono text-[10px] font-semibold uppercase tracking-widest",
-                        active ? "text-acid" : "text-white/55",
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p
+                        className={cn(
+                          "font-mono text-[10px] font-semibold uppercase tracking-widest",
+                          active ? "text-acid" : "text-white/55",
+                        )}
+                      >
+                        {t.label}
+                      </p>
+                      {t.badge && (
+                        <span
+                          className={cn(
+                            "rounded-sm px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider",
+                            t.value === "llm"
+                              ? "border border-acid/30 bg-acid/10 text-acid"
+                              : "border border-amber-400/25 bg-amber-400/10 text-amber-300/90",
+                          )}
+                        >
+                          {t.badge}
+                        </span>
                       )}
-                    >
-                      {t.label}
-                    </p>
+                    </div>
                     <p className="mt-1 text-[10px] text-white/35">
                       {t.modules.slice(0, 2).join(" · ")}
                     </p>

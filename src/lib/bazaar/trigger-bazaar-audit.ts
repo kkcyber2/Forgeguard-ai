@@ -5,6 +5,7 @@
 import {
   engineAuthHeaders,
   ENGINE_HANDSHAKE_TIMEOUT_MS,
+  joinEnginePath,
   resolveEngineBaseUrl,
 } from "@/lib/agathon-config";
 
@@ -42,7 +43,7 @@ export async function triggerBazaarAudit(
     };
   }
 
-  const url = `${base.replace(/\/+$/, "")}/bazaar/audit/${scriptId}`;
+  const url = joinEnginePath(base, `/bazaar/audit/${scriptId}`);
 
   try {
     const resp = await fetch(url, {

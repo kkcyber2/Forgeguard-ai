@@ -1,7 +1,13 @@
 -- Fix double-grant: subscriptions activate plan only; credit packs increment wallet only.
 
 ALTER TABLE public.crypto_deposits
-  ADD COLUMN IF NOT EXISTS deposit_type text NOT NULL DEFAULT 'subscription'
+  ADD COLUMN IF NOT EXISTS deposit_type text NOT NULL DEFAULT 'subscription';
+
+ALTER TABLE public.crypto_deposits
+  DROP CONSTRAINT IF EXISTS crypto_deposits_deposit_type_check;
+
+ALTER TABLE public.crypto_deposits
+  ADD CONSTRAINT crypto_deposits_deposit_type_check
     CHECK (deposit_type IN ('subscription', 'credit_pack'));
 
 ALTER TABLE public.crypto_deposits

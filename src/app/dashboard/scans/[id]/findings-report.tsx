@@ -20,6 +20,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { redactSecrets } from "@/lib/security/redact-secrets";
 import { TacticalTargetError } from "./tactical-target-error";
 import {
   type Finding,
@@ -122,7 +123,7 @@ export function FinancialLiabilitySection({
 
 /** Section A — Executive: what happened (executive_summary_md). */
 export function ExecutiveSummarySection({ md }: { md?: string | null }) {
-  const text = (md?.trim() || "").replace(/^#+\s*/gm, "");
+  const text = redactSecrets((md?.trim() || "").replace(/^#+\s*/gm, ""));
   if (!text) return null;
 
   const isSecure = /status:\s*secure/i.test(text);
@@ -453,7 +454,8 @@ function SectionHead({
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 function MarkdownBlock({ md }: { md: string }) {
-  const nodes = React.useMemo(() => parseMarkdown(md), [md]);
+  const safeMd = redactSecrets(md);
+  const nodes = React.useMemo(() => parseMarkdown(safeMd), [safeMd]);
   return <div className="markdown-body space-y-3">{nodes}</div>;
 }
 
@@ -1034,7 +1036,7 @@ function FindingCard({
                 </span>
               </div>
               <pre className="overflow-x-auto rounded border border-threat/20 bg-threat/5 p-3 font-mono text-[11px] leading-relaxed text-threat/90 whitespace-pre-wrap break-words">
-                {finding.evidence}
+                {redactSecrets(finding.evidence)}
               </pre>
             </div>
           )}
@@ -1046,7 +1048,7 @@ function FindingCard({
                 Audit Core Rationale
               </span>
               <p className="mt-1 text-xs text-foreground-muted leading-relaxed">
-                {finding.rationale}
+                {redactSecrets(finding.rationale)}
               </p>
             </div>
           )}
@@ -1291,8 +1293,8 @@ function buildReportHTML(
           <div style="font-size:10px;font-weight:600;text-transform:uppercase;color:${SEV_COLOR[f.severity] ?? SEV_COLOR.info}">${f.severity}</div>
         </div>
       </div>
-      ${f.evidence ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Evidence</div><pre style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:10px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">${escapeHTML(f.evidence)}</pre></div>` : ""}
-      ${f.remediation ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Remediation</div><div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:10px;border-radius:4px;font-size:11px">${escapeHTML(f.remediation)}</div></div>` : ""}
+      ${f.evidence ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Evidence</div><pre style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:10px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">${escapeHTML(redactSecrets(f.evidence))}</pre></div>` : ""}
+      ${f.remediation ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Remediation</div><div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:10px;border-radius:4px;font-size:11px">${escapeHTML(redactSecrets(f.remediation))}</div></div>` : ""}
       <div style="font-size:10px;font-weight:600;display:inline-block;padding:2px 8px;border-radius:3px;background:${f.verdict ? "#fef2f2" : "#f0fdf4"};color:${f.verdict ? "#dc2626" : "#15803d"}">${f.verdict ? "EXPLOITED" : "MITIGATED"}</div>
     </div>`,
     )
@@ -1371,7 +1373,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1
 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px">${statsRow}</div>
 
-${report.executive_summary_md ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section A — Executive Summary</h2><div style="font-size:12px;line-height:1.65;color:#374151;white-space:pre-wrap">${escapeHTML(report.executive_summary_md.replace(/^#+\s*/gm, ""))}</div></div>` : ""}
+${report.executive_summary_md ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section A — Executive Summary</h2><div style="font-size:12px;line-height:1.65;color:#374151;white-space:pre-wrap">${escapeHTML(redactSecrets(report.executive_summary_md).replace(/^#+\s*/gm, ""))}</div></div>` : ""}
 ${(() => {
   const ale = report.financial_liability_usd ?? report.ale_usd;
   return ale != null && ale > 0
@@ -1379,7 +1381,7 @@ ${(() => {
     : "";
 })()}
 
-${report.technical_proof_of_concept ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section C — Technical Proof of Concept</h2><pre style="background:#f9fafb;border:1px solid #e5e7eb;padding:14px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">${escapeHTML(String(report.technical_proof_of_concept))}</pre></div>` : ""}
+${report.technical_proof_of_concept ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section C — Technical Proof of Concept</h2><pre style="background:#f9fafb;border:1px solid #e5e7eb;padding:14px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">${escapeHTML(redactSecrets(String(report.technical_proof_of_concept)))}</pre></div>` : ""}
 
 ${report.remediation_code_snippet || report.optimization_suggestions_md ? `<div style="margin-bottom:28px"><h2 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:7px;margin:0 0 14px">Section D — Aegis Remediation</h2>${report.remediation_code_snippet ? `<pre style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0 0 12px">${escapeHTML(String(report.remediation_code_snippet))}</pre>` : ""}${report.optimization_suggestions_md ? `<div style="font-size:12px;line-height:1.65;color:#374151;white-space:pre-wrap">${escapeHTML(String(report.optimization_suggestions_md).replace(/^#+\s*/gm, ""))}</div>` : ""}</div>` : ""}
 

@@ -25,15 +25,16 @@ export interface MagicLinkState {
 }
 
 const LoginSchema = z.object({
-  email: z.string().email("Invalid email"),
-  password: z.string().min(1, "Password required"),
+  email: z.string().email("Invalid email").max(254, "Email too long"),
+  password: z.string().min(1, "Password required").max(128, "Password too long"),
 });
 
 const SignupSchema = z.object({
-  email: z.string().email("Invalid email"),
+  email: z.string().email("Invalid email").max(254, "Email too long"),
   password: z
     .string()
     .min(10, "At least 10 characters")
+    .max(128, "Password too long")
     .regex(/[A-Z]/, "One uppercase letter")
     .regex(/[0-9]/, "One digit"),
   fullName: z.string().min(2, "Required"),
@@ -106,7 +107,7 @@ export async function signup(
 }
 
 const MagicLinkSchema = z.object({
-  email: z.string().email("Invalid email"),
+  email: z.string().email("Invalid email").max(254, "Email too long"),
 });
 
 export async function sendMagicLink(

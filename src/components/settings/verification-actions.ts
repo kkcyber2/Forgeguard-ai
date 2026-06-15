@@ -510,3 +510,112 @@ export async function uploadIdentityDocument(
   revalidatePath("/dashboard/settings");
   return { path };
 }
+
+export type FaceLivenessPose = "center" | "up" | "down" | "left" | "right";
+
+const REQUIRED_POSES: FaceLivenessPose[] = [
+  "center",
+  "up",
+  "down",
+  "left",
+  "right",
+];
+
+function distinctFrameHashes(poses: { pose: FaceLivenessPose; dataUrl: string }[]): boolean {
+  const hashes = new Set<string>();
+  for (const p of poses) {
+    const base64 = p.dataUrl.split(",")[1] ?? "";
+    let h = 0;
+    for (let i = 0; i < Math.min(base64.length, 8000); i += 1) {
+      h = (h * 31 + base64.charCodeAt(i)) | 0;
+    }
+    const key = String(h);
+    if (hashes.has(key)) return false;
+    hashes.add(key);
+  }
+  return hashes.size === poses.length;
+}
+
+export async function submitFaceLiveness(
+  poses: { pose: FaceLivenessPose; dataUrl: string }[],
+): Promise<{ error?: string; verified?: boolean; schemaSync?: boolean; poseCount?: number }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "Not authenticated." };
+
+  const byPose = new Map<FaceLivenessPose, string>();
+  for (const p of poses) {
+    if (!REQUIRED_POSES.includes(p.pose)) {
+      return { error: `Invalid pose: ${p.pose}` };
+    }
+    if (!isValidCaptureDataUrl(p.dataUrl)) {
+      return { error: `Invalid capture for pose ${p.pose}. Retake with camera active.` };
+    }
+    byPose.set(p.pose, p.dataUrl);
+  }
+
+  if (byPose.size < REQUIRED_POSES.length) {
+    return { error: "All five poses required: center, up, down, left, right." };
+  }
+
+  const ordered = REQUIRED_POSES.map((pose) => ({
+    pose,
+    dataUrl: byPose.get(pose)!,
+  }));
+
+  if (!distinctFrameHashes(ordered)) {
+    return { error: "Liveness failed: poses must differ — move your head between captures." };
+  }
+
+  let admin: ReturnType<typeof createAdminSupabase>;
+  try {
+    admin = createAdminSupabase();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    console.error("[verify:liveness] createAdminSupabase failed:", msg);
+    return { error: "Server misconfigured. SUPABASE_SERVICE_ROLE_KEY required." };
+  }
+
+  const sealedAt = Date.now();
+  const uploadedPaths: string[] = [];
+
+  for (const { pose, dataUrl } of ordered) {
+    const path = `${user.id}/liveness/${pose}-${sealedAt}.jpg`;
+    const base64 = dataUrl.split(",")[1]!;
+    const buffer = Buffer.from(base64, "base64");
+
+    const { error: uploadErr } = await admin.storage
+      .from("verification-docs")
+      .upload(path, buffer, { contentType: "image/jpeg", upsert: true });
+
+    if (uploadErr) {
+      console.error("[verify:liveness] storage:", uploadErr.message, uploadErr);
+      return { error: uploadErr.message || "Storage upload failed." };
+    }
+    uploadedPaths.push(path);
+  }
+
+  const verifiedAt = new Date().toISOString();
+  const profileResult = await adminUpdateProfile(
+    user.id,
+    {
+      face_liveness_verified: true,
+      face_liveness_at: verifiedAt,
+      face_liveness_pose_count: ordered.length,
+    },
+    {
+      face_liveness_verified: true,
+    },
+  );
+
+  if (profileResult.error) {
+    console.error("[verify:liveness] profile update:", profileResult.error);
+    return {
+      error: profileResult.error,
+      schemaSync: profileResult.schemaSync,
+    };
+  }
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+  return { verified: true, poseCount: ordered.length };
+}

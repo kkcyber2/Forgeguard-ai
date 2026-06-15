@@ -4,13 +4,12 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import {
   BadgeCheck,
-  Camera,
   CheckCircle2,
   Circle,
   FileSearch,
   Globe,
   PenLine,
-  Phone,
+  ScanFace,
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,7 +18,7 @@ export type ClearanceTier = "pending" | "tactical" | "professional" | "sovereign
 
 export interface ClearanceProgressProps {
   emailVerified: boolean;
-  phoneVerified: boolean;
+  faceLivenessVerified: boolean;
   hasSignature: boolean;
   domainVerified: boolean;
   identityDocUploaded: boolean;
@@ -51,11 +50,11 @@ export function ClearanceProgress(props: ClearanceProgressProps) {
       href: undefined,
     },
     {
-      id: "phone",
-      icon: Phone,
-      label: "Phone verified",
-      done: props.phoneVerified,
-      href: "#clearance-phone",
+      id: "liveness",
+      icon: ScanFace,
+      label: "Face liveness verified",
+      done: props.faceLivenessVerified,
+      href: "#clearance-liveness",
     },
     {
       id: "signature",
@@ -80,7 +79,7 @@ export function ClearanceProgress(props: ClearanceProgressProps) {
     },
     {
       id: "sovereign",
-      icon: Camera,
+      icon: FileSearch,
       label: "Sovereign clearance",
       done: props.clearanceTier === "sovereign" && props.identityVerified,
       href: "#clearance-audit",
@@ -119,7 +118,7 @@ export function ClearanceProgress(props: ClearanceProgressProps) {
           const unlocked =
             tier.id === "tactical" ||
             (tier.id === "professional" &&
-              (props.phoneVerified || props.hasSignature)) ||
+              (props.faceLivenessVerified || props.hasSignature)) ||
             (tier.id === "sovereign" && props.identityVerified);
           return (
             <div

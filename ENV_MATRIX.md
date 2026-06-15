@@ -27,12 +27,12 @@ Legend: **V** = Vercel required · **R** = Railway required · **O** = optional 
 | `SOVEREIGN_CRYPTO_WALLET` | | ✓ | | Fallback static USDT address |
 | `GROQ_API_KEY` | | ✓ | | Optional direct Groq (engine uses Railway) |
 | `REVENUE_SIMULATION_MODE` | | ✓ | | Dev billing bypass |
-| `TWILIO_ACCOUNT_SID` | | ✓ | | SMS OTP (Stronghold) |
-| `TWILIO_AUTH_TOKEN` | | ✓ | | SMS OTP |
-| `TWILIO_PHONE_NUMBER` | | ✓ | | SMS OTP |
-| `TWILIO_SIMULATION_MODE` | | ✓ | | Dev OTP bypass |
-| `UPSTASH_REDIS_REST_URL` | | ✓ | | Distributed rate limit (P2 — not wired) |
-| `UPSTASH_REDIS_REST_TOKEN` | | ✓ | | Distributed rate limit |
+| `TWILIO_ACCOUNT_SID` | | ✓ | D | Legacy SMS OTP — not required for clearance |
+| `TWILIO_AUTH_TOKEN` | | ✓ | D | Legacy SMS OTP |
+| `TWILIO_PHONE_NUMBER` | | ✓ | D | Legacy SMS OTP |
+| `TWILIO_SIMULATION_MODE` | | ✓ | | Dev OTP bypass (legacy path only) |
+| `UPSTASH_REDIS_REST_URL` | | ✓ | | Distributed rate limit on `/auth/*` + `/api/webhooks/*` (wired in middleware when set) |
+| `UPSTASH_REDIS_REST_TOKEN` | | ✓ | | Paired with REST URL |
 | `RATE_LIMIT_REQUESTS_PER_MINUTE` | | ✓ | | In-memory middleware fallback |
 | `LEMONSQUEEZY_*` | | | ✓ | Legacy — bazaar optional only |
 | `STRIPE_*` / `NEXT_PUBLIC_STRIPE_*` | | | ✓ | Removed from billing flow |
@@ -63,15 +63,19 @@ Legend: **V** = Vercel required · **R** = Railway required · **O** = optional 
 
 ---
 
-## Railway / separate — War Machine (`AI-red-team/war_machine/`)
+## Railway — War Machine v2 (`kkcyber2/war-machine`, service `war-machine`)
 
 | Variable | R | O | Purpose |
 |----------|---|---|---------|
-| `SUPABASE_URL` | ✓ | | Lead storage |
+| `SUPABASE_URL` | ✓ | | Lead storage (`nlginrukltrwpkyujzzx`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✓ | | Lead writes |
-| `INTERNAL_SCAN_TOKEN` | ✓ | | Auth |
-| `WAR_MACHINE_PORT` | | ✓ | Default 7871 |
-| `PRODUCT_HUNT_API_TOKEN` | | ✓ | Scraper source |
+| `INTERNAL_SCAN_TOKEN` | ✓ | | Must byte-match Vercel |
+| `HEADLESS` | ✓ | | `true` in production |
+| `MAX_LEADS_PER_RUN` | | ✓ | Default 50 |
+| `OPENROUTER_API_KEY` | | ✓ | Outreach stage |
+| `RESEND_API_KEY` | | ✓ | Outreach stage |
+
+**API URL (Vercel `WAR_MACHINE_URL`):** `https://war-machine-production.up.railway.app`
 
 ---
 
@@ -79,11 +83,14 @@ Legend: **V** = Vercel required · **R** = Railway required · **O** = optional 
 
 | Platform | Variable | Risk if missing |
 |----------|----------|-----------------|
+| Vercel | `NOWPAYMENTS_API_KEY` | Crypto checkout disabled |
 | Vercel | `NOWPAYMENTS_IPN_SECRET` | IPN rejected (401) until set |
-| Vercel | `WAR_MACHINE_URL` | War-machine features idle |
+| Vercel | `SOVEREIGN_CRYPTO_WALLET` | Optional crypto fallback |
+| Vercel | `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Optional — falls back to in-memory rate limit |
 | Vercel | `ALLOWED_ORIGINS` | CORS may block API from www |
-| Supabase | LAUNCH_ALL.sql not run | Crypto checkout + triggers broken |
 | Railway | `AGATHON_WEBHOOK_CALLBACK_URL` | Scan completion webhooks fail |
+
+**Set 2026-06-14:** Vercel `WAR_MACHINE_URL` → `https://war-machine-production.up.railway.app`
 
 ---
 

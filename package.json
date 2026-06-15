@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:ai-audit": "node scripts/test-ai-audit.mjs"
+    "test:ai-audit": "node scripts/test-ai-audit.mjs",
+    "launch:db": "node scripts/run-launch-all.mjs",
+    "launch:db:verify": "node scripts/run-launch-all.mjs --verify-only"
   },
   "dependencies": {
     "@ai-sdk/groq": "^1.0.0",
@@ -48,6 +50,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.14.0",
     "eslint-config-next": "^15.0.3",
+    "pg": "^8.21.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3"

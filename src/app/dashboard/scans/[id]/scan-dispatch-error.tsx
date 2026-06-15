@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertOctagon } from "lucide-react";
+import { redactSecrets } from "@/lib/security/redact-secrets";
 import type { ScanLogEntry } from "./live-log";
 
 function extractRawError(logs: ScanLogEntry[], failureReason: string | null): string {
@@ -8,14 +9,14 @@ function extractRawError(logs: ScanLogEntry[], failureReason: string | null): st
     if (ev.type !== "error") continue;
     const p = ev.payload as Record<string, unknown> | null;
     if (p && typeof p.raw_response_body === "string" && p.raw_response_body.trim()) {
-      return p.raw_response_body;
+      return redactSecrets(p.raw_response_body);
     }
   }
-  if (failureReason?.trim()) return failureReason;
+  if (failureReason?.trim()) return redactSecrets(failureReason);
   for (const ev of logs) {
     if (ev.type !== "error") continue;
     const p = ev.payload as Record<string, unknown> | null;
-    if (p && typeof p.message === "string") return p.message;
+    if (p && typeof p.message === "string") return redactSecrets(p.message);
   }
   return "";
 }

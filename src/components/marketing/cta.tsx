@@ -46,10 +46,10 @@ export function CtaBanner({ isAuthenticated, primaryCta }: CtaBannerProps) {
                 <ArrowUpRight size={16} strokeWidth={1.75} />
               </Link>
               <Link
-                href={isAuthenticated ? "/dashboard" : "/demo"}
+                href={isAuthenticated ? "/dashboard/scans/new" : "/auth/signup"}
                 className={buttonStyles({ variant: "secondary", size: "lg" })}
               >
-                {isAuthenticated ? "Open dashboard" : "View live demo"}
+                {isAuthenticated ? "Launch a scan" : "Get started free"}
               </Link>
             </div>
           </div>

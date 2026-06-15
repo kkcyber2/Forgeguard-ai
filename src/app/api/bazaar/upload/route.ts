@@ -120,8 +120,9 @@ export async function POST(req: NextRequest) {
   }
 
   const qualityScore = Math.max(0, Math.min(10, Math.round((100 - audit.risk_score) / 10)));
-  const isCertified =
-    (audit.risk_score > 8 || qualityScore > 8) && audit.verdict === "cleared";
+  const passed = audit.verdict === "cleared" && audit.risk_score <= 25;
+  const isCertified = audit.is_certified ?? passed;
+  const isPublished = audit.is_published ?? passed;
 
   return NextResponse.json({
     ok:           true,
@@ -133,8 +134,8 @@ export async function POST(req: NextRequest) {
     findings:     audit.findings,
     reason:       audit.reason,
     remediation_advice: audit.remediation_advice,
-    is_published: audit.is_published ?? (isCertified && audit.verdict === "cleared"),
-    is_certified: audit.is_certified ?? isCertified,
+    is_published: isPublished,
+    is_certified: isCertified,
     custom_price_usd: price_usd,
     metadata:     audit.metadata,
     audit: {

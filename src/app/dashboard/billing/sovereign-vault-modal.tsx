@@ -37,6 +37,14 @@ export function SovereignVaultModal({
   const [payCurrency, setPayCurrency] = React.useState("USDT");
   const [verifyMsg, setVerifyMsg] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const [addressPrefix, setAddressPrefix] = React.useState("");
+  const [addressSuffix, setAddressSuffix] = React.useState("");
+
+  const addressCheckRequired = Boolean(depositAddress && !revenueSimulation);
+  const addressConfirmed =
+    !addressCheckRequired ||
+    (depositAddress!.slice(0, 6) === addressPrefix.trim() &&
+      depositAddress!.slice(-6) === addressSuffix.trim());
 
   React.useEffect(() => {
     if (!open || revenueSimulation) return;
@@ -49,6 +57,8 @@ export function SovereignVaultModal({
     setDepositAddress(null);
     setQrCode(null);
     setAmountUsdt(plan.price);
+    setAddressPrefix("");
+    setAddressSuffix("");
 
     void (depositKind === "credit_pack"
       ? generateCreditPackDeposit(plan.name)
@@ -239,6 +249,53 @@ export function SovereignVaultModal({
                 </div>
               )}
 
+              {!revenueSimulation && depositAddress && (
+                <>
+                  <div className="rounded-sm border border-amber-400/25 bg-amber-400/5 px-3 py-2 text-[10px] leading-relaxed text-amber-200/90">
+                    Verify the pasted address matches what you see on screen. Clipboard
+                    clipper malware can swap crypto addresses — compare character by character
+                    before sending funds.
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-[9px] uppercase tracking-[0.18em] text-zinc-600">
+                        First 6 characters
+                      </span>
+                      <input
+                        type="text"
+                        value={addressPrefix}
+                        onChange={(e) => setAddressPrefix(e.target.value)}
+                        maxLength={6}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="mt-1 w-full rounded-sm border border-lime-500/15 bg-[#0a0a0a] px-2 py-1.5 font-mono text-[11px] text-lime-400 outline-none focus:border-lime-500/40"
+                        placeholder={depositAddress.slice(0, 6)}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[9px] uppercase tracking-[0.18em] text-zinc-600">
+                        Last 6 characters
+                      </span>
+                      <input
+                        type="text"
+                        value={addressSuffix}
+                        onChange={(e) => setAddressSuffix(e.target.value)}
+                        maxLength={6}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="mt-1 w-full rounded-sm border border-lime-500/15 bg-[#0a0a0a] px-2 py-1.5 font-mono text-[11px] text-lime-400 outline-none focus:border-lime-500/40"
+                        placeholder={depositAddress.slice(-6)}
+                      />
+                    </label>
+                  </div>
+                  {!addressConfirmed && (addressPrefix || addressSuffix) && (
+                    <p className="text-[10px] text-amber-400/90">
+                      Address confirmation mismatch — re-check the deposit address above.
+                    </p>
+                  )}
+                </>
+              )}
+
               {verifyMsg && (
                 <div className="rounded-sm border border-lime-500/20 bg-lime-500/5 px-3 py-2 text-[10px] text-lime-400/80">
                   {verifyMsg}
@@ -247,7 +304,11 @@ export function SovereignVaultModal({
 
               <button
                 type="button"
-                disabled={verifying || (loading && !revenueSimulation)}
+                disabled={
+                  verifying ||
+                  (loading && !revenueSimulation) ||
+                  (addressCheckRequired && !addressConfirmed)
+                }
                 onClick={() => void handleVerify()}
                 className={cn(
                   "flex w-full items-center justify-center gap-2 rounded-sm border px-4 py-3",

@@ -1,6 +1,39 @@
 -- Sovereign crypto deposit rail — USDT/SOL/BTC via NOWPayments
 -- When status → confirmed, increment_wallet + activate subscription.
 
+-- Legacy live table repair (address_generated / amount_usd drift)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'crypto_deposits'
+  ) THEN
+    ALTER TABLE public.crypto_deposits
+      ADD COLUMN IF NOT EXISTS plan_name text,
+      ADD COLUMN IF NOT EXISTS plan_id text,
+      ADD COLUMN IF NOT EXISTS amount_usdt numeric,
+      ADD COLUMN IF NOT EXISTS deposit_address text,
+      ADD COLUMN IF NOT EXISTS pay_currency text DEFAULT 'usdttrc20',
+      ADD COLUMN IF NOT EXISTS payment_id text,
+      ADD COLUMN IF NOT EXISTS credits_granted boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now(),
+      ADD COLUMN IF NOT EXISTS confirmed_at timestamptz,
+      ADD COLUMN IF NOT EXISTS deposit_type text NOT NULL DEFAULT 'subscription',
+      ADD COLUMN IF NOT EXISTS credit_amount numeric;
+
+    UPDATE public.crypto_deposits
+       SET deposit_address = COALESCE(NULLIF(deposit_address, ''), address_generated, ''),
+           amount_usdt     = COALESCE(amount_usdt, amount_usd, 0),
+           pay_currency    = COALESCE(NULLIF(pay_currency, ''), NULLIF(currency_type, ''), 'usdttrc20'),
+           plan_name       = COALESCE(NULLIF(plan_name, ''), 'Legacy'),
+           plan_id         = COALESCE(NULLIF(plan_id, ''), 'startup'),
+           payment_id      = COALESCE(payment_id, tx_hash)
+     WHERE deposit_address IS NULL OR deposit_address = ''
+        OR amount_usdt IS NULL OR plan_name IS NULL OR plan_id IS NULL
+        OR (payment_id IS NULL AND tx_hash IS NOT NULL);
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.crypto_deposits (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,

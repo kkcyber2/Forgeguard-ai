@@ -14,7 +14,8 @@ export interface SettingsPageData {
   apiKeys: ApiKeyRow[];
   lastSignIn: string | null;
   emailVerified: boolean;
-  phoneVerified: boolean;
+  faceLivenessVerified: boolean;
+  faceLivenessPoseCount: number;
   domainVerified: boolean;
   hasSignature: boolean;
   identityProofed: boolean;
@@ -32,7 +33,8 @@ const EMPTY: SettingsPageData = {
   apiKeys: [],
   lastSignIn: null,
   emailVerified: false,
-  phoneVerified: false,
+  faceLivenessVerified: false,
+  faceLivenessPoseCount: 0,
   domainVerified: false,
   hasSignature: false,
   identityProofed: false,
@@ -111,7 +113,9 @@ export async function fetchSettingsPageData(
       apiKeys,
       lastSignIn,
       emailVerified,
-      phoneVerified: sovereign || (profile?.phone_verified ?? false),
+      faceLivenessVerified:
+        sovereign || (profile?.face_liveness_verified ?? false),
+      faceLivenessPoseCount: profile?.face_liveness_pose_count ?? 0,
       domainVerified: sovereign || (profile?.domain_verified ?? false),
       hasSignature: sovereign || !!profile?.signature_data,
       identityProofed: sovereign || (profile?.identity_proofed ?? false),

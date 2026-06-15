@@ -12,7 +12,7 @@ const navItems = [
   { label: "Platform", href: "/#platform" },
   { label: "Data Integrity", href: "/#data-integrity" },
   { label: "Guardrails", href: "/#guardrails" },
-  { label: "Demo", href: "/demo" },
+  { label: "Pricing", href: "/#pricing" },
   { label: "Guidelines", href: "/resources/guidelines" },
   { label: "About", href: "/about" },
 ];

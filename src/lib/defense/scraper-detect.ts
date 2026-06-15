@@ -3,8 +3,10 @@
  */
 export {
   getClientIp,
+  isAuditOrSearchBot,
   isScraperRequest,
   logBlacklistedEntity,
+  shouldBypassScraperDefenseForAuditBot,
 } from "@/services/scraper-defense.service";
 
 /** Legacy trap script — superseded by SHA-256 PoW challenges. */

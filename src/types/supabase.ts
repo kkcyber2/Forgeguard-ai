@@ -1524,6 +1524,9 @@ export type Database = {
           phone: string | null
           phone_number: string | null
           phone_verified: boolean | null
+          face_liveness_verified: boolean | null
+          face_liveness_at: string | null
+          face_liveness_pose_count: number | null
           profile_completeness: number | null
           reputation: number | null
           role: string | null
@@ -1577,6 +1580,9 @@ export type Database = {
           phone?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
+          face_liveness_verified?: boolean | null
+          face_liveness_at?: string | null
+          face_liveness_pose_count?: number | null
           profile_completeness?: number | null
           reputation?: number | null
           role?: string | null
@@ -1630,6 +1636,9 @@ export type Database = {
           phone?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
+          face_liveness_verified?: boolean | null
+          face_liveness_at?: string | null
+          face_liveness_pose_count?: number | null
           profile_completeness?: number | null
           reputation?: number | null
           role?: string | null

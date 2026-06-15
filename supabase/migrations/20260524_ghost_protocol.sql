@@ -18,9 +18,10 @@ UPDATE public.profiles p
  WHERE p.subscription_tier IS NULL;
 
 DO $$ BEGIN
+  ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_subscription_tier_check;
   ALTER TABLE public.profiles
     ADD CONSTRAINT profiles_subscription_tier_check
-    CHECK (subscription_tier IS NULL OR subscription_tier IN ('free', 'startup', 'enterprise'));
+    CHECK (subscription_tier IS NULL OR subscription_tier IN ('free', 'startup', 'enterprise', 'sovereign'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

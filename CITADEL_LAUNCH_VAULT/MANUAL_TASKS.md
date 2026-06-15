@@ -99,9 +99,32 @@ Add to **Vercel / `.env.local`**:
 | `SOVEREIGN_OPERATOR_EMAIL` | Admin + Dev persona gate | Default `ksk805763@gmail.com` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Aegis attack_logs middleware writes | Server-only — never `NEXT_PUBLIC_` |
 | `OPENROUTER_API_KEY` | AI Verification Triage (`/admin/verification`) | DeepSeek-R1 via OpenRouter. Without it, heuristic fallback runs (lower confidence). |
-| `TWILIO_ACCOUNT_SID` | User OTP flow (Stronghold) | **Required in production** for SMS codes |
-| `TWILIO_AUTH_TOKEN` | User OTP flow | **Required in production** |
-| `TWILIO_PHONE_NUMBER` | User OTP flow | E.164 format, e.g. `+15551234567` |
+| `TWILIO_ACCOUNT_SID` | Legacy SMS OTP | **Deprecated for clearance** — optional; `TWILIO_SIMULATION_MODE` for dev |
+| `TWILIO_AUTH_TOKEN` | Legacy SMS OTP | Deprecated for clearance |
+| `TWILIO_PHONE_NUMBER` | Legacy SMS OTP | Deprecated for clearance |
+
+### 2a. Payments — Vercel production (P0 launch blocker)
+
+Set on **Vercel → forgeguard-ai → Settings → Environment Variables → Production**, then **Redeploy**:
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `NOWPAYMENTS_API_KEY` | **Yes** (or sovereign fallback) | Enables crypto checkout; sets `launch-check` `crypto.configured` |
+| `NOWPAYMENTS_IPN_SECRET` | **Yes** for live IPN | HMAC verification on `POST /api/webhooks/nowpayments` |
+| `SOVEREIGN_CRYPTO_WALLET` | Optional fallback | Alternative to NOWPayments API for manual deposit addresses |
+| `WAR_MACHINE_URL` | Recommended | War Machine microservice URL (`launch-check` `warMachine`) |
+
+**Verify after redeploy:**
+
+```bash
+curl -s https://www.forgeguard-ai.com/api/debug/launch-check
+```
+
+Expect: `"crypto": { "configured": true, "nowpayments": true, "ipnSecret": true }` (or `sovereignWallet: true`).
+
+Then run **§4.5 Sovereign Vault — Crypto checkout smoke test** (subscription + credit_pack IPN).
+
+**Operator cannot skip:** Payments stay **Red** in `LAUNCH_STATUS_REPORT.md` until `crypto.configured: true` on production launch-check.
 
 **Verification go-live checklist:**
 
@@ -116,23 +139,49 @@ Add to **Vercel / `.env.local`**:
 2. **Security migrations** — Apply in order:
    - `supabase/migrations/20260529_rpc_service_role_only.sql`
    - `supabase/migrations/20260530_security_advisor_repair.sql`
+   - `supabase/migrations/20260618_security_invoker_views.sql` — clears 4 `security_definer_view` ERROR lints (`my_scan_quota`, `profiles_with_rank`, `intel_messages_with_profile`, `war_machine_leads`)
 
-3. **Twilio (phone OTP)** — Supabase Auth does **not** send SMS. ForgeGuard uses Twilio via server actions:
-   - Set all three `TWILIO_*` vars on Vercel
-   - Set `SUPABASE_SERVICE_ROLE_KEY` (OTP rows insert via admin client)
-   - Redeploy, then test **Settings → Phone verification → Verify via SMS**
+3. **Twilio (legacy SMS OTP)** — No longer required for Tactical clearance. Hacker identity uses **Settings → Face liveness** (multi-pose webcam). Twilio vars optional for legacy `sendOTP`/`verifyOTP` only; set `TWILIO_SIMULATION_MODE=true` in dev.
 
-4. **ID / webcam upload** — Uploads go to private bucket `verification-docs/{userId}/...` via service role:
+3b. **Face liveness migration** — Apply `supabase/migrations/20260619_face_liveness.sql`:
+   ```sql
+   SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'profiles'
+      AND column_name IN ('face_liveness_verified','face_liveness_at','face_liveness_pose_count');
+   ```
+   Storage path: `verification-docs/{userId}/liveness/{pose}-{timestamp}.jpg`
+
+4. **ID / webcam upload** — Enterprise sovereign path unchanged:
    - Confirm `SUPABASE_SERVICE_ROLE_KEY` on Vercel
    - User uploads in **Settings → Identity proofing**
    - Admin reviews at **`/admin/verification`** (needs `profiles.sovereign_pending = true`)
 
-5. **Auth hardening (manual)** — Supabase Dashboard → **Authentication → Settings** → enable **Leaked password protection**.
+5. **Auth hardening (manual — P1 launch)** — Supabase Dashboard → **Authentication → Settings**:
+   - **Leaked password protection:** Enable HaveIBeenPwned integration. Security advisor reports `auth_leaked_password_protection` WARN while disabled — re-check advisors after enable.
+   - **MFA:** Enable for Sovereign operator and all `profiles.role = 'admin'` accounts (Authenticator app or WebAuthn).
+   - Require MFA enrollment before granting admin clearance in production.
 
 **OpenRouter setup:**
 1. Create key at [openrouter.ai/keys](https://openrouter.ai/keys)
 2. Ensure billing/credits enabled for `deepseek/deepseek-r1`
 3. Redeploy after adding env vars
+
+---
+
+## 2b. Cloudflare — DNS + WAF (operator)
+
+Proxy **forgeguard-ai.com** and **www.forgeguard-ai.com** through Cloudflare (orange cloud).
+
+| Rule | Action |
+|------|--------|
+| Rate limit `/api/*` | e.g. 120 req/min per IP (adjust per traffic) |
+| Rate limit `/auth/*` | e.g. 30 req/min per IP |
+| Allow NOWPayments IPN | Source IPs: `51.89.194.21`, `51.75.77.69`, `138.201.172.58`, `65.21.158.36` → **Allow** POST `/api/webhooks/nowpayments` |
+| Do NOT block | `POST /api/webhooks/nowpayments`, `GET /api/health`, `GET /api/health/engine`, `GET /api/debug/launch-check` |
+| Audit bots | Keep Googlebot + Chrome-Lighthouse allowed on marketing `/` (middleware allowlist — do not WAF-block Lighthouse UA) |
+| Bot Fight Mode (optional) | Exclude webhook + health paths |
+
+Full payments checklist: `CITADEL_LAUNCH_VAULT/NOWPAYMENTS_SETUP.md`
 
 ---
 
@@ -152,6 +201,30 @@ UPDATE public.profiles
 ---
 
 ## 4. Feature Smoke Tests
+
+### 4.5 Sovereign Vault — Crypto checkout smoke test
+
+**Prerequisite:** `LAUNCH_ALL.sql` applied (see §1). Without it, `generateDepositAddress` inserts fail on missing columns.
+
+**Subscription path (`deposit_type = subscription`):**
+
+1. Dashboard → Billing → select Startup or Enterprise → Sovereign Vault modal.
+2. Complete NOWPayments deposit; wait for IPN (`/api/webhooks/nowpayments`).
+3. Confirm `subscriptions.plan` active; wallet unchanged except overage debits elsewhere.
+
+**Credit pack path (`deposit_type = credit_pack`):**
+
+1. Billing → credit pack → Sovereign Vault.
+2. After IPN: `user_wallets.balance_usd` increases via `increment_wallet`; subscription tier unchanged.
+
+**Verify in SQL:**
+
+```sql
+SELECT id, deposit_type, status, credits_granted, plan_id, credit_amount
+  FROM crypto_deposits ORDER BY created_at DESC LIMIT 5;
+```
+
+---
 
 ### 4.1 AI Verification Triage — `/admin/verification`
 

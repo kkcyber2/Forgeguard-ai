@@ -13,7 +13,7 @@ const columns: Array<{ title: string; items: { label: string; href: string }[] }
       { label: "Platform", href: "/#platform" },
       { label: "Data integrity", href: "/#data-integrity" },
       { label: "Guardrails", href: "/#guardrails" },
-      { label: "Live demo", href: "/demo" },
+      { label: "Get started", href: "/auth/signup" },
     ],
   },
   {

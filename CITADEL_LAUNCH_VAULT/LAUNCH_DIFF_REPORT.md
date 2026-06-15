@@ -1,8 +1,36 @@
 # LAUNCH_DIFF_REPORT — Live DB vs Repo (2026-06-13)
 
 **Supabase project:** `nlginrukltrwpkyujzzx` (ForgeGuard-ai)  
-**Verified via:** Supabase MCP `list_migrations`, `execute_sql`  
-**Not applied via MCP** — operator must run `LAUNCH_ALL.sql` after review.
+**Verified via:** Supabase MCP `execute_sql`, `list_migrations` (2026-06-13)  
+**Status:** **LAUNCH_ALL applied live** — crypto checkout unblocked
+
+---
+
+## Live verification (post-LAUNCH_ALL)
+
+| Check | Result |
+|-------|--------|
+| `crypto_deposits.payment_id`, `plan_id`, `amount_usdt`, etc. | **7/7 columns present** |
+| `crypto_deposit_confirmed_trigger` | **Present** |
+| `increment_wallet`, `release_kinetic_bounty`, `handle_crypto_deposit_confirmed` | **Present** |
+| `user_api_keys`, `scheduled_scans`, `attack_logs` | **Present** |
+| `supabase_migrations.schema_migrations` | **57 versions** (8 genesis + 49 launch stamp) |
+
+---
+
+## Repairs applied to LAUNCH_ALL.sql (2026-06-13)
+
+| Issue | Fix |
+|-------|-----|
+| Legacy `crypto_deposits` (only `deposit_type` + `address_generated`) | Added idempotent `ALTER ADD COLUMN` + backfill block before `CREATE TABLE IF NOT EXISTS` |
+| `profiles_subscription_tier_check` rejects `sovereign` | Constraint now includes `'sovereign'` |
+| `deposit_type` inline CHECK on ADD COLUMN | Split to `DROP/ADD CONSTRAINT` (re-runnable) |
+| `user_api_keys` / `scheduled_scans` policies | `DROP POLICY IF EXISTS` before create |
+| `scheduled_scan_frequency` enum | Wrapped in `DO $$ … duplicate_object` guard |
+
+**New migration:** `supabase/migrations/20260617_crypto_deposits_legacy_repair.sql`  
+**Runner:** `npm run launch:db` (requires `SUPABASE_DB_PASSWORD` or `DATABASE_URL`)  
+**Migration stamp:** `CITADEL_LAUNCH_VAULT/LAUNCH_MIGRATION_STAMP.sql` (48 local versions)
 
 ---
 
@@ -36,18 +64,9 @@ Includes but not limited to:
 
 ---
 
-## `crypto_deposits` schema mismatch (P0)
+## P0 crypto_deposits — RESOLVED (2026-06-13)
 
-| Expected (repo / app code) | Live DB (verified) |
-|----------------------------|-------------------|
-| `plan_name`, `plan_id`, `amount_usdt`, `deposit_address`, `pay_currency`, `payment_id` | **Missing** |
-| `credits_granted`, `confirmed_at`, `updated_at`, `credit_amount` | **Missing** |
-| `deposit_type` (`subscription` \| `credit_pack`) | **Present** (manual patch) |
-| Legacy columns | `address_generated`, `amount_usd`, `currency_type`, `tx_hash` |
-
-**Impact:** `generateDepositAddress` inserts will fail or IPN webhook cannot match `payment_id`.  
-**Trigger:** `handle_crypto_deposit_confirmed` — **NOT FOUND** on live DB.  
-**Triggers on table:** **NONE** (confirmed deposits do not grant subscription or wallet).
+Legacy columns (`address_generated`, `amount_usd`) may still exist alongside canonical columns; app code uses `payment_id`, `plan_id`, `amount_usdt`, `deposit_address`. Trigger grants subscription OR wallet per `deposit_type`.
 
 ---
 
@@ -81,9 +100,15 @@ Includes but not limited to:
 ## Recommended operator action
 
 1. **Backup** Supabase project (Dashboard → Database → Backups).  
-2. Run **`CITADEL_LAUNCH_VAULT/LAUNCH_ALL.sql`** once in SQL Editor.  
-3. Re-run verification block at end of script (from `sql/verify-live-schema.sql`).  
-4. Confirm:
+2. **Option A — CLI runner (recommended after MCP auth or DB password in `.env.local`):**
+   ```bash
+   cd forgeguard-ai
+   # Add SUPABASE_DB_PASSWORD=... to .env.local (Dashboard → Settings → Database)
+   npm run launch:db
+   ```
+3. **Option B — SQL Editor:** Run **`CITADEL_LAUNCH_VAULT/LAUNCH_ALL.sql`** once, then **`LAUNCH_MIGRATION_STAMP.sql`**.  
+4. Re-run verification block at end of script (from `sql/verify-live-schema.sql`).  
+5. Confirm:
    ```sql
    SELECT column_name FROM information_schema.columns
     WHERE table_name = 'crypto_deposits' AND column_name IN ('payment_id','plan_id','amount_usdt');
@@ -91,7 +116,7 @@ Includes but not limited to:
     JOIN pg_class c ON t.tgrelid = c.oid
     WHERE c.relname = 'crypto_deposits' AND NOT t.tgisinternal;
    ```
-5. **Migrate legacy rows** if any exist in old column names (manual one-off — not automated).
+6. **Migrate legacy rows** if any exist in old column names (manual one-off — not automated).
 
 ---
 

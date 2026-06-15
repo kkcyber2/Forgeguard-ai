@@ -2533,9 +2533,10 @@ UPDATE public.profiles p
  WHERE p.subscription_tier IS NULL;
 
 DO $$ BEGIN
+  ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_subscription_tier_check;
   ALTER TABLE public.profiles
     ADD CONSTRAINT profiles_subscription_tier_check
-    CHECK (subscription_tier IS NULL OR subscription_tier IN ('free', 'startup', 'enterprise'));
+    CHECK (subscription_tier IS NULL OR subscription_tier IN ('free', 'startup', 'enterprise', 'sovereign'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -3518,7 +3519,48 @@ COMMENT ON COLUMN public.scans.target_diagnostic_logs IS
 
 -- ========== 20260615_crypto_deposits.sql ==========
 
--- Sovereign crypto deposit rail â€” USDT/SOL/BTC via NOWPayments
+-- Legacy live table repair (address_generated / amount_usd drift) — must run before CREATE TABLE IF NOT EXISTS
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'crypto_deposits'
+  ) THEN
+    ALTER TABLE public.crypto_deposits
+      ADD COLUMN IF NOT EXISTS plan_name text,
+      ADD COLUMN IF NOT EXISTS plan_id text,
+      ADD COLUMN IF NOT EXISTS amount_usdt numeric,
+      ADD COLUMN IF NOT EXISTS deposit_address text,
+      ADD COLUMN IF NOT EXISTS pay_currency text DEFAULT 'usdttrc20',
+      ADD COLUMN IF NOT EXISTS payment_id text,
+      ADD COLUMN IF NOT EXISTS credits_granted boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now(),
+      ADD COLUMN IF NOT EXISTS confirmed_at timestamptz,
+      ADD COLUMN IF NOT EXISTS deposit_type text NOT NULL DEFAULT 'subscription',
+      ADD COLUMN IF NOT EXISTS credit_amount numeric;
+
+    UPDATE public.crypto_deposits
+       SET deposit_address = COALESCE(NULLIF(deposit_address, ''), address_generated, ''),
+           amount_usdt     = COALESCE(amount_usdt, amount_usd, 0),
+           pay_currency    = COALESCE(NULLIF(pay_currency, ''), NULLIF(currency_type, ''), 'usdttrc20'),
+           plan_name       = COALESCE(NULLIF(plan_name, ''), 'Legacy'),
+           plan_id         = COALESCE(NULLIF(plan_id, ''), 'startup'),
+           payment_id      = COALESCE(payment_id, tx_hash)
+     WHERE deposit_address IS NULL OR deposit_address = ''
+        OR amount_usdt IS NULL OR plan_name IS NULL OR plan_id IS NULL
+        OR (payment_id IS NULL AND tx_hash IS NOT NULL);
+
+    UPDATE public.crypto_deposits
+       SET plan_name = COALESCE(plan_name, 'Legacy'),
+           plan_id   = COALESCE(plan_id, 'startup'),
+           amount_usdt = COALESCE(amount_usdt, 0),
+           deposit_address = COALESCE(NULLIF(deposit_address, ''), 'legacy')
+     WHERE plan_name IS NULL OR plan_id IS NULL OR amount_usdt IS NULL
+        OR deposit_address IS NULL OR deposit_address = '';
+  END IF;
+END $$;
+
+-- Sovereign crypto deposit rail — USDT/SOL/BTC via NOWPayments
 -- When status â†’ confirmed, increment_wallet + activate subscription.
 
 CREATE TABLE IF NOT EXISTS public.crypto_deposits (
@@ -3614,7 +3656,13 @@ CREATE TRIGGER crypto_deposit_confirmed_trigger
 -- Fix double-grant: subscriptions activate plan only; credit packs increment wallet only.
 
 ALTER TABLE public.crypto_deposits
-  ADD COLUMN IF NOT EXISTS deposit_type text NOT NULL DEFAULT 'subscription'
+  ADD COLUMN IF NOT EXISTS deposit_type text NOT NULL DEFAULT 'subscription';
+
+ALTER TABLE public.crypto_deposits
+  DROP CONSTRAINT IF EXISTS crypto_deposits_deposit_type_check;
+
+ALTER TABLE public.crypto_deposits
+  ADD CONSTRAINT crypto_deposits_deposit_type_check
     CHECK (deposit_type IN ('subscription', 'credit_pack'));
 
 ALTER TABLE public.crypto_deposits
@@ -3722,20 +3770,20 @@ create index if not exists user_api_keys_user_idx
 alter table public.user_api_keys enable row level security;
 
 -- Users can only see their own keys
-create policy "users see own keys"
-  on public.user_api_keys for select
-  using (auth.uid() = user_id);
+DROP POLICY IF EXISTS "users see own keys" ON public.user_api_keys;
+CREATE POLICY "users see own keys"
+  ON public.user_api_keys FOR SELECT
+  USING (auth.uid() = user_id);
 
--- Users can create their own keys (creation goes via server action, but RLS
--- must allow the insert when using the session-bound supabase client)
-create policy "users create own keys"
-  on public.user_api_keys for insert
-  with check (auth.uid() = user_id);
+DROP POLICY IF EXISTS "users create own keys" ON public.user_api_keys;
+CREATE POLICY "users create own keys"
+  ON public.user_api_keys FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
--- Users can revoke (update) their own keys
-create policy "users revoke own keys"
-  on public.user_api_keys for update
-  using (auth.uid() = user_id);
+DROP POLICY IF EXISTS "users revoke own keys" ON public.user_api_keys;
+CREATE POLICY "users revoke own keys"
+  ON public.user_api_keys FOR UPDATE
+  USING (auth.uid() = user_id);
 
 -- Deletion is disallowed â€” soft-revoke via revoked_at instead
 -- (no delete policy)
@@ -3764,9 +3812,12 @@ comment on column public.user_api_keys.revoked_at  is 'Set to revoke; NULL means
 --   'monthly' â†’ next_run_at += interval '30 days'
 -- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-create type scheduled_scan_frequency as enum ('daily', 'weekly', 'monthly');
+DO $$ BEGIN
+  CREATE TYPE scheduled_scan_frequency AS ENUM ('daily', 'weekly', 'monthly');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-create table if not exists public.scheduled_scans (
+CREATE TABLE IF NOT EXISTS public.scheduled_scans (
   id                          uuid primary key default gen_random_uuid(),
   user_id                     uuid not null references auth.users (id) on delete cascade,
   name                        text not null,                   -- human label
@@ -3789,12 +3840,13 @@ create index if not exists scheduled_scans_user_idx
   on public.scheduled_scans (user_id, created_at desc);
 
 -- â”€â”€ Row Level Security â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-alter table public.scheduled_scans enable row level security;
+ALTER TABLE public.scheduled_scans ENABLE ROW LEVEL SECURITY;
 
-create policy "users manage own schedules"
-  on public.scheduled_scans
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+DROP POLICY IF EXISTS "users manage own schedules" ON public.scheduled_scans;
+CREATE POLICY "users manage own schedules"
+  ON public.scheduled_scans
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- â”€â”€ Comments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 comment on table  public.scheduled_scans is 'Recurring scan configurations, driven by pg_cron + Edge Function';

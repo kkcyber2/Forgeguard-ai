@@ -1,5 +1,7 @@
 "use client";
 
+/** @deprecated SMS clearance removed — use FaceLiveness. Kept for legacy TWILIO_SIMULATION_MODE dev flows. */
+
 import { useState, useTransition } from "react";
 import { Loader2, Phone, ShieldCheck } from "lucide-react";
 import { sendOTP, verifyOTP } from "./verification-actions";

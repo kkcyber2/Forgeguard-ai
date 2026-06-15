@@ -72,6 +72,13 @@ function normalizeEngineBase(raw: string): string {
   return base;
 }
 
+/** Join engine base URL + path without double slashes (prevents Vercel 502 DNS loops). */
+export function joinEnginePath(baseUrl: string, path: string): string {
+  const base = normalizeEngineBase(baseUrl);
+  const segment = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${segment}`.replace(/([^:]\/)\/+/g, "$1");
+}
+
 export function resolveEngineUrlSource(): EngineUrlSource {
   if (process.env.PYTHON_ENGINE_URL?.trim()) return "PYTHON_ENGINE_URL";
   if (process.env.AGATHON_ORCHESTRATOR_URL?.trim()) return "AGATHON_ORCHESTRATOR_URL";
@@ -95,7 +102,7 @@ export function resolveEngineAuthToken(): string | undefined {
 
 /** Single source of truth for engine health probe URL. */
 export function buildEngineHealthUrl(baseUrl: string): string {
-  return `${normalizeEngineBase(baseUrl)}/health`;
+  return joinEnginePath(baseUrl, "/health");
 }
 
 /** Log the exact engine health URL (no secrets). */

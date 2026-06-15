@@ -4,6 +4,8 @@
 
 const META_CHARS = /[.*+?^${}()|[\]\\]/g;
 
+const MAX_ATTACK_INPUT_CHARS = 500;
+
 /** Escape user attack text for safe inclusion in a regex character class or alternation. */
 export function escapeRegexLiteral(input: string): string {
   return input.replace(META_CHARS, "\\$&");
@@ -13,7 +15,7 @@ export function escapeRegexLiteral(input: string): string {
  * Build a blocking regex from the attack string — prefers distinctive tokens (≥4 chars).
  */
 export function attackStringToRegex(attack: string): string {
-  const raw = attack.trim();
+  const raw = attack.trim().slice(0, MAX_ATTACK_INPUT_CHARS);
   if (!raw) return "(?i)forgeguard-aegis-block";
 
   const tokens = raw

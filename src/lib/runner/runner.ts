@@ -5,6 +5,7 @@ import {
   resolveEngineBaseUrl,
   engineAuthHeaders,
   ENGINE_HANDSHAKE_TIMEOUT_MS,
+  joinEnginePath,
 } from "@/lib/agathon-config";
 import { stringifyPayloadNumerics } from "@/lib/agathon/payload-numerics";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
@@ -156,6 +157,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   });
 
   // 6. POST to /scan/start — no provider inference -------------------------
+  const scanStartUrl = joinEnginePath(orchestratorUrl, "/scan/start");
   try {
     const dispatchBody = {
       scan_id: scan.id,
@@ -174,7 +176,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       ownership_verified: sovereign,
       is_ghost_active: isGhostActive,
     };
-    const resp = await fetch(`${orchestratorUrl}/scan/start`, {
+    const resp = await fetch(scanStartUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -213,7 +215,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[runner] dispatch failed:", {
-      url: `${orchestratorUrl}/scan/start`,
+      url: scanStartUrl,
       scan_id: scanId,
       message,
     });

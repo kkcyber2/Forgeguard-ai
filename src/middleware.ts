@@ -11,6 +11,7 @@ import {
   getClientIp,
   isScraperRequest,
   logBlacklistedEntity,
+  shouldBypassScraperDefenseForAuditBot,
 } from "@/services/scraper-defense.service";
 import {
   enforceAgathonWebhookGate,
@@ -22,6 +23,9 @@ import {
   honeypotRedirectUrl,
   isHoneypotPath,
 } from "@/services/honeypot-defense.service";
+import {
+  checkUpstashRateLimit,
+} from "@/lib/security/upstash-rate-limit";
 import {
   mintPowChallenge,
   parsePowHeader,
@@ -44,6 +48,7 @@ const AEGIS_BURST = { max: 10, windowMs: 1000 } as const;
 const RATE_LIMITS = {
   authWrite: { max: 10, windowMs: 15 * 60 * 1000 },
   authRead: { max: 60, windowMs: 60 * 1000 },
+  webhook: { max: 120, windowMs: 60 * 1000 },
   scan: { max: 20, windowMs: 15 * 60 * 1000 },
   api: { max: 20, windowMs: 10 * 1000 },
   general: { max: 1000, windowMs: 60 * 1000 },
@@ -107,6 +112,20 @@ function isStaticAssetPath(pathname: string): boolean {
 
 function getClientKey(request: NextRequest, bucket: string): string {
   return `${getClientIp(request)}:${bucket}`;
+}
+
+async function isDistributedRateLimited(
+  request: NextRequest,
+  bucket: string,
+  max: number,
+  windowMs: number,
+): Promise<boolean> {
+  const key = getClientKey(request, bucket);
+  const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
+  const upstash = await checkUpstashRateLimit(key, max, windowSec);
+  if (upstash === true) return true;
+  if (upstash === false) return false;
+  return isRateLimited(key, max, windowMs);
 }
 
 function isRateLimited(key: string, max: number, windowMs: number): boolean {
@@ -198,6 +217,9 @@ function getRateLimitConfig(
     return isWrite
       ? { bucket: "authWrite", reason: "rate_limit", ...RATE_LIMITS.authWrite }
       : { bucket: "authRead", reason: "rate_limit", ...RATE_LIMITS.authRead };
+  }
+  if (pathname.startsWith("/api/webhooks/")) {
+    return { bucket: "webhook", reason: "rate_limit", ...RATE_LIMITS.webhook };
   }
   if (
     pathname.startsWith("/api/chat") ||
@@ -372,13 +394,15 @@ async function enforcePowChallenge(
   // Liveness + launch audit — never gate behind PoW (monitoring must reach engine status).
   if (
     pathname === "/api/health" ||
-    pathname === "/api/health/engine"
+    pathname === "/api/health/engine" ||
+    pathname === "/api/debug/launch-check"
   ) {
     return null;
   }
 
   if (pathname.startsWith("/_next/")) return null;
   if (pathname.startsWith("/api/v1/webhooks/")) return null;
+  if (shouldBypassScraperDefenseForAuditBot(request)) return null;
 
   const ip = getClientIp(request);
   const volumeKey = `${ip}:powVolume`;
@@ -471,9 +495,13 @@ export async function middleware(request: NextRequest) {
 
   const sovereignBypass = await isSovereignRequest(request);
 
-  if (!sovereignBypass && !isStaticAssetPath(pathname)) {
+  if (
+    !sovereignBypass &&
+    !isStaticAssetPath(pathname) &&
+    !shouldBypassScraperDefenseForAuditBot(request)
+  ) {
     const burstKey = getClientKey(request, "aegisBurst");
-    if (isRateLimited(burstKey, AEGIS_BURST.max, AEGIS_BURST.windowMs)) {
+    if (await isDistributedRateLimited(request, "aegisBurst", AEGIS_BURST.max, AEGIS_BURST.windowMs)) {
       return rateLimitResponse(
         request,
         AEGIS_BURST.max,
@@ -484,8 +512,7 @@ export async function middleware(request: NextRequest) {
     }
 
     const cfg = getRateLimitConfig(pathname, request.method);
-    const key = getClientKey(request, cfg.bucket);
-    if (isRateLimited(key, cfg.max, cfg.windowMs)) {
+    if (await isDistributedRateLimited(request, cfg.bucket, cfg.max, cfg.windowMs)) {
       return rateLimitResponse(
         request,
         cfg.max,

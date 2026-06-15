@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertOctagon } from "lucide-react";
+import { redactSecrets } from "@/lib/security/redact-secrets";
 
 export function TacticalTargetError({
   failureReason,
@@ -14,10 +15,11 @@ export function TacticalTargetError({
   const hasFailure = Boolean(failureReason?.trim() || targetDiagnosticLogs?.trim());
   if (findingCount > 0 || !hasFailure) return null;
 
-  const diagnostic =
+  const diagnostic = redactSecrets(
     targetDiagnosticLogs?.trim() ||
-    failureReason?.trim() ||
-    "No diagnostic payload returned from target.";
+      failureReason?.trim() ||
+      "No diagnostic payload returned from target.",
+  );
 
   return (
     <div
@@ -31,7 +33,9 @@ export function TacticalTargetError({
         </p>
       </div>
       {failureReason?.trim() && (
-        <p className="mb-3 text-xs leading-relaxed text-red-200/90">{failureReason}</p>
+        <p className="mb-3 text-xs leading-relaxed text-red-200/90">
+          {redactSecrets(failureReason)}
+        </p>
       )}
       <p className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-red-300/70">
         Target diagnostic (raw)

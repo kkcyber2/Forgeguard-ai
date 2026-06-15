@@ -15,7 +15,7 @@ import {
   SettingsClearanceAside,
   SettingsClearanceProvider,
 } from "@/components/settings/settings-clearance-aside";
-import { PhoneVerification } from "@/components/settings/phone-verification";
+import { FaceLiveness } from "@/components/settings/face-liveness";
 import { IdentityAuditorClientWrapper } from "@/components/settings/identity-auditor-client-wrapper";
 import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggle";
 import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
@@ -111,9 +111,9 @@ export default async function SettingsPage() {
             title="Clearance & Verification"
           >
             <div className="flex flex-col gap-8">
-              <PhoneVerification
-                initialPhone={data.profile?.phone ?? ""}
-                phoneVerified={data.phoneVerified}
+              <FaceLiveness
+                verified={data.faceLivenessVerified}
+                poseCount={data.faceLivenessPoseCount}
               />
               <IdentityAuditorClientWrapper
                 documentPath={data.docPath}
@@ -144,7 +144,7 @@ export default async function SettingsPage() {
 
           <SettingsClearanceAside
             emailVerified={data.emailVerified}
-            phoneVerified={data.phoneVerified}
+            faceLivenessVerified={data.faceLivenessVerified}
             domainVerified={data.domainVerified}
             hasSignature={data.hasSignature}
             identityDocUploaded={!!data.docPath}

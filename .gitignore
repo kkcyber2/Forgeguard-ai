@@ -61,3 +61,11 @@ logs
 # Temporary files
 *.tmp
 *.temp
+
+# Generated launch SQL chunks (local only)
+.launch-batches/
+.launch-chunks/
+.launch-parts/
+.launch-sections/
+
+.vercel

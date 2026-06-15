@@ -5,7 +5,22 @@
 **Vercel project:** `forgeguard-ai` (`prj_WU7JPbHjAUlMikaF6i1KIMJQ22Fl`)  
 **Railway project:** `reliable-spontaneity` → services `AI-red-team` (Agathon), `war-machine` (Marine Swarm API)  
 **War Machine API:** `https://war-machine-production.up.railway.app`  
-**Last local build:** 2026-06-15 — `npm run build` **PASS** (face liveness + Upstash middleware; **not yet deployed**)
+**Last local build:** 2026-06-15 — identity consolidation + mobile UX (`f1c0685`) **deployed**
+
+---
+
+## Identity UX (2026-06-15 — P0 fix)
+
+| Item | Status |
+|------|--------|
+| Single face flow (FaceLiveness only) | **Deployed** |
+| WebcamIdentity removed from Settings | **Deployed** |
+| Identity Auditor → gov ID file only | **Deployed** |
+| Upload MIME sniff + file preview | **Deployed** |
+| Mobile clearance-first layout | **Deployed** |
+| `20260620_identity_proofed_to_liveness` migration | **Applied live** |
+
+See `CITADEL_LAUNCH_VAULT/MOBILE_UX_REPORT.md`.
 
 ---
 

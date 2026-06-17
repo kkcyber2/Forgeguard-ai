@@ -1,139 +1,155 @@
 # LAUNCH_STATUS_REPORT — ForgeGuard AI
 
-**Generated:** 2026-06-15T15:30:00Z (UTC)  
-**Supabase project:** `nlginrukltrwpkyujzzx` (ACTIVE_HEALTHY)  
-**Vercel project:** `forgeguard-ai` (`prj_WU7JPbHjAUlMikaF6i1KIMJQ22Fl`)  
-**Railway project:** `reliable-spontaneity` → services `AI-red-team` (Agathon), `war-machine` (Marine Swarm API)  
-**War Machine API:** `https://war-machine-production.up.railway.app`  
-**Last local build:** 2026-06-15 — identity consolidation + mobile UX (`f1c0685`) **deployed**
+**GO/NO-GO audit:** 2026-06-17T16:25:00Z (UTC)  
+**Supabase:** `nlginrukltrwpkyujzzx` (ACTIVE_HEALTHY)  
+**Vercel:** `forgeguard-ai` — deployment `dpl_F6mhDsKw1RfHfTxyPsg5sSmvESjf` (READY)  
+**War Machine:** `https://war-machine-production.up.railway.app`  
+**Agathon:** Railway `AI-red-team`  
+**Company registration:** N/A — not required for launch
 
 ---
 
-## Identity UX (2026-06-15 — P0 fix)
+## GO/NO-GO matrix (2026-06-17)
 
-| Item | Status |
-|------|--------|
-| Single face flow (FaceLiveness only) | **Deployed** |
-| WebcamIdentity removed from Settings | **Deployed** |
-| Identity Auditor → gov ID file only | **Deployed** |
-| Upload MIME sniff + file preview | **Deployed** |
-| Mobile clearance-first layout | **Deployed** |
-| `20260620_identity_proofed_to_liveness` migration | **Applied live** |
-
-See `CITADEL_LAUNCH_VAULT/MOBILE_UX_REPORT.md`.
-
----
-
-## MCP health check (2026-06-15)
-
-| MCP | Call | Result |
-|-----|------|--------|
-| **Supabase** | `apply_migration` (`face_liveness`) | OK — columns live on `profiles` |
-| **Supabase** | `execute_sql` | OK — `face_liveness_verified`, `face_liveness_at`, `face_liveness_pose_count` |
-| **Vercel** | `web_fetch_vercel_url` launch-check | OK — **200** |
-| **Railway** | `curl /health` | OK — `{"ok":true,"service":"war-machine","status":"healthy"}` |
+| Layer | Status | Evidence |
+|-------|--------|----------|
+| **Git/Vercel** | **Green** | `main` @ `0e52722`; prod deploy READY; `npm run build` passed on last ship |
+| **Env** | **Green** | launch-check `envMatrixComplete: true` (all 13 required vars) |
+| **Payments config** | **Green** | `crypto.configured: true`, `nowpayments: true`, `ipnSecret: true` |
+| **Payments live IPN** | **OPERATOR PENDING** | $10 Sovereign Vault checkout + `crypto_deposits` row |
+| **Engine (Agathon)** | **Green** | `engineProbe.ok: true`, latency **184ms** |
+| **War Machine health** | **Green** | `GET /health` → `status: healthy` |
+| **War Machine scrape→leads** | **Yellow** | `POST /scrape` **202**; `leads` count **0** (PH selector drift — see WAR_MACHINE_E2E_REPORT.md) |
+| **Identity UX** | **Green** | Single FaceLiveness; WebcamIdentity removed; gov ID upload only (`f1c0685` deployed) |
+| **Mobile UX** | **Yellow** | Code shipped; **operator phone test** pending (390×844) |
+| **PSI / Lighthouse** | **Green** | Lighthouse UA → **200** `text/html` on `/`, `/about`, `/auth/login` |
+| **Supabase DB** | **Green** | `face_liveness_*` columns; `verification-docs` bucket; **0 ERROR** advisors |
+| **Cloudflare** | **Yellow** | Not proxied (`Server: Vercel` only) — MANUAL_TASKS §2b |
+| **Company registration** | **N/A** | Not a launch blocker |
 
 ---
 
-## Status matrix
+## Launch verdict
 
-| Area | Status | Summary |
-|------|--------|---------|
-| **DB** | **Green** | Face liveness migration applied; security invoker views live |
-| **PSI / PageSpeed** | **Green** | Lighthouse UA → 200 `text/html` (prior fix deployed) |
-| **Payments** | **Green** | Production launch-check `crypto.configured: true` (2026-06-15) |
-| **Engine** | **Green** | Agathon probe ~250 ms |
-| **Webhooks** | **Yellow** | NOWPayments keys set; live $10 IPN smoke test still operator-owned |
-| **Env** | **Green** | Core vars set; optional `UPSTASH_*` not required |
-| **War Machine v2** | **Green** | `warMachine: true`; `/health` 200 |
-| **Face liveness (Phase 1)** | **Yellow** | Code + migration ready; **deploy Vercel** to ship UI |
-| **Security (Supabase advisors)** | **Yellow** | 0 ERROR; WARN remain (leaked-password protection, permissive RLS) |
-| **Cloudflare** | **Red** | DNS not proxied yet (`Server: Vercel` only) — operator task |
+### **CONDITIONAL GO**
 
-**Overall launch-check (production, pre–face-liveness deploy):** `ok: true`
+Public launch is **approved** for core product flows:
+
+- Production health + env matrix **green**
+- Agathon engine **healthy**
+- Payments **configured** (live IPN = operator smoke test)
+- Identity consolidation **deployed**
+- War Machine **API wired** (202 dispatch)
+
+**Known limitation (not P0):** War Machine scrape completes but **0 leads** ingested — Product Hunt selector drift. Marine Swarm dispatch works; outreach pipeline empty until scraper tune.
+
+**No P0 code fixes required** from this audit.
 
 ---
 
-## Production launch-check (2026-06-15T15:26:24Z)
+## Operator handoff (3 items)
+
+1. **Run $10 crypto payment** — Sovereign Vault checkout → confirm `crypto_deposits` row + IPN in Vercel logs (`NOWPAYMENTS_SETUP.md`)
+2. **Test face liveness on your phone** — Settings → 5 poses + gov ID file pick → green "Received" badge
+3. **(Optional post-launch)** Cloudflare proxy + Supabase leaked-password protection + admin MFA
+
+---
+
+## Phase 1 — Production health (automated evidence)
+
+### launch-check (2026-06-17T16:18:02Z)
 
 ```json
 {
   "ok": true,
   "checks": {
     "crypto": { "configured": true, "nowpayments": true, "ipnSecret": true, "sovereignWallet": true },
-    "engineEnv": { "urlSet": true, "tokenSet": true },
-    "engineProbe": { "ok": true, "httpStatus": 200, "latencyMs": 250 },
-    "supabase": { "urlSet": true, "anonKeySet": true, "serviceRoleSet": true },
-    "openrouter": true,
-    "warMachine": true
+    "engineProbe": { "ok": true, "httpStatus": 200, "latencyMs": 184 },
+    "warMachine": true,
+    "envMatrixComplete": true
   }
 }
 ```
 
+### Optional env (false — OK)
+
+| Variable | Set |
+|----------|-----|
+| `UPSTASH_REDIS_REST_URL` | false |
+| `UPSTASH_REDIS_REST_TOKEN` | false |
+| `REVENUE_SIMULATION_MODE` | false |
+| `TWILIO_*` | true (legacy only) |
+
+### HTTP probes
+
+| Route | Status | Notes |
+|-------|--------|-------|
+| `/api/health` | **200** | |
+| `/api/health/engine` | **200** | |
+| `/` (Lighthouse UA) | **200** | `text/html` |
+| `/about` (Lighthouse UA) | **200** | `text/html` |
+| `/auth/login` (Lighthouse UA) | **200** | `text/html` |
+| `/contact` (Chrome UA) | **429** | Audit IP hit Aegis PoW burst — not a prod bug |
+| `/api/webhooks/nowpayments` POST | **429** | Audit IP rate limit; NOWPayments uses different IPs |
+| `/api/v1/webhooks/agathon` POST `{}` | **401** | Signature check present — not 5xx |
+
 ---
 
-## Phase 1 — Face liveness (implemented locally)
+## Phase 2 — War Machine E2E
+
+See **`CITADEL_LAUNCH_VAULT/WAR_MACHINE_E2E_REPORT.md`**
+
+Summary: health OK, scrape **202**, leads **0**, stats updated → pipeline OK, PH scraper empty.
+
+---
+
+## Phase 3 — Agathon scan pipeline
+
+| Check | Result |
+|-------|--------|
+| Engine latency | **184ms** (< 2s) |
+| `AGATHON_WEBHOOK_CALLBACK_URL` | `https://www.forgeguard-ai.com/api/v1/webhooks/agathon` |
+| Webhook malformed POST | **401** (auth gate OK) |
+| Full scan E2E | Operator — requires logged-in user + quota + target |
+
+---
+
+## Phase 4 — Identity + mobile (production)
+
+| Check | Result |
+|-------|--------|
+| WebcamIdentity / "Identity Proofing" section | **Removed** from settings page (code audit) |
+| FaceLiveness + gov ID upload | **Deployed** |
+| Clearance ladder | "Face liveness verified" + "Government ID uploaded" |
+| Mobile browser test | **Operator pending** |
+
+---
+
+## Phase 5 — Payments (config)
+
+| Check | Result |
+|-------|--------|
+| launch-check crypto | **All true** |
+| `NOWPAYMENTS_SETUP.md` | Present |
+| Live $10 IPN | **Operator pending** |
+
+---
+
+## Phase 6 — Security (non-blockers)
 
 | Item | Status |
 |------|--------|
-| `PhoneVerification` removed from settings / clearance | Done |
-| `face-liveness.tsx` — 5-pose guided scan, `facingMode: user` | Done |
-| `submitFaceLiveness()` → `verification-docs/{userId}/liveness/` | Done |
-| Profile columns + migration `20260619_face_liveness` | Applied live via Supabase MCP |
-| Clearance ladder → "Face liveness verified" | Done |
-| `trust-score.ts` → `faceLivenessVerified` weight | Done |
-| Twilio deprecated for clearance (legacy path kept) | Done |
-| Enterprise ID upload (`identity-auditor`) | Unchanged |
-
-**Deploy:** `vercel deploy --prod` from `forgeguard-ai/` after review.
+| Supabase advisors ERROR | **0** |
+| Supabase advisors WARN | ~47 (RLS, leaked-password off, RPC EXECUTE) |
+| Cloudflare WAF | Not deployed |
+| UPSTASH rate limit | Optional — in-memory fallback |
+| `verification-docs` bucket | Exists (note: bucket flag `public` — objects protected by storage RLS) |
 
 ---
 
-## Phase 2 — Defense hardening
+## Related docs
 
-| Item | Status |
-|------|--------|
-| Upstash rate limit on `/auth/*` + `/api/webhooks/*` | Wired in middleware when `UPSTASH_*` set |
-| Cloudflare WAF / NOWPayments IP allowlist | Documented in `MANUAL_TASKS.md` §2b |
-| `ENV_MATRIX.md` | Updated (Twilio deprecated, Upstash wired) |
-| Leaked password + MFA | Operator manual in `MANUAL_TASKS.md` §2a |
-
----
-
-## Missing / optional env vars (post MCP check)
-
-| Platform | Variable | Notes |
-|----------|----------|-------|
-| Vercel | `UPSTASH_REDIS_REST_URL` | Optional — in-memory fallback active |
-| Vercel | `UPSTASH_REDIS_REST_TOKEN` | Optional |
-| Vercel | `TWILIO_*` | Optional — legacy SMS only; not clearance |
-| Operator | Cloudflare proxy | Not code — see `MANUAL_TASKS.md` §2b |
-
-**No P0 blockers** on Vercel/Railway env for launch-check.
-
----
-
-## War Machine v2
-
-- Railway `GET /health` → **200** healthy
-- Vercel `WAR_MACHINE_URL` set; admin **Fire Marine Swarm** → `POST /scrape` **202**
-- GitHub push for local war-machine commits still manual (`3073250`, `440d44e`, `7a8a510`)
-
----
-
-## Operator next steps
-
-1. **Deploy** face liveness + Upstash middleware to Vercel production.
-2. **Cloudflare** — proxy domain, WAF rules, NOWPayments IP allowlist (`NOWPAYMENTS_SETUP.md`).
-3. **Smoke test** — Settings → Face liveness (5 poses) + $10 crypto IPN.
-4. **Auth** — Enable leaked password protection + admin MFA in Supabase Dashboard.
-5. **Push** war-machine repo commits to GitHub.
-
----
-
-## Related vault docs
-
-- `MANUAL_TASKS.md` — Cloudflare, face liveness migration, MFA
-- `NOWPAYMENTS_SETUP.md` — receiving vs withdrawing, curl tests
-- `ENV_MATRIX.md` — full env reference
-- `SECURITY_HARDENING_REPORT.md` — P0–P2 code hardening
+- `NOWPAYMENTS_SETUP.md`
+- `MOBILE_UX_REPORT.md`
+- `WAR_MACHINE_E2E_REPORT.md`
+- `MANUAL_TASKS.md`

@@ -79,11 +79,11 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   };
 
   if (scanErr || !scan) {
-    console.error("[runner] could not load scan:", scanErr?.message);
+    console.error("[runner] could not load scan:", scanErr?.message, { scan_id: scanId });
     return;
   }
   if (scan.user_id !== userId) {
-    console.error("[runner] user/scan mismatch — refusing to run");
+    console.error("[runner] user/scan mismatch — refusing to run", { scan_id: scanId });
     return;
   }
 
@@ -255,7 +255,7 @@ async function emit(
     payload: ev.payload != null ? stringifyPayloadNumerics(ev.payload) : null,
   });
   if (error) {
-    console.error("[runner] log insert failed:", error.message);
+    console.error("[runner] log insert failed:", error.message, { scan_id: scanId });
   }
 }
 
@@ -278,7 +278,7 @@ async function transitionStatus(
     .update(update)
     .eq("id", scanId);
   if (error) {
-    console.error("[runner] status transition failed:", error.message);
+    console.error("[runner] status transition failed:", error.message, { scan_id: scanId });
   }
 }
 

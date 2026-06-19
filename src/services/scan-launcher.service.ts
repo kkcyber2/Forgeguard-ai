@@ -246,20 +246,9 @@ export async function launchScan(ctx: LaunchScanContext): Promise<LaunchScanResu
   }
 
   try {
-    const highIntensity =
-      scan.intensity === "greasy" || scan.intensity === "aggressive";
-    if (highIntensity) {
-      void runScan({ scanId: scan.id, userId: ctx.userId })
-        .then(() => commitScanPayment(payment))
-        .catch((err) => {
-          console.error("[scan-launcher] async runScan failed:", err);
-        });
-      return {
-        ok: true,
-        scanId: scan.id,
-        message: "Runner dispatched (non-blocking high-intensity)",
-      };
-    }
+    // Always await runScan — it only performs the Railway handshake (~200–500ms).
+    // Fire-and-forget was leaving greasy/aggressive scans stuck in `queued` because
+    // Vercel serverless terminates when the HTTP response is sent.
     await runScan({ scanId: scan.id, userId: ctx.userId });
     await commitScanPayment(payment);
   } catch (err) {

@@ -12,6 +12,31 @@ import { ENGINE_HANDSHAKE_TIMEOUT_MS } from "@/lib/agathon-config";
 import { verifyScanOwnership } from "./ownership-actions";
 import { normalizeSurfaceKind, SURFACE_KINDS } from "@/lib/scans/surface-kind";
 
+async function markScanDispatchFailed(
+  scanId: string,
+  reason: string,
+): Promise<void> {
+  const admin = createAdminSupabase();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin as any)
+    .from("scans")
+    .update({
+      status: "failed",
+      progress_pct: 100,
+      completed_at: new Date().toISOString(),
+      failure_reason: reason.slice(0, 2000),
+    })
+    .eq("id", scanId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin as any).from("scan_logs").insert({
+    scan_id: scanId,
+    type: "error",
+    severity: "high",
+    attack_name: "dispatch_error",
+    payload: { message: reason },
+  });
+}
+
 /**
  * Scan Server Actions.
  * --------------------
@@ -223,7 +248,7 @@ export async function createScan(
       console.error(
         "[scans] runner kickoff returned",
         dispatchResp.status,
-        body.slice(0, 400),
+        { scan_id: scan.id, body: body.slice(0, 400) },
       );
 
       // Surface a professional error for engine overload (429) or crash (500/503).
@@ -238,12 +263,27 @@ export async function createScan(
             "Please wait a moment and try again — your quota was not consumed.",
         };
       }
+
+      const failReason = `Dispatch failed (HTTP ${dispatchResp.status}): ${body.slice(0, 500)}`;
+      await markScanDispatchFailed(scan.id, failReason);
+      return {
+        ok: false,
+        error:
+          "Scan dispatch failed. Check your API key and target URL, then launch a new scan.",
+      };
     }
   } catch (e) {
-    // We log + swallow — the scan row exists in 'queued' and can be
-    // resumed. We don't want to block the redirect on a transient kickoff
-    // failure (e.g. Railway cold start hitting the 20s budget).
-    console.error("[scans] runner kickoff error:", e);
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[scans] runner kickoff error:", { scan_id: scan.id, message: e });
+    await markScanDispatchFailed(
+      scan.id,
+      `Dispatch timeout or network error: ${message}`,
+    );
+    return {
+      ok: false,
+      error:
+        "Could not reach the breach engine. Your scan was marked failed — please retry.",
+    };
   }
 
   revalidatePath("/dashboard");

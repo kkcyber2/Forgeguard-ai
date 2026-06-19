@@ -6,6 +6,7 @@ import {
 import { revalidateScansCache } from "@/lib/scans/revalidate";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { ingestScanCompletedCorpus } from "@/lib/training/corpus";
+import { autoPersistAegisRulesForScan } from "@/lib/evolve/aegis-auto-export";
 import {
   applyFortressBlock,
   verifyWebhookToken,
@@ -270,6 +271,10 @@ export async function POST(request: NextRequest) {
           riskLabel: String(prepared.risk_label ?? riskLabel),
           attacksRun: attacksRunInt,
         });
+        const aegisResult = await autoPersistAegisRulesForScan(admin, event.scanId);
+        if (!aegisResult.ok) {
+          console.warn("[webhook:agathon] aegis auto-evolve skipped:", aegisResult.error);
+        }
       }
 
       persistOk = true;

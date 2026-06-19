@@ -29,34 +29,44 @@
 
 ## Phase 2 — Auto-evolve attack + defense
 
-| # | Task | Status |
-|---|------|--------|
-| 2.1 | Agathon → custom_tools E2E | PENDING |
-| 2.2 | Attack Replay Theater UI | PENDING |
-| 2.3 | Aegis export → persist rules | PENDING |
-| 2.4 | EVOLVE_SYSTEM_E2E.md | PENDING |
+| # | Task | Status | Evidence |
+|---|------|--------|----------|
+| 2.1 | Agathon → custom_tools E2E | **DONE** | Engine inserts via orchestrator; scan detail shows `custom_tools` count; `EVOLVE_SYSTEM_E2E.md` |
+| 2.2 | Attack Replay Theater UI | **DONE** | `replay-steps.ts`, `attack-replay-theater.tsx`, wired on scan detail (sealed/failed) |
+| 2.3 | Aegis auto-export on scan complete | **DONE** | `ruleset-core.ts`, `aegis-auto-export.ts`, webhook hook + `scan_logs` |
+| 2.4 | EVOLVE_SYSTEM_E2E.md | **DONE** | `CITADEL_LAUNCH_VAULT/EVOLVE_SYSTEM_E2E.md` |
 
 ---
 
-## Phases 3–10
+## Phase 3 — Social feed + teams
+
+| # | Task | Status | Evidence |
+|---|------|--------|----------|
+| 3.1 | `20260621_social_teams.sql` migration | **DONE** | Applied live via Supabase MCP |
+| 3.2 | Server actions (feed + teams) | **DONE** | `feed-actions.ts`, `team-actions.ts` |
+| 3.3 | Intel Hub tabs (Chat \| Feed \| Teams) | **DONE** | `intel-hub.tsx`, `/dashboard/intel` |
+| 3.4 | Nav | **DONE** | Tabs under Intel only (no extra nav route) |
+| 3.5 | Mobile touch targets | **DONE** | Full-width cards, min-h 44px buttons, text-xs |
+
+---
+
+## Phases 4–10
 
 | Phase | Theme | Status |
 |-------|-------|--------|
-| 3 | Social feed + teams | NOT STARTED |
 | 4 | Citadel Intel Vault (legal OSINT) | NOT STARTED |
 | 5 | Startup / Client HQ | NOT STARTED |
 | 6 | Auth hardening (2FA, recovery) | NOT STARTED |
 | 7 | E2EE (scoped) | NOT STARTED |
 | 8 | Forge Terminal v2 | NOT STARTED |
 | 9 | Beat Fable UX (CLI, leaderboard, demo) | NOT STARTED |
-| 10 | Full verification + deploy | PENDING build |
+| 10 | Full verification + deploy | IN PROGRESS |
 
 ---
 
 ## Next actions
 
-1. `npm run build` — verify Phase 0 + 1 compile  
-2. Deploy forgeguard-ai to Vercel prod  
-3. Operator: Billing → Sovereign 199 USDT → confirm `crypto_deposits` pending row  
-4. Run one scan → confirm `training_corpus_events` row  
-5. Begin Phase 2 E2E doc
+1. Operator: sealed scan → confirm `custom_tools`, `aegis_rules`, replay UI, `training_corpus_events`
+2. Operator: `/dashboard/intel` → create post, create team, like post
+3. Operator: Billing → Sovereign deposit → confirm `crypto_deposits` pending row
+4. Begin Phase 4 (legal OSINT Intel Vault)

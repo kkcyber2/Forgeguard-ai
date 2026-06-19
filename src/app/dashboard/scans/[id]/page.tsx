@@ -8,6 +8,7 @@ import {
   Globe2,
   Radar,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { FindingsBreakdown } from "./findings-breakdown";
@@ -25,6 +26,8 @@ import { deleteScan } from "../actions";
 import { fetchDashboardAnalytics } from "@/lib/analytics/dashboard-metrics";
 import { SCAN_REPORT_SELECT } from "@/lib/scans/queries";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
+import { buildAttackReplaySteps } from "@/lib/evolve/replay-steps";
+import { AttackReplayTheater } from "@/components/scans/attack-replay-theater";
 
 /**
  * /dashboard/scans/[id] — single-scan detail.
@@ -139,6 +142,19 @@ export default async function ScanDetailPage({ params }: PageProps) {
     created_at: row.created_at,
   }));
 
+  const { count: customToolsCount } = await supabase
+    .from("custom_tools")
+    .select("id", { count: "exact", head: true })
+    .eq("origin_scan_id", id);
+
+  const replaySteps =
+    scan.status === "sealed" || scan.status === "failed"
+      ? buildAttackReplaySteps(
+          (logs ?? []) as import("@/lib/evolve/replay-steps").ReplayLogRow[],
+          (scanReport?.attack_path as unknown[] | undefined) ?? null,
+        )
+      : [];
+
   return (
     <>
       <div className="mb-4">
@@ -223,7 +239,22 @@ export default async function ScanDetailPage({ params }: PageProps) {
             </dl>
           </Card>
         </StaggerItem>
+        <StaggerItem>
+          <Card>
+            <CardHead icon={Wrench} label="Evolved tools" />
+            <p className="font-mono text-2xl text-lime-400 tabular-nums">
+              {customToolsCount ?? 0}
+            </p>
+            <p className="mt-1 text-[11px] text-foreground-subtle">
+              custom_tools from Agathon Brain
+            </p>
+          </Card>
+        </StaggerItem>
       </Stagger>
+
+      {(scan.status === "sealed" || scan.status === "failed") && replaySteps.length > 0 ? (
+        <AttackReplayTheater steps={replaySteps} />
+      ) : null}
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-1">

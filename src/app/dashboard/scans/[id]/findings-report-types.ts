@@ -42,6 +42,7 @@ export interface ScanReport {
   cvss_overall?: number;
   risk_label?: "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   findings?: Finding[];
+  attack_path?: unknown[] | null;
   optimization_suggestions_md?: string;
   owasp_coverage?: Record<string, OWASPBucket>;
   attacks_run?: number;

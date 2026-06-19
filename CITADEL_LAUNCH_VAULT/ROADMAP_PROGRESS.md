@@ -64,9 +64,19 @@
 
 ---
 
+## Scan pipeline (P0)
+
+| Check | Status | Evidence |
+|-------|--------|----------|
+| Engine health | **GREEN** | `/api/health/engine` healthy, 115ms |
+| Dispatch chain | **GREEN** | Fix `6fa7c81` — await runScan for all intensities |
+| Stuck scan root cause | **RESOLVED** | `SCAN_STUCK_DEBUG.md` — greasy/aggressive fire-and-forget on Vercel |
+| Operator E2E | **PENDING** | Launch fresh greasy + standard scan post-deploy |
+
+---
+
 ## Next actions
 
-1. Operator: sealed scan → confirm `custom_tools`, `aegis_rules`, replay UI, `training_corpus_events`
-2. Operator: `/dashboard/intel` → create post, create team, like post
-3. Operator: Billing → Sovereign deposit → confirm `crypto_deposits` pending row
-4. Begin Phase 4 (legal OSINT Intel Vault)
+1. Operator: launch greasy scan → confirm leaves queued within 5s
+2. Operator: sealed scan → confirm `custom_tools`, `aegis_rules`, replay UI
+3. Begin Phase 4 (legal OSINT Intel Vault)

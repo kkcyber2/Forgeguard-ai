@@ -1,6 +1,6 @@
 # SCAN_STUCK_DEBUG — P0 Pipeline Fix
 
-**Date:** 2026-06-19 · **Supabase:** `nlginrukltrwpkyujzzx` · **Commit:** (pending)
+**Date:** 2026-06-19 · **Supabase:** `nlginrukltrwpkyujzzx` · **Commit:** `6fa7c81`
 
 ---
 
@@ -100,8 +100,8 @@ Secondary issue: `createScan` **swallowed** dispatch errors in a catch block and
 
 ### Build
 
-- [ ] `npm run build` PASS
-- [ ] Vercel prod deploy
+- [x] `npm run build` PASS
+- [x] Vercel prod deploy → [forgeguard-ai.com](https://forgeguard-ai.com) (`6fa7c81`)
 
 ### E2E (post-deploy)
 
@@ -109,9 +109,11 @@ Secondary issue: `createScan` **swallowed** dispatch errors in a catch block and
 2. Expect: queued → probing (≤5s) → progress increases → sealed
 3. Launch **greasy** scan — must leave queued within seconds (logs appear)
 
+**Evidence:** Prior standard scans sealed (`37671a1f`, `ab6860d5`, `f17abe2c`). Engine probe 200ms. Stuck greasy/aggressive rows had 0 logs pre-fix; marked failed with reason. Fix removes fire-and-forget — operator should launch fresh scan to confirm greasy path.
+
 ### Stuck scan recovery
 
-Existing stuck rows (`20191b6d`, `0226cfb7`) can be deleted or re-launched after deploy.
+Pre-fix rows `20191b6d`, `0226cfb7` marked **failed** with recovery message. Delete or launch new scan.
 
 ---
 

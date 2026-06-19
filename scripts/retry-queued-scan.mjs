@@ -3,7 +3,6 @@
  * Usage: node --env-file=.env.local scripts/retry-queued-scan.mjs <scan_id>
  */
 import { createClient } from "@supabase/supabase-js";
-import { createDecipheriv } from "node:crypto";
 
 const scanId = process.argv[2];
 if (!scanId) {
@@ -13,24 +12,27 @@ if (!scanId) {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const credSecret = process.env.SCAN_CREDENTIAL_SECRET;
-const engineUrl = (process.env.PYTHON_ENGINE_URL ?? process.env.AGATHON_ORCHESTRATOR_URL ?? "").replace(/\/+$/, "");
-const token = process.env.INTERNAL_SCAN_TOKEN ?? process.env.AGATHON_INTERNAL_SECRET;
-
-if (!supabaseUrl || !serviceKey || !credSecret || !engineUrl || !token) {
-  console.error("Missing required env vars");
+if (!supabaseUrl || !serviceKey || !token) {
+  console.error("Missing required env vars (SUPABASE + INTERNAL_SCAN_TOKEN)");
   process.exit(1);
 }
+const engineUrl = (
+  process.env.PYTHON_ENGINE_URL ??
+  process.env.AGATHON_ORCHESTRATOR_URL ??
+  "https://engine.forgeguard-ai.com"
+).replace(/\/+$/, "");
+const token = process.env.INTERNAL_SCAN_TOKEN ?? process.env.AGATHON_INTERNAL_SECRET;
 
-function openCredential(sealed) {
-  const [ivB64, tagB64, ctB64] = sealed.split(":");
-  const key = Buffer.from(credSecret, "hex");
-  const iv = Buffer.from(ivB64, "base64");
-  const tag = Buffer.from(tagB64, "base64");
-  const ct = Buffer.from(ctB64, "base64");
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+function openCredential(blob) {
+  let cleaned = blob;
+  if (cleaned.startsWith("\\x")) {
+    cleaned = Buffer.from(cleaned.slice(2), "hex").toString("utf8");
+  }
+  const MARKER = "fg1:";
+  if (cleaned.startsWith(MARKER)) {
+    return Buffer.from(cleaned.slice(MARKER.length), "base64").toString("utf8");
+  }
+  throw new Error("Unrecognised credential format");
 }
 
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });

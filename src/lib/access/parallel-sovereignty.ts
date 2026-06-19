@@ -80,6 +80,7 @@ export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
     { href: "/admin/bounties", label: "Bounty Escrow", icon: "credit-card", section: "Ops" },
     { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark", section: "Ops" },
     { href: "/admin/system", label: "System health", icon: "activity", section: "Ops" },
+    { href: "/admin/training-corpus", label: "Training Corpus", icon: "flask-conical", section: "Ops" },
     { href: "/admin/promotions", label: "Promotions", icon: "shield-alert", section: "Ops" },
     { href: "/admin/settings", label: "Settings", icon: "settings", section: "Account" },
   ];
@@ -118,6 +119,7 @@ export function buildSovereignMasterNav(): {
     { href: "/admin/verification", label: "Verification", icon: "shield-check", section: "OPS" },
     { href: "/admin/ledger", label: "Ledger", icon: "landmark", section: "OPS" },
     { href: "/admin/system", label: "System", icon: "activity", section: "OPS" },
+    { href: "/admin/training-corpus", label: "Training Corpus", icon: "flask-conical", section: "OPS" },
     { href: "/dashboard/settings", label: "Settings", icon: "settings", section: "OPS" },
   ];
 

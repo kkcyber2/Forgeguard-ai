@@ -5,6 +5,7 @@ import {
 } from "@/lib/agathon/payload-numerics";
 import { revalidateScansCache } from "@/lib/scans/revalidate";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { ingestScanCompletedCorpus } from "@/lib/training/corpus";
 import {
   applyFortressBlock,
   verifyWebhookToken,
@@ -256,6 +257,19 @@ export async function POST(request: NextRequest) {
         .upsert(prepared, { onConflict: "scan_id" });
       if (upsertErr) {
         throw new Error(`scan_reports.upsert: ${upsertErr.message}`);
+      }
+
+      const ownerId = scanOwner?.user_id as string | undefined;
+      if (ownerId) {
+        const attackPath = Array.isArray(p.attack_path) ? p.attack_path : [];
+        await ingestScanCompletedCorpus(admin, {
+          scanId: event.scanId,
+          userId: ownerId,
+          findings: findingsArr,
+          attackPath,
+          riskLabel: String(prepared.risk_label ?? riskLabel),
+          attacksRun: attacksRunInt,
+        });
       }
 
       persistOk = true;

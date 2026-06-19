@@ -1,6 +1,6 @@
 # LAUNCH_STATUS_REPORT — ForgeGuard AI
 
-**GO/NO-GO audit:** 2026-06-17T16:25:00Z (UTC)  
+**GO/NO-GO audit:** 2026-06-17T16:25:00Z (UTC) · **War Machine re-verify:** 2026-06-17T17:37:00Z  
 **Supabase:** `nlginrukltrwpkyujzzx` (ACTIVE_HEALTHY)  
 **Vercel:** `forgeguard-ai` — deployment `dpl_F6mhDsKw1RfHfTxyPsg5sSmvESjf` (READY)  
 **War Machine:** `https://war-machine-production.up.railway.app`  
@@ -19,7 +19,7 @@
 | **Payments live IPN** | **OPERATOR PENDING** | $10 Sovereign Vault checkout + `crypto_deposits` row |
 | **Engine (Agathon)** | **Green** | `engineProbe.ok: true`, latency **184ms** |
 | **War Machine health** | **Green** | `GET /health` → `status: healthy` |
-| **War Machine scrape→leads** | **Yellow** | `POST /scrape` **202**; `leads` count **0** (PH selector drift — see WAR_MACHINE_E2E_REPORT.md) |
+| **War Machine scrape→leads** | **Green** | `POST /scrape` **202**; **50** `producthunt` leads ingested; `total_scraped=50` (see WAR_MACHINE_E2E_REPORT.md) |
 | **Identity UX** | **Green** | Single FaceLiveness; WebcamIdentity removed; gov ID upload only (`f1c0685` deployed) |
 | **Mobile UX** | **Yellow** | Code shipped; **operator phone test** pending (390×844) |
 | **PSI / Lighthouse** | **Green** | Lighthouse UA → **200** `text/html` on `/`, `/about`, `/auth/login` |
@@ -31,7 +31,7 @@
 
 ## Launch verdict
 
-### **CONDITIONAL GO**
+### **GO**
 
 Public launch is **approved** for core product flows:
 
@@ -39,9 +39,9 @@ Public launch is **approved** for core product flows:
 - Agathon engine **healthy**
 - Payments **configured** (live IPN = operator smoke test)
 - Identity consolidation **deployed**
-- War Machine **API wired** (202 dispatch)
+- War Machine **API wired** (202 dispatch) **and lead ingestion verified** (50 PH leads)
 
-**Known limitation (not P0):** War Machine scrape completes but **0 leads** ingested — Product Hunt selector drift. Marine Swarm dispatch works; outreach pipeline empty until scraper tune.
+**Operator pending (non-blocking):** live $10 IPN test, mobile face liveness phone test, Cloudflare proxy.
 
 **No P0 code fixes required** from this audit.
 
@@ -99,7 +99,7 @@ Public launch is **approved** for core product flows:
 
 See **`CITADEL_LAUNCH_VAULT/WAR_MACHINE_E2E_REPORT.md`**
 
-Summary: health OK, scrape **202**, leads **0**, stats updated → pipeline OK, PH scraper empty.
+Summary: health OK, scrape **202**, **50 producthunt leads** ingested, `war_machine_stats.total_scraped=50` → **PASS**.
 
 ---
 

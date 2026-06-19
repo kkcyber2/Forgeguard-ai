@@ -17,6 +17,46 @@ import {
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";
 
+type CryptoDepositInsert = {
+  id: string;
+  user_id: string;
+  plan_name: string;
+  plan_id: string;
+  deposit_type: "subscription" | "credit_pack";
+  amount_usdt: number;
+  deposit_address: string;
+  pay_currency: string;
+  payment_id: string | null;
+  status: string;
+  credit_amount?: number;
+};
+
+/** Live DB retains legacy NOT NULL columns address_generated + amount_usd — mirror canonical fields. */
+function buildCryptoDepositRow(row: CryptoDepositInsert): Record<string, unknown> {
+  return {
+    ...row,
+    address_generated: row.deposit_address,
+    amount_usd: row.amount_usdt,
+  };
+}
+
+function logDepositDbError(scope: string, error: { message: string; code?: string; details?: string; hint?: string }) {
+  console.error(`[crypto/${scope}/db]`, {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  });
+}
+
+async function insertCryptoDeposit(
+  admin: ReturnType<typeof createAdminSupabase>,
+  row: CryptoDepositInsert,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (admin as any).from("crypto_deposits").insert(buildCryptoDepositRow(row));
+}
+
 export type GenerateDepositResult =
   | {
       ok: true;
@@ -89,21 +129,21 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     console.warn("[crypto/generateDepositAddress] NOWPayments unavailable — using static wallet");
   }
 
-  const { error } = await admin.from("crypto_deposits").insert({
-    id: depositId,
-    user_id: user.id,
-    plan_name: planMeta.planName,
-    plan_id: planMeta.planId,
-    deposit_type: "subscription",
-    amount_usdt: payAmount,
-    deposit_address: depositAddress,
-    pay_currency: payCurrency,
-    payment_id: paymentId,
-    status: "pending",
+  const { error } = await insertCryptoDeposit(admin, {
+      id: depositId,
+      user_id: user.id,
+      plan_name: planMeta.planName,
+      plan_id: planMeta.planId,
+      deposit_type: "subscription",
+      amount_usdt: payAmount,
+      deposit_address: depositAddress,
+      pay_currency: payCurrency,
+      payment_id: paymentId,
+      status: "pending",
   });
 
   if (error) {
-    console.error("[crypto/generateDepositAddress/db]", error.message);
+    logDepositDbError("generateDepositAddress", error);
     return { ok: false, error: "Failed to record deposit" };
   }
 
@@ -172,22 +212,22 @@ export async function generateCreditPackDeposit(
     }
   }
 
-  const { error } = await admin.from("crypto_deposits").insert({
-    id: depositId,
-    user_id: user.id,
-    plan_name: packMeta.packName,
-    plan_id: "credit_pack",
-    deposit_type: "credit_pack",
-    amount_usdt: payAmount,
-    credit_amount: packMeta.creditAmount,
-    deposit_address: depositAddress,
-    pay_currency: payCurrency,
-    payment_id: paymentId,
-    status: "pending",
+  const { error } = await insertCryptoDeposit(admin, {
+      id: depositId,
+      user_id: user.id,
+      plan_name: packMeta.packName,
+      plan_id: "credit_pack",
+      deposit_type: "credit_pack",
+      amount_usdt: payAmount,
+      credit_amount: packMeta.creditAmount,
+      deposit_address: depositAddress,
+      pay_currency: payCurrency,
+      payment_id: paymentId,
+      status: "pending",
   });
 
   if (error) {
-    console.error("[crypto/generateCreditPackDeposit/db]", error.message);
+    logDepositDbError("generateCreditPackDeposit", error);
     return { ok: false, error: "Failed to record deposit" };
   }
 
@@ -282,7 +322,7 @@ export async function simulateCryptoDeposit(
   const admin = createAdminSupabase();
   const depositId = crypto.randomUUID();
 
-  const { error } = await admin.from("crypto_deposits").insert({
+  const { error } = await insertCryptoDeposit(admin, {
     id: depositId,
     user_id: user.id,
     plan_name: planMeta.planName,
@@ -291,11 +331,12 @@ export async function simulateCryptoDeposit(
     amount_usdt: planMeta.amountUsdt,
     deposit_address: getSovereignCryptoWallet() ?? "SIMULATED-VAULT",
     pay_currency: "usdttrc20",
+    payment_id: null,
     status: "confirmed",
   });
 
   if (error) {
-    console.error("[crypto/simulate]", error.message);
+    logDepositDbError("simulate", error);
     return { ok: false, error: "Simulation failed" };
   }
 

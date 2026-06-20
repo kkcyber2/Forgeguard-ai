@@ -325,7 +325,18 @@ export async function POST(request: NextRequest) {
     const progressPct =
       progressRaw != null ? Number.parseFloat(String(progressRaw)) : null;
     try {
-      if (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: currentScan } = await (admin as any)
+        .from("scans")
+        .select("status")
+        .eq("id", event.scanId)
+        .maybeSingle();
+
+      const terminal =
+        currentScan?.status === "sealed" || currentScan?.status === "failed";
+      if (terminal) {
+        persistOk = true;
+      } else if (
         progressPct != null &&
         !Number.isNaN(progressPct) &&
         progressPct > 0
@@ -344,8 +355,8 @@ export async function POST(request: NextRequest) {
           .eq("id", event.scanId)
           .maybeSingle();
         revalidateScansCache(scanOwner?.user_id as string | undefined);
+        persistOk = true;
       }
-      persistOk = true;
     } catch (err) {
       persistOk = false;
       persistError = err instanceof Error ? err.message : String(err);

@@ -120,3 +120,48 @@ Pre-fix rows `20191b6d`, `0226cfb7` marked **failed** with recovery message. Del
 ## Plain-English summary
 
 **Greasy and aggressive scans never actually started.** The app told Vercel "done" before sending the scan to Railway, and Vercel killed the background work. Standard scans worked fine. Fix: always wait for the Railway handshake to finish before responding.
+
+---
+
+## Incident 2 — STUCK_PROBING_90_GROQ_429
+
+**Date:** 2026-06-19 · **Scan:** `ec97f348-4ba1-458d-aee4-cc3e1a1a2ee8` · **Commits:** AI-red-team (pending), forgeguard-ai (pending)
+
+### Classification
+
+| Signal | Evidence |
+|--------|----------|
+| Progress | Frozen at **90%**, status **probing** |
+| Groq | `429 rate_limit_exceeded` — ~2.3K calls/24h free tier |
+| Live log loop | `brain returned no tool calls — injecting nudge` |
+| Groq-on-Groq | Target `api.groq.com` + Brain uses same `GROQ_API_KEY` |
+| UI regression | Late `status_update` webhook **downgraded** sealed → probing after `scan.completed` |
+
+### Root cause
+
+1. Brain progress caps at ~90% until `seal_scan` — normal, not a hang by itself.
+2. Groq free-tier exhaustion → Brain returns empty tool_calls → infinite nudge loop.
+3. Same API key for target strikes + Brain doubles rate pressure.
+4. `status_update` webhook had no terminal guard — progress ping after completion reset status to probing (scan `ec97f348` had `scan_reports` + `completed_at` but UI showed probing).
+
+### Fixes
+
+| Component | Change |
+|-----------|--------|
+| `orchestrator.py` | `consecutive_no_tool_calls` — force exit after 5 nudges (`brain_stuck_no_tools`) |
+| `orchestrator.py` | Rate-limit circuit breaker at 8 hits → fail with readable message |
+| `orchestrator.py` | Groq target → prefer `OPENROUTER_API_KEY` for Brain (`deepseek/deepseek-chat`) |
+| `orchestrator.py` | `MAX_BRAIN_TURNS` 20 on Groq free tier when no OpenRouter |
+| `agathon/route.ts` | Skip `status_update` when scan already sealed/failed |
+| `scan-status-tracker.tsx` | 90% probing banner (not stuck; Groq 429 guidance) |
+
+### Operator playbook
+
+1. **Cooldown** ~60 minutes after Groq 429, or upgrade Groq Dev tier.
+2. Set **`OPENROUTER_API_KEY`** on Railway AI-red-team (Brain uses OpenRouter; strikes use target key).
+3. Use **non-Groq target** for smoke tests when Groq quota is hot.
+4. PASS criteria: scan **seals or fails fast** within 15m — never infinite 90% + nudge loop.
+
+### Recovery
+
+- `ec97f348` manually reconciled to **sealed** (report existed; webhook downgrade bug).

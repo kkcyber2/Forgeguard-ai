@@ -171,6 +171,8 @@ export function ScanStatusTracker({
   const tone = STATUS_TONE[status];
   const isActive = status === "probing" || status === "queued";
   const milestone = milestoneForProgress(progress);
+  const showBrainCapBanner =
+    isActive && progress >= 90 && status === "probing";
 
   return (
     <>
@@ -182,6 +184,19 @@ export function ScanStatusTracker({
           {progress}%
         </span>
       </div>
+      {showBrainCapBanner ? (
+        <p className="mt-2 rounded-sm border border-amber-400/25 bg-amber-400/10 px-2 py-2 text-[11px] leading-relaxed text-amber-200/90">
+          Brain phase (90% cap) — not stuck. If live logs show Groq{" "}
+          <span className="font-mono">429</span>, wait ~60m or set{" "}
+          <span className="font-mono">OPENROUTER_API_KEY</span> on the engine.{" "}
+          <a
+            href="/resources/guidelines"
+            className="underline underline-offset-2 hover:text-amber-100"
+          >
+            Scan guidelines
+          </a>
+        </p>
+      ) : null}
       {milestone && isActive ? (
         <p className="mt-1 font-mono text-[10px] text-acid/80">{milestone}</p>
       ) : null}

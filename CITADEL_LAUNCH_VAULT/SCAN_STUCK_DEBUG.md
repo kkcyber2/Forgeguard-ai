@@ -165,3 +165,59 @@ Pre-fix rows `20191b6d`, `0226cfb7` marked **failed** with recovery message. Del
 ### Recovery
 
 - `ec97f348` manually reconciled to **sealed** (report existed; webhook downgrade bug).
+
+---
+
+## Incident 3 — LIST_ZERO_DETAIL_N + REPORT_23502 + kinetic_check
+
+**Classification codes:** `LIST_ZERO_DETAIL_N`, `REPORT_23502`, `STUCK_PROBING_90_GROQ_429`
+
+### Symptoms
+
+| Error | Meaning |
+|-------|---------|
+| `scan_logs_type_kinetic_check` | Vercel webhook inserted `type: "webhook"` — not in production CHECK |
+| `23502` NOT NULL | Genesis SYNC partial upsert without `executive_summary_md` |
+| List **0 findings**, detail **5 HIGH** | `scans.finding_count` never updated on `scan.completed` |
+| `webhook_notify_failed` timeout | Engine POST timeout 10s; Vercel handler slow |
+
+### Fixes (this session)
+
+| P0 | File | Change |
+|----|------|--------|
+| 1 | `webhooks/agathon/route.ts` | Sync `finding_count` / `high_severity_count` on seal; backfill findings from scan_logs |
+| 1 | `orchestrator.py` | `_compute_scan_finding_counters` on scan PATCH before webhook |
+| 2 | `orchestrator.py` | Genesis SYNC **UPDATE-only** when row exists (no partial INSERT) |
+| 3 | `webhooks/agathon/route.ts` | Ingress log `type: "info"` only (no duplicate fallback) |
+| 4 | `orchestrator.py` | Skip nudge when rate limited; OpenRouter 402 fail-fast; webhook timeout 30s |
+| 5 | `finding-counts.ts` + webhook | Backfill empty findings from breach logs |
+| 6 | `scans/page.tsx` + `enrich-scan-rows.ts` | List hydrates counts from `scan_reports` when stale |
+| 6 | `scans/[id]/page.tsx` | Banner when report missing but breach logs exist |
+
+### SQL verification
+
+```sql
+SELECT s.id, s.status, s.finding_count, s.high_severity_count,
+       jsonb_array_length(sr.findings) AS report_findings
+FROM scans s
+LEFT JOIN scan_reports sr ON sr.scan_id = s.id
+WHERE s.id = '<scan_id>';
+```
+
+```sql
+SELECT type, severity, attack_name, payload->>'message' AS msg
+FROM scan_logs WHERE scan_id = '<scan_id>'
+ORDER BY created_at DESC LIMIT 20;
+```
+
+### Operator playbook
+
+1. Top up **OpenRouter** credits on Railway AI-red-team.
+2. Keep **Groq target key** separate from engine `GROQ_API_KEY`.
+3. After Groq 429: **60m cooldown** or upgrade tier before `gpt-oss-*` targets.
+4. Smoke target matrix: OpenAI `gpt-4o-mini`, or Groq only after cooldown + OpenRouter brain set.
+5. Redeploy **both** Railway (`AI-red-team`) and Vercel (`forgeguard-ai`).
+
+### Allowed scan_logs types (production)
+
+From `20260607_emergency_brain_reset.sql` + kinetic migration: `info`, `thought`, `strike`, `breach`, `finance` (and legacy expanded set if applied). **Always use `info` for webhook ingress.**

@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { buttonStyles } from "@/components/ui/button";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { scansTableToHistory } from "@/lib/scans/adapt";
+import { enrichScanRowsWithReportCounts } from "@/lib/scans/enrich-scan-rows";
 
 /**
  * /dashboard/scans — list all scans owned by the current user.
@@ -31,7 +32,8 @@ export default async function ScansListPage() {
 
   if (error) console.error("[scans] list:", error.message);
 
-  const history = scansTableToHistory(data ?? []);
+  const enriched = await enrichScanRowsWithReportCounts(supabase, data ?? []);
+  const history = scansTableToHistory(enriched);
 
   return (
     <>

@@ -71,6 +71,9 @@
 | Engine health | **GREEN** | `/api/health/engine` healthy, 115ms |
 | Dispatch chain | **GREEN** | Fix `6fa7c81` — await runScan for all intensities |
 | Groq 90% / nudge loop | **GREEN** | Circuit breaker + nudge cap + OpenRouter brain routing |
+| finding_count list sync | **GREEN** | Webhook + orchestrator counters + list enrichment |
+| Genesis 23502 | **GREEN** | UPDATE-only SYNC; no partial INSERT |
+| Webhook kinetic_check | **GREEN** | Ingress uses `type: info` only |
 | Webhook status regression | **GREEN** | Terminal guard on `status_update` |
 | Stuck scan root cause | **RESOLVED** | `SCAN_STUCK_DEBUG.md` |
 | Operator E2E | **PENDING** | Launch scan post-deploy; must seal/fail < 15m |

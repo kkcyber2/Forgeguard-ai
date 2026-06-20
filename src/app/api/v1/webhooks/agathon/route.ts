@@ -4,6 +4,10 @@ import {
   prepareScanReportUpsert,
 } from "@/lib/agathon/payload-numerics";
 import { revalidateScansCache } from "@/lib/scans/revalidate";
+import {
+  countFindingsFromReport,
+  countFindingsFromScanLogs,
+} from "@/lib/scans/finding-counts";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { ingestScanCompletedCorpus } from "@/lib/training/corpus";
 import { autoPersistAegisRulesForScan } from "@/lib/evolve/aegis-auto-export";
@@ -117,7 +121,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: ingressErr } = await (admin as any).from("scan_logs").insert({
       scan_id: event.scanId,
-      type: "webhook",
+      type: "info",
       severity: "info",
       attack_name: "webhook_agathon",
       payload: {
@@ -131,18 +135,9 @@ export async function POST(request: NextRequest) {
       },
     });
     if (ingressErr) {
-      console.warn("[webhook:agathon] scan_logs webhook type failed:", ingressErr.message);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (admin as any).from("scan_logs").insert({
+      console.warn("[webhook:agathon] scan_logs ingress failed:", {
         scan_id: event.scanId,
-        type: "info",
-        severity: "info",
-        attack_name: "webhook_agathon",
-        payload: {
-          message: "Agathon webhook received (info fallback)",
-          kind: event.kind,
-          ingress_error: ingressErr.message.slice(0, 200),
-        },
+        error: ingressErr.message,
       });
     }
   }
@@ -152,7 +147,7 @@ export async function POST(request: NextRequest) {
     const technicalReport =
       typeof p.technical_report_md === "string" ? p.technical_report_md : null;
     const aleUsd = p.ale_usd ?? p.financial_liability_usd ?? null;
-    const findingsArr = Array.isArray(p.findings) ? p.findings : [];
+    let findingsArr = Array.isArray(p.findings) ? p.findings : [];
     try {
       const scanStatus = normalizeScanStatus(p.status);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -202,6 +197,31 @@ export async function POST(request: NextRequest) {
         p.overall_cvss != null ? Number.parseFloat(String(p.overall_cvss)) : 0;
 
       const zeroFindings = findingsArr.length === 0;
+      if (zeroFindings) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: breachLogs } = await (admin as any)
+          .from("scan_logs")
+          .select("type, severity, attack_name, payload")
+          .eq("scan_id", event.scanId)
+          .in("type", ["breach", "strike", "finding", "attempt"])
+          .order("created_at", { ascending: false })
+          .limit(200);
+        const fromLogs = countFindingsFromScanLogs(breachLogs ?? []);
+        if (fromLogs.finding_count > 0) {
+          findingsArr = (breachLogs ?? [])
+            .filter((row: { type?: string }) =>
+              ["breach", "finding"].includes(String(row.type ?? "").toLowerCase()),
+            )
+            .map((row: Record<string, unknown>) => ({
+              attack: row.attack_name ?? "breach",
+              severity: row.severity ?? "high",
+              success: true,
+              evidence: row.payload,
+            }));
+        }
+      }
+
+      const zeroFindingsAfterBackfill = findingsArr.length === 0;
       const securePoc = `${attacksRunInt} vectors tested. Perimeter intake is healthy.`;
       const securePocFull = `Status: Secure\n${securePoc}`;
 
@@ -209,7 +229,7 @@ export async function POST(request: NextRequest) {
         typeof p.technical_proof_of_concept === "string" &&
         p.technical_proof_of_concept.trim()
           ? p.technical_proof_of_concept.trim()
-          : zeroFindings
+          : zeroFindingsAfterBackfill
             ? securePocFull
             : "";
 
@@ -219,7 +239,7 @@ export async function POST(request: NextRequest) {
           : null) ??
         existing?.executive_summary_md ??
         (technicalReport ? technicalReport.slice(0, 4000) : null) ??
-        (zeroFindings
+        (zeroFindingsAfterBackfill
           ? `Status: Secure — ${securePoc}`
           : pocText || "Scan complete.");
 
@@ -236,7 +256,8 @@ export async function POST(request: NextRequest) {
       if (typeof p.executive_summary === "string") {
         patch.executive_summary = p.executive_summary;
       }
-      patch.technical_proof_of_concept = pocText || (zeroFindings ? securePocFull : null);
+      patch.technical_proof_of_concept =
+        pocText || (zeroFindingsAfterBackfill ? securePocFull : null);
       if (typeof p.remediation_code_snippet === "string") {
         patch.remediation_code_snippet = p.remediation_code_snippet;
       }
@@ -246,7 +267,7 @@ export async function POST(request: NextRequest) {
       if (parsedAle != null && !Number.isNaN(parsedAle)) {
         patch.financial_liability_usd = parsedAle;
         patch.ale_usd = parsedAle;
-      } else if (zeroFindings) {
+      } else if (zeroFindingsAfterBackfill) {
         patch.financial_liability_usd = 0;
         patch.ale_usd = 0;
       }
@@ -258,6 +279,28 @@ export async function POST(request: NextRequest) {
         .upsert(prepared, { onConflict: "scan_id" });
       if (upsertErr) {
         throw new Error(`scan_reports.upsert: ${upsertErr.message}`);
+      }
+
+      const counts = countFindingsFromReport(
+        Array.isArray(prepared.findings) ? prepared.findings : findingsArr,
+      );
+      const scanCounterPatch: Record<string, unknown> = {
+        finding_count: counts.finding_count,
+        high_severity_count: counts.high_severity_count,
+      };
+      if (parsedAle != null && !Number.isNaN(parsedAle)) {
+        scanCounterPatch.ale_usd = parsedAle;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: counterErr } = await (admin as any)
+        .from("scans")
+        .update(scanCounterPatch)
+        .eq("id", event.scanId);
+      if (counterErr) {
+        console.warn("[webhook:agathon] finding_count sync failed:", {
+          scan_id: event.scanId,
+          error: counterErr.message,
+        });
       }
 
       const ownerId = scanOwner?.user_id as string | undefined;
@@ -288,6 +331,8 @@ export async function POST(request: NextRequest) {
           message: "scan.completed persisted",
           risk_label: prepared.risk_label,
           attacks_run: prepared.attacks_run,
+          finding_count: counts.finding_count,
+          high_severity_count: counts.high_severity_count,
         },
       });
     } catch (err) {
@@ -422,6 +467,24 @@ export async function POST(request: NextRequest) {
       if (upsertErr) {
         throw new Error(`scan_reports.vector_breach: ${upsertErr.message}`);
       }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: scanRow } = await (admin as any)
+        .from("scans")
+        .select("finding_count, high_severity_count")
+        .eq("id", event.scanId)
+        .maybeSingle();
+      const sev = normalizeRiskLabel(p.severity ?? "HIGH");
+      const bumpHigh = sev === "HIGH" || sev === "CRITICAL";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (admin as any)
+        .from("scans")
+        .update({
+          finding_count: Number(scanRow?.finding_count ?? 0) + 1,
+          high_severity_count:
+            Number(scanRow?.high_severity_count ?? 0) + (bumpHigh ? 1 : 0),
+        })
+        .eq("id", event.scanId);
 
       const progressRaw = p.progress_pct;
       const progressPct =

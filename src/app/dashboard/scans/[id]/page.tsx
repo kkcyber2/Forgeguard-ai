@@ -256,6 +256,17 @@ export default async function ScanDetailPage({ params }: PageProps) {
         <AttackReplayTheater steps={replaySteps} />
       ) : null}
 
+      {scan.status === "sealed" && !scanReport && (logs ?? []).some((l) => {
+        const t = String(l.type ?? "").toLowerCase();
+        return t === "breach" || t === "finding";
+      }) ? (
+        <div className="mt-4 rounded-sm border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-xs leading-relaxed text-amber-200/90">
+          Report sync incomplete — findings are visible in the breakdown and live log.
+          Refresh the page; if the Enterprise Report section is still empty, the scan
+          completed before the webhook finished persisting.
+        </div>
+      ) : null}
+
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <FindingsBreakdown

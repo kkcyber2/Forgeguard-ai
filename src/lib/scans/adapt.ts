@@ -51,9 +51,8 @@ export function toCardStatus(s: Database["public"]["Tables"]["scans"]["Row"]["st
   }
 }
 
-/** Infer approximate severity bucket counts from the two fast counters
- *  maintained by the DB trigger. The detail page shows the full breakdown
- *  from `scan_logs`; the card view only needs enough signal for the bar. */
+/** Infer approximate severity bucket counts from scans.finding_count /
+ *  high_severity_count (synced by webhook + orchestrator on seal). */
 function inferSeverityCounts(
   findingCount: number,
   highSeverityCount: number,

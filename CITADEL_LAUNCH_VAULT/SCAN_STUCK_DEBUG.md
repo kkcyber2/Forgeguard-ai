@@ -125,7 +125,7 @@ Pre-fix rows `20191b6d`, `0226cfb7` marked **failed** with recovery message. Del
 
 ## Incident 2 — STUCK_PROBING_90_GROQ_429
 
-**Date:** 2026-06-19 · **Scan:** `ec97f348-4ba1-458d-aee4-cc3e1a1a2ee8` · **Commits:** AI-red-team (pending), forgeguard-ai (pending)
+**Date:** 2026-06-19 · **Scan:** `ec97f348-4ba1-458d-aee4-cc3e1a1a2ee8` · **Commits:** AI-red-team `02166b1`, forgeguard-ai `df6b891`
 
 ### Classification
 

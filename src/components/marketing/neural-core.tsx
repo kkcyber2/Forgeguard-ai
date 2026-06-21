@@ -1,14 +1,7 @@
 // @ts-nocheck
 "use client";
 /**
- * NeuralCore — 3D Acid-Green Particle Sphere
- * -----------------------------------------
- * React Three Fiber canvas rendering 3,000 pulsing particles
- * arranged on a sphere surface. Particles brighten and scatter
- * on mouse proximity.
- *
- * Aesthetic: High-Performance Sovereign OS.
- * Palette:   Acid Green (#D1FF00), Electric Purple (#8B5CF6), Obsidian.
+ * NeuralCore — 3D Acid-Green Particle Sphere (R3F / three.js).
  */
 
 import * as React from "react";
@@ -16,7 +9,6 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { AdaptiveDpr, AdaptiveEvents } from "@react-three/drei";
 import * as THREE from "three";
 
-/* constants */
 const PARTICLE_COUNT = 1000;
 const SPHERE_RADIUS = 2.2;
 const ACID_GREEN = new THREE.Color("#D1FF00");
@@ -24,7 +16,6 @@ const ELECTRIC_PURPLE = new THREE.Color("#8B5CF6");
 const MOUSE_INFLUENCE_RADIUS = 0.9;
 const REPEL_STRENGTH = 0.18;
 
-/* particle geometry builder */
 function buildSphereParticles(count, radius) {
   const positions = new Float32Array(count * 3);
   const scales = new Float32Array(count);
@@ -44,7 +35,6 @@ function buildSphereParticles(count, radius) {
   return { positions, scales, phases };
 }
 
-/* inner R3F component */
 function ParticleSphere() {
   const pointsRef = React.useRef(null);
   const { camera, size } = useThree();
@@ -53,8 +43,6 @@ function ParticleSphere() {
     () => buildSphereParticles(PARTICLE_COUNT, SPHERE_RADIUS),
     [],
   );
-
-  const colorsRef = React.useRef(new Float32Array(PARTICLE_COUNT * 3));
 
   const mouse = React.useRef({ x: 0, y: 0 });
   React.useEffect(() => {
@@ -76,13 +64,13 @@ function ParticleSphere() {
       cols[i * 3 + 2] = ACID_GREEN.b;
     }
     geo.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
-    colorsRef.current = cols;
     return geo;
   }, [positions]);
 
   const raycaster = React.useRef(new THREE.Raycaster());
   const mouseVec = React.useRef(new THREE.Vector2());
   const tempVec = React.useRef(new THREE.Vector3());
+  const closestPoint = React.useRef(new THREE.Vector3());
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
@@ -112,7 +100,7 @@ function ParticleSphere() {
       const dist = ray.distanceToPoint(tempVec.current);
       if (dist < MOUSE_INFLUENCE_RADIUS) {
         const strength = (1 - dist / MOUSE_INFLUENCE_RADIUS) * REPEL_STRENGTH;
-        const cp = ray.closestPointToPoint(tempVec.current, new THREE.Vector3());
+        const cp = ray.closestPointToPoint(tempVec.current, closestPoint.current);
         const dx = nx - cp.x;
         const dy = ny - cp.y;
         const dz = nz - cp.z;
@@ -158,13 +146,11 @@ function ParticleSphere() {
   );
 }
 
-/* public component */
-export function NeuralCore({ className }) {
-  // SSR guard: Canvas accesses WebGL/DOM APIs that do not exist on the server.
-  // Next.js server-renders "use client" components for initial HTML, so we must
-  // defer the Canvas until we are confirmed to be running in the browser.
+export function NeuralCore({ className }: { className?: string }) {
   const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => { setMounted(true); }, []);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
   if (!mounted) return null;
 
   return (

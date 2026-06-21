@@ -174,7 +174,7 @@ export function SovereignVaultModal({
           />
 
           <p className="text-[10px] uppercase tracking-[0.28em] text-zinc-600">
-            // ghost_mode.checkout.init
+            {"// ghost_mode.checkout.init"}
           </p>
           <h2 className="mt-1 text-sm font-semibold text-lime-400">
             {plan.name} — {amountUsdt} USDT

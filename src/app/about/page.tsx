@@ -71,7 +71,7 @@ export default async function AboutPage() {
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-obsidian-950 to-transparent" />
         <div className="relative mx-auto max-w-4xl px-6 md:px-8">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-acid mb-4">
-            // about_forgeguard.ai
+            {"// about_forgeguard.ai"}
           </p>
           <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-6xl">
             Every AI system is a{" "}

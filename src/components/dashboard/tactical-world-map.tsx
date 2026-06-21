@@ -44,24 +44,13 @@ export interface LiveWorldMapProps {
 
 type Ping = { x: number; y: number; kind: "scan" | "attack"; id: string };
 
-export function TacticalWorldMap({
-  activeScans: activeScansProp,
-  scanTargets: scanTargetsProp,
+function TacticalWorldMapCanvas({
+  activeScans,
+  scanTargets = [],
   pulseNodeIds,
   dense = false,
   attackPulses = false,
 }: LiveWorldMapProps) {
-  const activeScans = activeScansProp ?? 0;
-  const scanTargets = scanTargetsProp ?? [];
-
-  if (!LAND_PATHS?.length) {
-    return (
-      <div
-        className={`relative w-full overflow-hidden rounded-xs bg-[#050505] ${dense ? "h-[360px]" : "h-[220px]"}`}
-        aria-label="Tactical world map loading"
-      />
-    );
-  }
   const [scanPings, setScanPings] = React.useState<Ping[]>([]);
   const [attackPings, setAttackPings] = React.useState<Ping[]>([]);
   const [visible, setVisible] = React.useState(false);
@@ -130,7 +119,7 @@ export function TacticalWorldMap({
           event: "INSERT",
           schema: "public",
           table: "scan_logs",
-          filter: "type=eq.finding",
+          filter: "type=eq.breach",
         },
         () => {
           if (!mounted) return;
@@ -227,5 +216,35 @@ export function TacticalWorldMap({
         )}
       </div>
     </div>
+  );
+}
+
+export function TacticalWorldMap({
+  activeScans: activeScansProp,
+  scanTargets: scanTargetsProp,
+  pulseNodeIds,
+  dense = false,
+  attackPulses = false,
+}: LiveWorldMapProps) {
+  const activeScans = activeScansProp ?? 0;
+  const scanTargets = scanTargetsProp ?? [];
+
+  if (!LAND_PATHS?.length) {
+    return (
+      <div
+        className={`relative w-full overflow-hidden rounded-xs bg-[#050505] ${dense ? "h-[360px]" : "h-[220px]"}`}
+        aria-label="Tactical world map loading"
+      />
+    );
+  }
+
+  return (
+    <TacticalWorldMapCanvas
+      activeScans={activeScans}
+      scanTargets={scanTargets}
+      pulseNodeIds={pulseNodeIds}
+      dense={dense}
+      attackPulses={attackPulses}
+    />
   );
 }

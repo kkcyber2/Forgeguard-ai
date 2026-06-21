@@ -102,7 +102,7 @@ export default async function CareersPage() {
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-grid-hairline bg-grid-lg opacity-[0.3]" />
         <div className="relative mx-auto max-w-4xl px-6 md:px-8">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-acid mb-4">
-            // careers
+            {"// careers"}
           </p>
           <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-6xl">
             Joining the{" "}

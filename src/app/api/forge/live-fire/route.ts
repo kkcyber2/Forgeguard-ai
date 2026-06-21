@@ -20,6 +20,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { openRouterRequestHeaders } from "@/lib/agathon-config";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { normalizeHackerRankLabel } from "@/lib/access/ranks";
 
 export const runtime = "nodejs";
@@ -213,8 +214,8 @@ export async function POST(req: NextRequest) {
   // ─────────────────────────────────────────────────────────────────────────────
 
   if (code_content && containsTraitorPattern(code_content)) {
-    // Freeze wallet and update rank via SECURITY DEFINER RPC
-    await supabase.rpc("freeze_wallet", {
+    const admin = createAdminSupabase();
+    await admin.rpc("freeze_wallet", {
       p_user_id: user.id,
       p_reason:  "Traitor Protocol: attempt to access platform credentials detected in submitted code.",
     });

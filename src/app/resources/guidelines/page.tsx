@@ -144,7 +144,7 @@ export default async function GuidelinesPage() {
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-grid-hairline bg-grid-lg opacity-[0.3]" />
         <div className="relative mx-auto max-w-4xl px-6 md:px-8">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-acid mb-4">
-            // resources/guidelines
+            {"// resources/guidelines"}
           </p>
           <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl">
             Red-Teaming Best Practices

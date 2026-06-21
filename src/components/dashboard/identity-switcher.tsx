@@ -56,18 +56,19 @@ export function IdentitySwitcher({
     activeModeProp ?? (personaReady ? storeRole : ("hacker" as SovereignRole));
   const ghostTint = personaReady && isGhostMode;
 
-  if (!personaReady) return null;
-  const canSwitch = canSwitchProp ?? canSwitchStore;
-  const showDevChip = isSovereign && canDev;
-
   const [pending, setPending] = React.useState<SovereignRole | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!personaReady) return;
     if (activeMode === "dev" && !isSovereign) {
       window.location.href = "/auth/force-logout";
     }
-  }, [activeMode, isSovereign]);
+  }, [activeMode, isSovereign, personaReady]);
+
+  if (!personaReady) return null;
+  const canSwitch = canSwitchProp ?? canSwitchStore;
+  const showDevChip = isSovereign && canDev;
 
   async function handleSwitch(role: SovereignRole) {
     if (!canSwitch || role === activeMode || pending) return;

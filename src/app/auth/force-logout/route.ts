@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(SOVEREIGN_VIOLATION_LOGIN, request.url));
   }
 
-  let response = NextResponse.redirect(new URL(SOVEREIGN_VIOLATION_LOGIN, request.url));
+  const response = NextResponse.redirect(new URL(SOVEREIGN_VIOLATION_LOGIN, request.url));
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {

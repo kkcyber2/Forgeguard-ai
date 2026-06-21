@@ -22,7 +22,7 @@ export default function OpenGraphImage() {
         }}
       >
         <div style={{ fontSize: 28, letterSpacing: "0.2em", color: "#D1FF00" }}>
-          // FORGEGUARD AI
+          {"// FORGEGUARD AI"}
         </div>
         <div style={{ fontSize: 64, fontWeight: 700, marginTop: 24, lineHeight: 1.1 }}>
           Adversarial Intelligence

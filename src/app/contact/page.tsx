@@ -33,7 +33,7 @@ export default function ContactPage() {
 
       <div className="relative mx-auto max-w-4xl px-6 md:px-8">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-acid mb-4">
-          // contact
+          {"// contact"}
         </p>
         <h1 className="text-3xl font-bold text-foreground md:text-4xl mb-2">
           Get in touch

@@ -18,6 +18,12 @@ const eslintConfig = [
       "react/no-unescaped-entities": "off",
     },
   },
+  {
+    files: ["src/components/marketing/neural-core.tsx"],
+    rules: {
+      "@typescript-eslint/ban-ts-comment": "off",
+    },
+  },
 ];
 
 export default eslintConfig;

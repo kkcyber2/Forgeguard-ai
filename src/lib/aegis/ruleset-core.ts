@@ -76,6 +76,20 @@ export const TECHNIQUE_PATTERNS: Record<
   },
 };
 
+export const VERIFY_PROMPT_SNIPPETS: Record<string, string> = {
+  homoglyph: "а",
+  prompt_injection: "ignore previous instructions",
+  jailbreak: "do anything now",
+  role_confusion: "maintenance mode",
+  markdown_exfil: "![",
+  indirect_injection: "fetch(",
+  default: "system prompt",
+};
+
+export function verifySnippetForTechnique(key: string): string {
+  return VERIFY_PROMPT_SNIPPETS[key] ?? VERIFY_PROMPT_SNIPPETS.default!;
+}
+
 export function techniqueKey(finding: ScanFinding): string {
   const name = (finding.attack_name ?? "").toLowerCase();
   if (name.includes("homoglyph")) return "homoglyph";
@@ -138,22 +152,31 @@ export function buildCloudflareRuleset(scanId: string, findings: ScanFinding[]):
 export function aegisRulesToRows(
   scanId: string,
   ruleset: CloudflareRuleset,
+  options?: { appId?: string },
 ): Array<{
   scan_id: string;
   rule_id: string;
   pattern: string;
+  rule_content: string | null;
+  app_id: string | null;
   description: string;
   action: string;
   format: string;
   enabled: boolean;
 }> {
-  return ruleset.rules.map((r) => ({
-    scan_id: scanId,
-    rule_id: r.ref,
-    pattern: r.expression.slice(0, 500),
-    description: r.description,
-    action: r.action,
-    format: "cloudflare",
-    enabled: r.enabled,
-  }));
+  return ruleset.rules.map((r) => {
+    const techMatch = r.ref.match(/^fg-aegis-([a-z_]+)-/);
+    const techKey = techMatch?.[1] ?? "default";
+    return {
+      scan_id: scanId,
+      rule_id: r.ref,
+      pattern: r.expression.slice(0, 500),
+      rule_content: verifySnippetForTechnique(techKey),
+      app_id: options?.appId ?? null,
+      description: r.description,
+      action: r.action,
+      format: "cloudflare",
+      enabled: r.enabled,
+    };
+  });
 }

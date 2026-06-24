@@ -1,30 +1,32 @@
 # LAUNCH_STATUS_REPORT — ForgeGuard AI
 
-**GO/NO-GO audit:** 2026-06-17T16:25:00Z (UTC) · **War Machine re-verify:** 2026-06-17T17:37:00Z  
+**GO/NO-GO audit:** 2026-06-17T16:25:00Z (UTC) · **Operator smoke doc:** 2026-06-13  
 **Supabase:** `nlginrukltrwpkyujzzx` (ACTIVE_HEALTHY)  
-**Vercel:** `forgeguard-ai` — deployment `dpl_F6mhDsKw1RfHfTxyPsg5sSmvESjf` (READY)  
+**Vercel:** `forgeguard-ai` — production **`11bd6fd`** (`dpl_JNR6BPVG2gmtny8Y852sz8obCVPB`)  
 **War Machine:** `https://war-machine-production.up.railway.app`  
-**Agathon:** Railway `AI-red-team`  
+**Agathon:** Railway `AI-red-team` @ `85c55d0`  
 **Company registration:** N/A — not required for launch
+
+**Operator checklist:** `CITADEL_LAUNCH_VAULT/OPERATOR_SMOKE.md` (billing + identity + curl preflight; **no new scans**)
 
 ---
 
-## GO/NO-GO matrix (2026-06-17)
+## GO/NO-GO matrix (2026-06-13 update)
 
 | Layer | Status | Evidence |
 |-------|--------|----------|
-| **Git/Vercel** | **Green** | `main` @ `0e52722`; prod deploy READY; `npm run build` passed on last ship |
-| **Env** | **Green** | launch-check `envMatrixComplete: true` (all 13 required vars) |
+| **Git/Vercel** | **Green** | `main` @ `11bd6fd`; prod deploy READY; `npm run build` PASS |
+| **Env** | **Green** | launch-check `envMatrixComplete: true` (13 required vars) |
 | **Payments config** | **Green** | `crypto.configured: true`, `nowpayments: true`, `ipnSecret: true` |
-| **Payments live IPN** | **OPERATOR PENDING** | $10 Sovereign Vault checkout + `crypto_deposits` row |
-| **Engine (Agathon)** | **Green** | `engineProbe.ok: true`, latency **184ms** |
+| **Payments live IPN** | **OPERATOR PENDING** | Step 1 in `OPERATOR_SMOKE.md` — $10 credit pack + IPN log |
+| **Engine (Agathon)** | **Green** | `GET /api/health/engine` + launch-check `engineProbe.ok` |
 | **War Machine health** | **Green** | `GET /health` → `status: healthy` |
-| **War Machine scrape→leads** | **Green** | `POST /scrape` **202**; **50** `producthunt` leads ingested; `total_scraped=50` (see WAR_MACHINE_E2E_REPORT.md) |
-| **Identity UX** | **Green** | Single FaceLiveness; WebcamIdentity removed; gov ID upload only (`f1c0685` deployed) |
-| **Mobile UX** | **Yellow** | Code shipped; **operator phone test** pending (390×844) |
-| **PSI / Lighthouse** | **Green** | Lighthouse UA → **200** `text/html` on `/`, `/about`, `/auth/login` |
-| **Supabase DB** | **Green** | `face_liveness_*` columns; `verification-docs` bucket; **0 ERROR** advisors |
-| **Cloudflare** | **Yellow** | Not proxied (`Server: Vercel` only) — MANUAL_TASKS §2b |
+| **War Machine scrape→leads** | **Green** | 50 `producthunt` leads; `WAR_MACHINE_E2E_REPORT.md` PASS |
+| **Identity UX (code)** | **Green** | FaceLiveness + gov ID upload; WebcamIdentity removed |
+| **Mobile UX (operator test)** | **OPERATOR PENDING** | Step 2 in `OPERATOR_SMOKE.md` — 390×844 liveness + ID |
+| **PSI / Lighthouse** | **Green** | Lighthouse UA → **200** on `/`, `/about`, `/auth/login` |
+| **Supabase DB** | **Green** | `face_liveness_*`; `verification-docs`; RPC lockdown applied |
+| **Cloudflare** | **Yellow** | Not proxied — `MANUAL_TASKS.md` §2b |
 | **Company registration** | **N/A** | Not a launch blocker |
 
 ---
@@ -36,70 +38,74 @@
 Public launch is **approved** for core product flows:
 
 - Production health + env matrix **green**
-- Agathon engine **healthy**
-- Payments **configured** (live IPN = operator smoke test)
-- Identity consolidation **deployed**
-- War Machine **API wired** (202 dispatch) **and lead ingestion verified** (50 PH leads)
+- Agathon engine **healthy** (health probe only — no scan required for this sign-off)
+- Payments **configured**; live IPN = operator Step 1 in `OPERATOR_SMOKE.md`
+- Identity consolidation **deployed**; mobile proof = operator Step 2
+- War Machine **verified** (50 PH leads)
 
 **Operator pending (non-blocking):** live $10 IPN test, mobile face liveness phone test, Cloudflare proxy.
 
-**No P0 code fixes required** from this audit.
+---
+
+## P0 fix — billing (2026-06-13)
+
+**Credit pack wallet grant:** DB trigger + `grantConfirmedCryptoDeposit()` incorrectly used `credit_amount` (100) for `increment_wallet` instead of `amount_usdt` ($10).
+
+- Migration: `20260625_credit_pack_wallet_grant.sql` (applied live)
+- App: `src/lib/payments/crypto.ts` — credit_pack uses `amount_usdt` only
+
+Verify after IPN: wallet increases by **$10**, not $100.
 
 ---
 
-## Operator handoff (3 items)
+## Operator handoff
 
-1. **Run $10 crypto payment** — Sovereign Vault checkout → confirm `crypto_deposits` row + IPN in Vercel logs (`NOWPAYMENTS_SETUP.md`)
-2. **Test face liveness on your phone** — Settings → 5 poses + gov ID file pick → green "Received" badge
-3. **(Optional post-launch)** Cloudflare proxy + Supabase leaked-password protection + admin MFA
+| # | Task | Doc | Status |
+|---|------|-----|--------|
+| 0 | curl preflight (launch-check + engine + IPN route) | `OPERATOR_SMOKE.md` Step 0 | **Automated — run & check** |
+| 1 | $10 Sovereign Vault → `crypto_deposits` + Vercel IPN | `OPERATOR_SMOKE.md` Step 1 | **PENDING** |
+| 2 | Face liveness + gov ID on phone 390×844 | `OPERATOR_SMOKE.md` Step 2 | **PENDING** |
+| 3 | (Optional) Cloudflare proxy | `MANUAL_TASKS.md` | Post-launch |
 
 ---
 
-## Phase 1 — Production health (automated evidence)
+## Phase 1 — Production health (automated)
 
-### launch-check (2026-06-17T16:18:02Z)
+### launch-check — verify on deploy
 
-```json
-{
-  "ok": true,
-  "checks": {
-    "crypto": { "configured": true, "nowpayments": true, "ipnSecret": true, "sovereignWallet": true },
-    "engineProbe": { "ok": true, "httpStatus": 200, "latencyMs": 184 },
-    "warMachine": true,
-    "envMatrixComplete": true
-  }
-}
+```powershell
+curl -s https://www.forgeguard-ai.com/api/debug/launch-check
 ```
 
-### Optional env (false — OK)
+**Pass:** `ok: true`, `checks.crypto.configured: true`, `checks.engineProbe.ok: true`, `checks.envMatrixComplete: true`
 
-| Variable | Set |
-|----------|-----|
-| `UPSTASH_REDIS_REST_URL` | false |
-| `UPSTASH_REDIS_REST_TOKEN` | false |
-| `REVENUE_SIMULATION_MODE` | false |
-| `TWILIO_*` | true (legacy only) |
+**Live snapshot (2026-06-21T04:01Z):** `ok: true`, engine latency **194ms**, registry **161**.
 
-### HTTP probes
+### engine health
+
+```powershell
+curl -s https://www.forgeguard-ai.com/api/health/engine
+```
+
+**Pass:** HTTP 200, `status: healthy`, latency &lt; 2s
+
+### HTTP probes (2026-06-17 baseline)
 
 | Route | Status | Notes |
 |-------|--------|-------|
 | `/api/health` | **200** | |
-| `/api/health/engine` | **200** | |
-| `/` (Lighthouse UA) | **200** | `text/html` |
-| `/about` (Lighthouse UA) | **200** | `text/html` |
-| `/auth/login` (Lighthouse UA) | **200** | `text/html` |
-| `/contact` (Chrome UA) | **429** | Audit IP hit Aegis PoW burst — not a prod bug |
-| `/api/webhooks/nowpayments` POST | **429** | Audit IP rate limit; NOWPayments uses different IPs |
-| `/api/v1/webhooks/agathon` POST `{}` | **401** | Signature check present — not 5xx |
+| `/api/health/engine` | **200** | **DONE** — operator re-run via Step 0 |
+| `/api/debug/launch-check` | **200** | **DONE** — operator re-run via Step 0 |
+| `/` (Lighthouse UA) | **200** | |
+| `/about` (Lighthouse UA) | **200** | |
+| `/auth/login` (Lighthouse UA) | **200** | |
+| `/api/webhooks/nowpayments` POST | **401/400** | Route live (no valid sig in curl) |
 
 ---
 
 ## Phase 2 — War Machine E2E
 
-See **`CITADEL_LAUNCH_VAULT/WAR_MACHINE_E2E_REPORT.md`**
-
-Summary: health OK, scrape **202**, **50 producthunt leads** ingested, `war_machine_stats.total_scraped=50` → **PASS**.
+See **`WAR_MACHINE_E2E_REPORT.md`** — **PASS** (50 producthunt leads).
 
 ---
 
@@ -107,31 +113,29 @@ Summary: health OK, scrape **202**, **50 producthunt leads** ingested, `war_mach
 
 | Check | Result |
 |-------|--------|
-| Engine latency | **184ms** (< 2s) |
-| `AGATHON_WEBHOOK_CALLBACK_URL` | `https://www.forgeguard-ai.com/api/v1/webhooks/agathon` |
-| Webhook malformed POST | **401** (auth gate OK) |
-| Full scan E2E | Operator — requires logged-in user + quota + target |
+| Engine latency | **Green** via `/api/health/engine` |
+| Webhook auth gate | **401** on unsigned POST |
+| Full scan E2E | **Out of scope** — OpenRouter recharge required |
 
 ---
 
-## Phase 4 — Identity + mobile (production)
+## Phase 4 — Identity + mobile
 
 | Check | Result |
 |-------|--------|
-| WebcamIdentity / "Identity Proofing" section | **Removed** from settings page (code audit) |
-| FaceLiveness + gov ID upload | **Deployed** |
-| Clearance ladder | "Face liveness verified" + "Government ID uploaded" |
-| Mobile browser test | **Operator pending** |
+| FaceLiveness + gov ID upload (code) | **DONE** — deployed |
+| Mobile browser test | **OPERATOR PENDING** — `OPERATOR_SMOKE.md` Step 2 |
 
 ---
 
-## Phase 5 — Payments (config)
+## Phase 5 — Payments
 
 | Check | Result |
 |-------|--------|
-| launch-check crypto | **All true** |
+| launch-check crypto | **DONE** — all flags true |
 | `NOWPAYMENTS_SETUP.md` | Present |
-| Live $10 IPN | **Operator pending** |
+| Pending row on checkout | **Code DONE** — `crypto-actions.ts` legacy column mirror |
+| Live $10 IPN + wallet grant | **OPERATOR PENDING** — Step 1; P0 grant fix applied |
 
 ---
 
@@ -139,17 +143,17 @@ Summary: health OK, scrape **202**, **50 producthunt leads** ingested, `war_mach
 
 | Item | Status |
 |------|--------|
-| Supabase advisors ERROR | **0** |
-| Supabase advisors WARN | ~47 (RLS, leaked-password off, RPC EXECUTE) |
+| Supabase advisors ERROR | **0** (post RPC lockdown) |
 | Cloudflare WAF | Not deployed |
-| UPSTASH rate limit | Optional — in-memory fallback |
-| `verification-docs` bucket | Exists (note: bucket flag `public` — objects protected by storage RLS) |
+| UPSTASH rate limit | Optional |
 
 ---
 
 ## Related docs
 
+- **`OPERATOR_SMOKE.md`** — primary operator launch checklist (this report)
 - `NOWPAYMENTS_SETUP.md`
 - `MOBILE_UX_REPORT.md`
 - `WAR_MACHINE_E2E_REPORT.md`
 - `MANUAL_TASKS.md`
+- `ROADMAP_PROGRESS.md`

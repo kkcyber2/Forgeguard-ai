@@ -18,6 +18,10 @@ import {
   fortressBlockedResponse,
   isSessionFortressBlocked,
 } from "@/services/fortress-perimeter.service";
+import { isIpBlocked, ipHashFromRequest } from "@/lib/perimeter/ip-blocklist";
+import { recordPerimeterViolation } from "@/lib/perimeter/record-violation";
+import { applyTarPitIfFlagged } from "@/lib/perimeter/tarpit";
+import { THREAT_DELTAS } from "@/lib/perimeter/threat-score";
 import {
   BUNKER_CHALLENGE_PATH,
   honeypotRedirectUrl,
@@ -158,6 +162,14 @@ function logAttackAttempt(
     reason,
     metadata: { bucket: bucket ?? reason },
   };
+
+  recordPerimeterViolation(request, {
+    reason,
+    source: "fortress",
+    threatDelta: reason.includes("burst") || reason.includes("rate_limit")
+      ? THREAT_DELTAS.rate_limit
+      : undefined,
+  });
 
   void fetch(`${url}/rest/v1/attack_logs`, {
     method: "POST",
@@ -360,6 +372,23 @@ async function isSovereignSession(request: NextRequest): Promise<boolean> {
   return isSovereignOperator(user?.email);
 }
 
+async function enforceIpBlocklist(request: NextRequest): Promise<NextResponse | null> {
+  if (await isSovereignRequest(request)) return null;
+  const ipHash = ipHashFromRequest(request);
+  if (!(await isIpBlocked(ipHash))) return null;
+
+  return new NextResponse(
+    JSON.stringify({ error: "Access denied by Fortress perimeter." }),
+    {
+      status: 403,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Aegis-Fortress": "ip-blocked",
+      },
+    },
+  );
+}
+
 /**
  * Kinetic honeypots — synchronous, no session auth. Rewrites to bunker PoW.
  */
@@ -369,8 +398,13 @@ function enforceKineticHoneypot(request: NextRequest): NextResponse | null {
   if (pathname.startsWith("/api/bunker/")) return null;
   if (!isHoneypotPath(pathname)) return null;
 
-  logBlacklistedEntity(request, `kinetic_honeypot:${pathname}`);
-  logAttackAttempt(request, "kinetic_honeypot", pathname);
+  recordPerimeterViolation(request, {
+    reason: `kinetic_honeypot:${pathname}`,
+    severity: "critical",
+    threatDelta: THREAT_DELTAS.honeypot,
+    forceBlock: true,
+    source: "honeypot",
+  });
 
   const rewriteUrl = honeypotRedirectUrl(request, pathname);
   const requestHeaders = new Headers(request.headers);
@@ -471,6 +505,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const ipBlock = await enforceIpBlocklist(request);
+  if (ipBlock) return ipBlock;
+
   const honeypotBlock = enforceKineticHoneypot(request);
   if (honeypotBlock) return honeypotBlock;
 
@@ -567,6 +604,10 @@ export async function middleware(request: NextRequest) {
     response.headers.set("Access-Control-Max-Age", "86400");
   }
 
+  if (!(await isSovereignRequest(request))) {
+    await applyTarPitIfFlagged(request);
+  }
+
   return response;
 }
 
@@ -575,6 +616,8 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.json|icons/).*)",
     "/.env",
     "/.env.local",
+    "/api/.env.bak",
+    "/api/.env",
     "/wp-admin",
     "/wp-admin/:path*",
     "/admin/setup",

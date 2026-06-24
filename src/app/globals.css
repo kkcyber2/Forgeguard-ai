@@ -11,6 +11,21 @@
 @layer base {
   :root {
     color-scheme: dark;
+    --fg-background: #050505;
+    --fg-surface: #0a0a0b;
+    --fg-surface-raised: #0f1011;
+    --fg-foreground: #ecedf0;
+    --fg-foreground-muted: #797b85;
+    --fg-foreground-subtle: #5e6069;
+    --fg-border: rgba(255, 255, 255, 0.06);
+    --fg-border-strong: rgba(255, 255, 255, 0.12);
+    --fg-header-bg: rgba(5, 5, 5, 0.8);
+    --fg-sidebar-bg: #050505;
+    --fg-card-overlay: rgba(15, 16, 17, 0.4);
+    --fg-scrollbar: rgba(255, 255, 255, 0.08);
+    --fg-scrollbar-hover: rgba(255, 255, 255, 0.14);
+    --fg-selection-fg: #ecedf0;
+    --fg-autofill-bg: #080808;
   }
 
   * {
@@ -56,7 +71,8 @@
   /* ── Layer 1: Deep Obsidian base ── */
   body {
     min-height: 100vh;
-    background-color: #050505;
+    background-color: var(--fg-background);
+    color: var(--fg-foreground);
     overflow-x: hidden;
     position: relative;
   }
@@ -137,7 +153,7 @@
 
   ::selection {
     background: rgba(209, 255, 0, 0.2);
-    color: #ECEDF0;
+    color: var(--fg-selection-fg);
   }
 
   /* Minimal scrollbars */
@@ -149,11 +165,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.08);
+    background: var(--fg-scrollbar);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.14);
+    background: var(--fg-scrollbar-hover);
   }
 
   /* Focus rings — acid hairline, never blue */
@@ -167,9 +183,9 @@
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
   textarea:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0 1000px #080808 inset;
-    -webkit-text-fill-color: #ECEDF0;
-    caret-color: #ECEDF0;
+    -webkit-box-shadow: 0 0 0 1000px var(--fg-autofill-bg) inset;
+    -webkit-text-fill-color: var(--fg-foreground);
+    caret-color: var(--fg-foreground);
   }
 }
 
@@ -333,11 +349,26 @@
 
 html.light-mode {
   color-scheme: light;
+  --fg-background: #f9fafb;
+  --fg-surface: #ffffff;
+  --fg-surface-raised: #f3f4f6;
+  --fg-foreground: #0a0a0a;
+  --fg-foreground-muted: #4b5563;
+  --fg-foreground-subtle: #6b7280;
+  --fg-border: rgba(0, 0, 0, 0.08);
+  --fg-border-strong: rgba(0, 0, 0, 0.14);
+  --fg-header-bg: rgba(255, 255, 255, 0.92);
+  --fg-sidebar-bg: #ffffff;
+  --fg-card-overlay: rgba(255, 255, 255, 0.9);
+  --fg-scrollbar: rgba(0, 0, 0, 0.12);
+  --fg-scrollbar-hover: rgba(0, 0, 0, 0.2);
+  --fg-selection-fg: #0a0a0a;
+  --fg-autofill-bg: #f3f4f6;
 }
 
 html.light-mode body {
-  background-color: #F9FAFB;
-  color: #0a0a0a;
+  background-color: var(--fg-background);
+  color: var(--fg-foreground);
 }
 
 /* Suppress dark grain + grid in light mode */
@@ -349,39 +380,141 @@ html.light-mode body::after {
 /* Subtle light-mode grid replacement */
 html.light-mode body {
   background-image:
-    linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
-/* Top hairline — same acid green */
 html.light-mode html::before {
-  background: linear-gradient(90deg, transparent 0%, #D1FF00 40%, #a8cc00 60%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(209, 255, 0, 0.35) 40%,
+    rgba(168, 204, 0, 0.35) 60%,
+    transparent 100%
+  );
 }
 
-/* Header — light mode surface */
+/* Dashboard shell */
 html.light-mode header {
-  background-color: rgba(255,255,255,0.92) !important;
-  border-color: rgba(0,0,0,0.08) !important;
+  background-color: var(--fg-header-bg) !important;
+  border-color: var(--fg-border) !important;
 }
 
-/* Nav link text */
-html.light-mode .font-mono {
-  color: inherit;
+html.light-mode .fg-sidebar {
+  background-color: var(--fg-sidebar-bg) !important;
+  border-color: var(--fg-border) !important;
+}
+
+html.light-mode .fg-sidebar-link {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+html.light-mode .fg-sidebar-link:hover {
+  color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+html.light-mode .fg-sidebar-section {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+/* Obsidian utility overrides (dashboard cards, intel hub, scans) */
+html.light-mode .bg-obsidian-950 {
+  background-color: #f3f4f6 !important;
+}
+
+html.light-mode .bg-obsidian-900 {
+  background-color: #ffffff !important;
+}
+
+html.light-mode .bg-obsidian-800 {
+  background-color: #f9fafb !important;
+}
+
+html.light-mode .bg-obsidian-800\/40,
+html.light-mode .bg-obsidian-800\/60 {
+  background-color: var(--fg-card-overlay) !important;
+}
+
+html.light-mode .bg-obsidian-950\/60 {
+  background-color: rgba(243, 244, 246, 0.85) !important;
+}
+
+html.light-mode .bg-black\/20,
+html.light-mode .bg-black\/30,
+html.light-mode .bg-black\/40 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light-mode .border-white\/\[0\.05\],
+html.light-mode .border-white\/\[0\.06\],
+html.light-mode .border-white\/\[0\.08\],
+html.light-mode .border-white\/10,
+html.light-mode .border-white\/\[0\.06\] {
+  border-color: var(--fg-border) !important;
+}
+
+html.light-mode .text-white {
+  color: var(--fg-foreground) !important;
+}
+
+html.light-mode .text-white\/50,
+html.light-mode .text-white\/40,
+html.light-mode .text-white\/35,
+html.light-mode .text-white\/30 {
+  color: var(--fg-foreground-muted) !important;
+}
+
+html.light-mode .bg-surface {
+  background-color: var(--fg-surface) !important;
+}
+
+html.light-mode .glass {
+  background:
+    linear-gradient(
+      160deg,
+      rgba(0, 0, 0, 0.02) 0%,
+      rgba(0, 0, 0, 0.01) 50%,
+      rgba(0, 0, 0, 0.03) 100%
+    )
+    padding-box,
+    linear-gradient(
+      160deg,
+      rgba(0, 0, 0, 0.08) 0%,
+      rgba(0, 0, 0, 0.03) 100%
+    )
+    border-box;
 }
 
 /* Data cards */
 html.light-mode .data-card {
-  background: rgba(0,0,0,0.02);
-  border: 0.5px solid rgba(0,0,0,0.08);
+  background: rgba(0, 0, 0, 0.02);
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
 }
+
 html.light-mode .data-card:hover {
-  background: rgba(0,0,0,0.04);
-  border-color: rgba(0,0,0,0.14);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.14);
 }
 
 /* Live dot stays green */
 html.light-mode .live-dot {
   background: #7db200;
-  box-shadow: 0 0 6px rgba(125,178,0,0.8), 0 0 12px rgba(125,178,0,0.3);
+  box-shadow: 0 0 6px rgba(125, 178, 0, 0.8), 0 0 12px rgba(125, 178, 0, 0.3);
+}
+
+/* Marketing / misc */
+html.light-mode .app-grain {
+  opacity: 0;
+}
+
+html.light-mode .divider-x {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.08) 30%,
+    rgba(0, 0, 0, 0.08) 70%,
+    transparent 100%
+  );
 }

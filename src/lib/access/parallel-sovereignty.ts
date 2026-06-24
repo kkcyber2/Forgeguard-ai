@@ -72,6 +72,7 @@ export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
   const primary: NavItem[] = [
     { href: "/admin", label: "Command Center", icon: "layout-dashboard", section: "Command" },
     { href: "/admin/threats", label: "Live Map", icon: "globe", section: "Command" },
+    { href: "/admin/threat-console", label: "Threat Console", icon: "shield-alert", section: "Command" },
     { href: "/admin/users", label: "User Management", icon: "users", section: "Command" },
     { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "Command" },
   ];
@@ -81,6 +82,7 @@ export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
     { href: "/admin/ledger", label: "Financial Ledger", icon: "landmark", section: "Ops" },
     { href: "/admin/system", label: "System health", icon: "activity", section: "Ops" },
     { href: "/admin/training-corpus", label: "Training Corpus", icon: "flask-conical", section: "Ops" },
+    { href: "/admin/almanac", label: "Almanac", icon: "book-open", section: "Ops" },
     { href: "/admin/promotions", label: "Promotions", icon: "shield-alert", section: "Ops" },
     { href: "/admin/settings", label: "Settings", icon: "settings", section: "Account" },
   ];
@@ -96,6 +98,7 @@ export function buildSovereignMasterNav(): {
   const system: NavItem[] = [
     { href: "/admin", label: "Command Center", icon: "layout-dashboard", section: "SYSTEM" },
     { href: "/admin/threats", label: "Live Map", icon: "globe", section: "SYSTEM" },
+    { href: "/admin/threat-console", label: "Threat Console", icon: "shield-alert", section: "SYSTEM" },
     { href: "/admin/users", label: "User Management", icon: "users", section: "SYSTEM" },
     { href: "/admin/threats", label: "Global Threats", icon: "shield-alert", section: "SYSTEM" },
   ];
@@ -120,6 +123,7 @@ export function buildSovereignMasterNav(): {
     { href: "/admin/ledger", label: "Ledger", icon: "landmark", section: "OPS" },
     { href: "/admin/system", label: "System", icon: "activity", section: "OPS" },
     { href: "/admin/training-corpus", label: "Training Corpus", icon: "flask-conical", section: "OPS" },
+    { href: "/admin/almanac", label: "Almanac", icon: "book-open", section: "OPS" },
     { href: "/dashboard/settings", label: "Settings", icon: "settings", section: "OPS" },
   ];
 

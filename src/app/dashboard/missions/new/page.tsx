@@ -2,15 +2,19 @@
 
 /**
  * /dashboard/missions/new — Post a new security mission (Clients only)
- * ─────────────────────────────────────────────────────────────────────
- * Sovereign OS aesthetic: Obsidian / Acid Green / Glassmorphism.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Crosshair } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
+import { createMission } from "@/lib/trust/mission-actions";
+import {
+  resolveVerifiedCompanyTag,
+  validateSelfTypedCompanyTag,
+} from "@/lib/trust/identity";
 
 const RANKS = ["RECRUIT", "OPERATIVE", "ELITE", "SOVEREIGN"] as const;
 
@@ -21,6 +25,11 @@ export default function NewMissionPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [profileTrust, setProfileTrust] = useState<{
+    company_tag: string | null;
+    domain_verified: boolean;
+    company_domain: string | null;
+  } | null>(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -30,6 +39,33 @@ export default function NewMissionPage() {
     required_rank: "OPERATIVE" as string,
     company_tag: "",
   });
+
+  useEffect(() => {
+    const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    void supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("company_tag, domain_verified, company_domain")
+        .eq("id", user.id)
+        .single();
+      if (data) {
+        setProfileTrust({
+          company_tag: data.company_tag,
+          domain_verified: Boolean(data.domain_verified),
+          company_domain: data.company_domain,
+        });
+      }
+    });
+  }, []);
+
+  const verifiedTag = profileTrust
+    ? resolveVerifiedCompanyTag(profileTrust)
+    : null;
+
+  const tagPreview = form.company_tag.trim()
+    ? validateSelfTypedCompanyTag(form.company_tag, profileTrust ?? {})
+    : null;
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -43,24 +79,27 @@ export default function NewMissionPage() {
       setError("Title and description are required.");
       return;
     }
+
+    if (form.company_tag.trim() && tagPreview && !tagPreview.ok) {
+      setError(tagPreview.error);
+      return;
+    }
+
     setError(null);
 
     startTransition(async () => {
-      const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError("Not authenticated."); return; }
-
-      const { error: dbErr } = await supabase.from("missions").insert({
-        client_id: user.id,
+      const result = await createMission({
         title: form.title.trim(),
         description: form.description.trim(),
-        scope: form.scope.trim() || null,
-        budget_credits: parseInt(form.budget_credits, 10) || 0,
-        required_rank: form.required_rank,
-        company_tag: form.company_tag.trim().toUpperCase() || null,
+        scope: form.scope.trim() || undefined,
+        budgetCredits: parseInt(form.budget_credits, 10) || 0,
+        requiredRank: form.required_rank,
       });
 
-      if (dbErr) { setError(dbErr.message); return; }
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       router.push("/dashboard/missions");
     });
   }
@@ -78,7 +117,6 @@ export default function NewMissionPage() {
 
   return (
     <div className="mx-auto max-w-2xl pb-16">
-      {/* Back */}
       <Link
         href="/dashboard/missions"
         className="mb-6 flex items-center gap-2 text-xs transition-opacity hover:opacity-70"
@@ -88,7 +126,6 @@ export default function NewMissionPage() {
         Mission Vault
       </Link>
 
-      {/* Header */}
       <div className="mb-8">
         <div className="mb-2 flex items-center gap-2">
           <Crosshair size={16} style={{ color: "#D1FF00" }} strokeWidth={1.5} />
@@ -98,11 +135,10 @@ export default function NewMissionPage() {
         </div>
         <h1 className="text-2xl font-semibold text-white">New Contract</h1>
         <p className="mt-1 text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>
-          Define the scope, budget, and operator requirements. Verified hackers will pitch within 24 hours.
+          Define the scope, budget, and operator requirements. Company badges appear only after DNS domain verification.
         </p>
       </div>
 
-      {/* Form */}
       <form onSubmit={handleSubmit}>
         <div
           className="rounded-[4px] p-6"
@@ -112,7 +148,6 @@ export default function NewMissionPage() {
           }}
         >
           <div className="flex flex-col gap-5">
-            {/* Title */}
             <Field label="Mission Title">
               <input
                 name="title"
@@ -126,7 +161,6 @@ export default function NewMissionPage() {
               />
             </Field>
 
-            {/* Description */}
             <Field label="Mission Brief">
               <textarea
                 name="description"
@@ -140,7 +174,6 @@ export default function NewMissionPage() {
               />
             </Field>
 
-            {/* Scope */}
             <Field label="Scope / Rules of Engagement" hint="Optional">
               <textarea
                 name="scope"
@@ -154,7 +187,6 @@ export default function NewMissionPage() {
               />
             </Field>
 
-            {/* Budget + Rank */}
             <div className="grid grid-cols-2 gap-4">
               <Field label="Budget (credits)">
                 <input
@@ -190,30 +222,44 @@ export default function NewMissionPage() {
               </Field>
             </div>
 
-            {/* Company tag */}
-            <Field label="Company Tag" hint="e.g. STRIPE SEC — displayed as badge on the mission">
-              <input
-                name="company_tag"
-                type="text"
-                value={form.company_tag}
-                onChange={handleChange}
-                placeholder="ACME SEC"
-                maxLength={24}
-                style={inputStyle}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(209,255,0,0.35)"; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
-              />
-              {form.company_tag && (
-                <span
-                  className="mt-1.5 flex w-fit items-center gap-1 font-mono text-[10px] uppercase tracking-[0.15em] px-2 py-0.5 rounded-[3px]"
-                  style={{
-                    background: "rgba(56,189,248,0.1)",
-                    border: "0.5px solid rgba(56,189,248,0.3)",
-                    color: "#38BDF8",
-                  }}
-                >
-                  [{String(form.company_tag ?? "").toUpperCase()}]
-                </span>
+            <Field
+              label="Company Tag"
+              hint={verifiedTag ? "Verified from your domain" : "DNS verification required"}
+            >
+              {verifiedTag ? (
+                <div className="mt-1">
+                  <TrustTagBadge tag={verifiedTag} tier="domain" verified />
+                  <p className="mt-2 text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+                    This verified tag will appear on your mission automatically.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <input
+                    name="company_tag"
+                    type="text"
+                    value={form.company_tag}
+                    onChange={handleChange}
+                    placeholder="ACME SEC (preview only until DNS verified)"
+                    maxLength={24}
+                    style={inputStyle}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(209,255,0,0.35)"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                  />
+                  {form.company_tag.trim() ? (
+                    <div className="mt-2">
+                      {tagPreview && !tagPreview.ok ? (
+                        <TrustTagBadge
+                          unverifiedPreview={tagPreview.previewUnverified ?? form.company_tag}
+                          verified={false}
+                        />
+                      ) : null}
+                      <p className="mt-1.5 text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+                        Self-typed tags are not saved. Verify your domain in Settings to publish a badge.
+                      </p>
+                    </div>
+                  ) : null}
+                </>
               )}
             </Field>
 
@@ -221,7 +267,6 @@ export default function NewMissionPage() {
               <p className="text-xs" style={{ color: "rgba(255,100,100,0.85)" }}>{error}</p>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={isPending}

@@ -1,5 +1,7 @@
 import { BadgeCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
+import type { TrustTier } from "@/lib/trust/identity";
 
 export function VerifiedCheckmark({
   className,
@@ -27,13 +29,14 @@ export function VerifiedCheckmark({
   );
 }
 
-export function CompanyTagBadge({ tag }: { tag: string }) {
-  const label = tag.startsWith("[") ? tag : `[${tag}]`;
-  return (
-    <span className="inline-flex rounded-[2px] border-[0.5px] border-[#D1FF00]/25 bg-[#D1FF00]/[0.06] px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.14em] text-[#D1FF00]/90">
-      {label}
-    </span>
-  );
+export function CompanyTagBadge({
+  tag,
+  tier = "domain",
+}: {
+  tag: string;
+  tier?: TrustTier;
+}) {
+  return <TrustTagBadge tag={tag} tier={tier} verified size="sm" />;
 }
 
 export function OperatorNameBadge({
@@ -41,17 +44,23 @@ export function OperatorNameBadge({
   identityVerified,
   companyTag,
   domainVerified,
+  trustTier = "domain",
 }: {
   name: string;
   identityVerified?: boolean;
   companyTag?: string | null;
   domainVerified?: boolean;
+  trustTier?: TrustTier;
 }) {
   return (
     <span className="inline-flex items-center gap-1.5 min-w-0">
       <span className="truncate font-mono text-[11px] text-white/90">{name}</span>
       {identityVerified && <VerifiedCheckmark />}
-      {domainVerified && companyTag && <CompanyTagBadge tag={companyTag} />}
+      <TrustTagBadge
+        tag={companyTag}
+        tier={trustTier}
+        verified={Boolean(domainVerified && companyTag)}
+      />
     </span>
   );
 }

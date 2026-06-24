@@ -9,6 +9,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { scansTableToHistory } from "@/lib/scans/adapt";
 import { enrichScanRowsWithReportCounts } from "@/lib/scans/enrich-scan-rows";
+import { resolveVerifiedCompanyTag } from "@/lib/trust/identity";
 
 /**
  * /dashboard/scans — list all scans owned by the current user.
@@ -33,7 +34,22 @@ export default async function ScansListPage() {
   if (error) console.error("[scans] list:", error.message);
 
   const enriched = await enrichScanRowsWithReportCounts(supabase, data ?? []);
-  const history = scansTableToHistory(enriched);
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("company_tag, domain_verified, company_domain")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const operatorTag = resolveVerifiedCompanyTag({
+    company_tag: profile?.company_tag,
+    domain_verified: profile?.domain_verified,
+    company_domain: profile?.company_domain,
+  });
+
+  const history = scansTableToHistory(enriched).map((entry) => ({
+    ...entry,
+    card: { ...entry.card, operatorCompanyTag: operatorTag },
+  }));
 
   return (
     <>

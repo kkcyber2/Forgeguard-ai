@@ -8,6 +8,8 @@ import type { NextRequest } from "next/server";
 export const KINETIC_HONEYPOT_PATHS = [
   "/.env",
   "/.env.local",
+  "/api/.env.bak",
+  "/api/.env",
   "/wp-admin",
   "/admin/setup",
 ] as const;

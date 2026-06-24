@@ -4,8 +4,8 @@ import type { AdminScanRow } from "@/components/admin/scan-inspector-drawer";
 import type { PendingBazaarScript } from "@/components/admin/bazaar-triage-panel";
 import type { BountyEscrowRow } from "@/components/admin/mission-control-panel";
 import type { VerificationQueueRow } from "@/app/admin/verification/verification-row";
-import { resolveScanTargets, type PopNodeId } from "@/lib/admin/resolve-scan-node";
 import type { ScanTargetPulse } from "@/components/dashboard/tactical-world-map";
+import { fetchLiveMapBootstrap } from "@/lib/live-map/platform-events";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { Database } from "@/types/supabase";
@@ -123,6 +123,7 @@ export default async function AdminOverviewPage() {
     pendingScripts,
     verificationQueue,
     bountyEscrows,
+    liveMapBootstrap,
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -147,6 +148,7 @@ export default async function AdminOverviewPage() {
     fetchPendingScripts(),
     fetchVerificationQueue(),
     fetchBountyEscrows(),
+    fetchLiveMapBootstrap(20),
   ]);
 
   if (profilesErr) console.error("[admin] profiles:", profilesErr.message);
@@ -208,10 +210,7 @@ export default async function AdminOverviewPage() {
     .map((s) => ({
       id: s.id,
       target_url: s.target_url,
-      target_model: s.target_model,
     }));
-
-  const pulseNodeIds: PopNodeId[] = resolveScanTargets(scanTargets);
 
   return (
     <CommandCenter
@@ -219,7 +218,7 @@ export default async function AdminOverviewPage() {
       pendingTriage={pendingScripts.length}
       applicantCount={verificationQueue.length}
       scanTargets={scanTargets}
-      pulseNodeIds={pulseNodeIds}
+      liveMapBootstrap={liveMapBootstrap}
       operators={operators}
       scans={scanRows}
       pendingScripts={pendingScripts}

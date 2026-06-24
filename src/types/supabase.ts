@@ -1540,6 +1540,7 @@ export type Database = {
           updated_at: string | null
           user_type: "client" | "hacker" | "developer" | null
           verification_data: Json | null
+          work_email_verified: boolean | null
         }
         Insert: {
           access_level?: number | null
@@ -1596,6 +1597,7 @@ export type Database = {
           updated_at?: string | null
           user_type?: "client" | "hacker" | "developer" | null
           verification_data?: Json | null
+          work_email_verified?: boolean | null
         }
         Update: {
           access_level?: number | null
@@ -1652,6 +1654,7 @@ export type Database = {
           updated_at?: string | null
           user_type?: "client" | "hacker" | "developer" | null
           verification_data?: Json | null
+          work_email_verified?: boolean | null
         }
         Relationships: []
       }
@@ -2099,6 +2102,7 @@ export type Database = {
           pdf_storage_key: string | null
           risk_label: string
           scan_id: string
+          social_templates: Json | null
         }
         Insert: {
           aegis_zip_b64?: string | null
@@ -2124,6 +2128,7 @@ export type Database = {
           pdf_storage_key?: string | null
           risk_label: string
           scan_id: string
+          social_templates?: Json | null
         }
         Update: {
           aegis_zip_b64?: string | null
@@ -2149,6 +2154,7 @@ export type Database = {
           pdf_storage_key?: string | null
           risk_label?: string
           scan_id?: string
+          social_templates?: Json | null
         }
         Relationships: [
           {
@@ -2863,6 +2869,156 @@ export type Database = {
           metadata?: Record<string, unknown> | null
         }
         Relationships: []
+      }
+      perimeter_events: {
+        Row: {
+          id: string
+          ip_hash: string
+          path: string | null
+          severity: string
+          geo_lat: number
+          geo_lng: number
+          geo_country: string | null
+          threat_delta: number | null
+          reason: string | null
+          source: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ip_hash: string
+          path?: string | null
+          severity?: string
+          geo_lat: number
+          geo_lng: number
+          geo_country?: string | null
+          threat_delta?: number | null
+          reason?: string | null
+          source?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ip_hash?: string
+          path?: string | null
+          severity?: string
+          geo_lat?: number
+          geo_lng?: number
+          geo_country?: string | null
+          threat_delta?: number | null
+          reason?: string | null
+          source?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      perimeter_ip_blocklist: {
+        Row: {
+          id: string
+          ip_hash: string
+          reason: string
+          threat_score: number
+          expires_at: string
+          geo_country: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ip_hash: string
+          reason: string
+          threat_score?: number
+          expires_at: string
+          geo_country?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ip_hash?: string
+          reason?: string
+          threat_score?: number
+          expires_at?: string
+          geo_country?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      vulnerability_almanac_entries: {
+        Row: {
+          id: string
+          slug: string
+          title: string
+          family: string
+          owasp_id: string | null
+          severity: string
+          summary_md: string
+          poc_redacted: string | null
+          attack_hash: string
+          first_seen_at: string
+          last_seen_at: string
+          source_scan_id: string | null
+          published: boolean
+          source_type: string
+          cve_id: string | null
+          merged_into_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          title: string
+          family: string
+          owasp_id?: string | null
+          severity?: string
+          summary_md?: string
+          poc_redacted?: string | null
+          attack_hash: string
+          first_seen_at?: string
+          last_seen_at?: string
+          source_scan_id?: string | null
+          published?: boolean
+          source_type?: string
+          cve_id?: string | null
+          merged_into_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          slug?: string
+          title?: string
+          family?: string
+          owasp_id?: string | null
+          severity?: string
+          summary_md?: string
+          poc_redacted?: string | null
+          attack_hash?: string
+          first_seen_at?: string
+          last_seen_at?: string
+          source_scan_id?: string | null
+          published?: boolean
+          source_type?: string
+          cve_id?: string | null
+          merged_into_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vulnerability_almanac_entries_source_scan_id_fkey"
+            columns: ["source_scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vulnerability_almanac_entries_merged_into_id_fkey"
+            columns: ["merged_into_id"]
+            isOneToOne: false
+            referencedRelation: "vulnerability_almanac_entries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       verification_otps: {
         Row: {

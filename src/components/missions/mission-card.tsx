@@ -9,7 +9,8 @@
  */
 
 import Link from "next/link";
-import { Coins, ShieldCheck, BadgeCheck, Clock, ArrowRight } from "lucide-react";
+import { Coins, ShieldCheck, Clock, ArrowRight } from "lucide-react";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
 
 const RANK_COLORS: Record<string, string> = {
   RECRUIT:   "rgba(255,255,255,0.35)",
@@ -95,18 +96,8 @@ export function MissionCard({
         {/* ── Top row: company badge + status ─────────────── */}
         <div className="relative flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            {companyTag && (
-              <span
-                className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.15em] px-2 py-0.5 rounded-[3px]"
-                style={{
-                  background: "rgba(56,189,248,0.1)",
-                  border: "0.5px solid rgba(56,189,248,0.3)",
-                  color: "#38BDF8",
-                }}
-              >
-                {domainVerified && <BadgeCheck size={9} strokeWidth={2} />}
-                {companyTag}
-              </span>
+            {companyTag && domainVerified && (
+              <TrustTagBadge tag={companyTag} verified tier="domain" size="md" />
             )}
             {isOwner && (
               <span

@@ -1,6 +1,7 @@
 import { OperatorNameBadge } from "@/components/dashboard/verified-badge";
 import { cn } from "@/lib/utils";
 import { normalizeHackerRankLabel, rankBadgeClass } from "@/lib/access/ranks";
+import type { TrustTier } from "@/lib/trust/identity";
 
 export interface HackerProfileProps {
   fullName: string | null;
@@ -10,6 +11,7 @@ export interface HackerProfileProps {
   identityVerified: boolean;
   companyTag: string | null;
   domainVerified: boolean;
+  trustTier?: TrustTier;
   clearanceTier?: string;
   compact?: boolean;
 }
@@ -22,6 +24,7 @@ export function HackerProfile({
   identityVerified,
   companyTag,
   domainVerified,
+  trustTier = "domain",
   clearanceTier,
   compact = false,
 }: HackerProfileProps) {
@@ -42,6 +45,7 @@ export function HackerProfile({
             identityVerified={identityVerified}
             companyTag={companyTag}
             domainVerified={domainVerified}
+            trustTier={trustTier}
           />
           {!compact && (
             <p className="mt-1 truncate font-mono text-[9px] text-zinc-500">{email}</p>

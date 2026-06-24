@@ -6,6 +6,7 @@ import {
   buildCloudflareRuleset,
   type ScanFinding,
 } from "@/lib/aegis/ruleset-core";
+import { defaultAegisAppId } from "@/lib/aegis/shield-rules";
 
 export interface AegisAutoExportResult {
   ok: boolean;
@@ -20,6 +21,7 @@ export interface AegisAutoExportResult {
 export async function autoPersistAegisRulesForScan(
   admin: SupabaseClient,
   scanId: string,
+  userId?: string,
 ): Promise<AegisAutoExportResult> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,7 +52,8 @@ export async function autoPersistAegisRulesForScan(
           ];
 
     const ruleset = buildCloudflareRuleset(scanId, effective);
-    const rows = aegisRulesToRows(scanId, ruleset);
+    const appId = userId ? defaultAegisAppId(userId) : undefined;
+    const rows = aegisRulesToRows(scanId, ruleset, { appId });
 
     if (rows.length === 0) {
       return { ok: true, ruleCount: 0 };

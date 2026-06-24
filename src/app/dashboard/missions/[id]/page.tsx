@@ -1,8 +1,10 @@
 import * as React from "react";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, Coins, ShieldCheck, BadgeCheck, Users } from "lucide-react";
+import { ArrowLeft, Coins, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
+import { resolveVerifiedCompanyTag } from "@/lib/trust/identity";
 import { createServerSupabase, getSessionUser, getCurrentProfile } from "@/lib/supabase/server";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
 import { ProposalForm } from "@/components/missions/proposal-form";
 import { ProposalList } from "@/components/missions/proposal-list";
 import { MissionChat } from "@/components/missions/mission-chat";
@@ -53,6 +55,18 @@ export default async function MissionDetailPage({ params }: Props) {
   const isOwner = mission.client_id === user.id;
   const isSelectedHacker = mission.selected_hacker_id === user.id;
   const canChat = isOwner || isSelectedHacker;
+
+  const { data: clientProfileRaw } = await db
+    .from("profiles")
+    .select("company_tag, domain_verified, company_domain")
+    .eq("id", mission.client_id as string)
+    .maybeSingle();
+
+  const clientCompanyTag = resolveVerifiedCompanyTag({
+    company_tag: clientProfileRaw?.company_tag,
+    domain_verified: clientProfileRaw?.domain_verified,
+    company_domain: clientProfileRaw?.company_domain,
+  });
 
   // Fetch proposals (clients see all; hackers see their own)
   const proposalQuery = db
@@ -123,8 +137,16 @@ export default async function MissionDetailPage({ params }: Props) {
       fullName: p.is_ghost_active ? operatorAlias(p.id) : p.full_name,
       hackerRank: p.hacker_rank ?? "RECRUIT",
       identityVerified: p.identity_verified ?? false,
-      companyTag: p.company_tag,
-      domainVerified: p.domain_verified ?? false,
+      companyTag: resolveVerifiedCompanyTag({
+        company_tag: p.company_tag,
+        domain_verified: p.domain_verified,
+      }),
+      domainVerified: Boolean(
+        resolveVerifiedCompanyTag({
+          company_tag: p.company_tag,
+          domain_verified: p.domain_verified,
+        }),
+      ),
       isGhostActive: p.is_ghost_active ?? false,
     };
   }
@@ -164,18 +186,10 @@ export default async function MissionDetailPage({ params }: Props) {
         {/* Header row */}
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
-            {mission.company_tag && (
-              <span
-                className="mb-2 flex w-fit items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] px-2 py-0.5 rounded-[3px]"
-                style={{
-                  background: "rgba(56,189,248,0.1)",
-                  border: "0.5px solid rgba(56,189,248,0.3)",
-                  color: "#38BDF8",
-                }}
-              >
-                {mission.domain_verified && <BadgeCheck size={10} strokeWidth={2} />}
-                [{mission.company_tag}]
-              </span>
+            {clientCompanyTag && (
+              <div className="mb-2">
+                <TrustTagBadge tag={clientCompanyTag} verified tier="domain" size="md" />
+              </div>
             )}
             <h1 className="text-xl font-semibold text-white">{mission.title}</h1>
           </div>

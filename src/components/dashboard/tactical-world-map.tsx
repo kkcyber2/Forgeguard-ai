@@ -3,13 +3,11 @@
 import * as React from "react";
 import { geoMercator } from "d3-geo";
 import { createBrowserClient } from "@supabase/ssr";
-import type { PopNodeId } from "@/lib/admin/resolve-scan-node";
-import {
-  nodeToGeo,
-  resolveScanGeo,
-  resolveScanNode,
-} from "@/lib/admin/resolve-scan-node";
 import worldMapData from "@/lib/geo/world-map-paths.json";
+import {
+  extractTargetUrlFromPayload,
+  resolvePulseGeo,
+} from "@/lib/live-map/geo";
 
 const WIDTH = worldMapData.width;
 const HEIGHT = worldMapData.height;
@@ -20,7 +18,6 @@ const PROJ_META = worldMapData.projection as {
   center: [number, number];
 };
 const SCAN_COLOR = "#ADFF2F";
-const ATTACK_COLOR = "#A020F0";
 
 function buildProjection() {
   return geoMercator()
@@ -35,31 +32,34 @@ export interface ScanTargetPulse {
 }
 
 export interface LiveWorldMapProps {
-  activeScans: number;
   scanTargets?: ScanTargetPulse[];
-  pulseNodeIds?: readonly PopNodeId[];
+  scanTargetById?: Record<string, string>;
   dense?: boolean;
-  attackPulses?: boolean;
+  /** When set, realtime breach/strike pulses are limited to this user's scans. */
+  userId?: string | null;
 }
 
-type Ping = { x: number; y: number; kind: "scan" | "attack"; id: string };
+type Ping = { x: number; y: number; id: string };
 
 function TacticalWorldMapCanvas({
-  activeScans,
   scanTargets = [],
-  pulseNodeIds,
+  scanTargetById = {},
   dense = false,
-  attackPulses = false,
+  userId = null,
 }: LiveWorldMapProps) {
-  const [scanPings, setScanPings] = React.useState<Ping[]>([]);
-  const [attackPings, setAttackPings] = React.useState<Ping[]>([]);
+  const [pings, setPings] = React.useState<Ping[]>([]);
   const [visible, setVisible] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
+  const scanCacheRef = React.useRef(scanTargetById);
   const sessionIdRef = React.useRef(
     typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
       : `sess-${Date.now()}`,
   );
+
+  React.useEffect(() => {
+    scanCacheRef.current = { ...scanCacheRef.current, ...scanTargetById };
+  }, [scanTargetById]);
 
   React.useEffect(() => {
     const el = rootRef.current;
@@ -74,35 +74,18 @@ function TacticalWorldMapCanvas({
 
   React.useEffect(() => {
     const proj = buildProjection();
-    const pings: Ping[] = [];
-
-    if (pulseNodeIds && pulseNodeIds.length > 0) {
-      for (const nodeId of pulseNodeIds) {
-        const geo = nodeToGeo(nodeId);
-        const xy = proj([geo.lng, geo.lat]);
-        if (xy) pings.push({ x: xy[0], y: xy[1], kind: "scan", id: nodeId });
-      }
-    } else if (scanTargets.length > 0) {
-      scanTargets.forEach((s, i) => {
-        const geo = resolveScanGeo(s.target_url, i);
-        const xy = proj([geo.lng, geo.lat]);
-        if (xy) pings.push({ x: xy[0], y: xy[1], kind: "scan", id: s.id });
-      });
-    } else if (activeScans > 0) {
-      const nodes: PopNodeId[] = ["iad", "sfo", "lhr", "sin", "nrt"];
-      nodes.slice(0, Math.min(activeScans, 5)).forEach((nodeId) => {
-        const geo = nodeToGeo(nodeId);
-        const xy = proj([geo.lng, geo.lat]);
-        if (xy) pings.push({ x: xy[0], y: xy[1], kind: "scan", id: nodeId });
-      });
-    }
-
-    setScanPings(pings);
-  }, [activeScans, scanTargets, pulseNodeIds]);
+    const next: Ping[] = [];
+    scanTargets.forEach((s, i) => {
+      const geo = resolvePulseGeo(s.target_url, i);
+      if (!geo) return;
+      const xy = proj([geo.lng, geo.lat]);
+      if (xy) next.push({ x: xy[0], y: xy[1], id: s.id });
+    });
+    setPings(next);
+  }, [scanTargets]);
 
   React.useEffect(() => {
     if (!visible) return;
-
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) return;
@@ -110,54 +93,71 @@ function TacticalWorldMapCanvas({
     let mounted = true;
     const supabase = createBrowserClient(url, key);
     const proj = buildProjection();
+    let allowedScanIds = new Set<string>();
+
+    if (userId) {
+      void supabase
+        .from("scans")
+        .select("id")
+        .eq("user_id", userId)
+        .then(({ data }) => {
+          if (!mounted) return;
+          allowedScanIds = new Set((data ?? []).map((s) => s.id));
+        });
+    }
+
+    async function targetForScan(
+      scanId: string,
+      payload: unknown,
+    ): Promise<string | null> {
+      const cached = scanCacheRef.current[scanId];
+      if (cached) return cached;
+      const fromPayload = extractTargetUrlFromPayload(payload);
+      if (fromPayload) return fromPayload;
+      const { data } = await supabase
+        .from("scans")
+        .select("target_url")
+        .eq("id", scanId)
+        .maybeSingle();
+      const target = data?.target_url ?? null;
+      if (target) scanCacheRef.current[scanId] = target;
+      return target;
+    }
 
     const channel = supabase
       .channel(`tactical-map:events:${sessionIdRef.current}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "scan_logs",
-          filter: "type=eq.breach",
-        },
-        () => {
+        { event: "INSERT", schema: "public", table: "scan_logs" },
+        async (payload) => {
           if (!mounted) return;
-          const nodeId = resolveScanNode("https://api.openai.com", Date.now());
-          const geo = nodeToGeo(nodeId);
+          const row = payload.new as {
+            id: number;
+            scan_id: string;
+            type: string;
+            payload: unknown;
+          };
+          if (userId && !allowedScanIds.has(row.scan_id)) return;
+          const kind = String(row.type ?? "").toLowerCase();
+          if (kind !== "breach" && kind !== "strike") return;
+
+          const targetUrl = await targetForScan(row.scan_id, row.payload);
+          const geo = resolvePulseGeo(targetUrl);
+          if (!geo) return;
           const xy = proj([geo.lng, geo.lat]);
           if (!xy) return;
-          const id = `scan-${Date.now()}`;
-          setScanPings((prev) => [...prev.slice(-8), { x: xy[0], y: xy[1], kind: "scan", id }]);
-        },
-      );
 
-    if (attackPulses) {
-      channel.on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "attack_logs" },
-        () => {
-          if (!mounted) return;
-          const nodeId = resolveScanNode("https://anthropic.com", Date.now() + 1);
-          const geo = nodeToGeo(nodeId);
-          const xy = proj([geo.lng, geo.lat]);
-          if (!xy) return;
-          const id = `atk-${Date.now()}`;
-          setAttackPings((prev) => [...prev.slice(-4), { x: xy[0], y: xy[1], kind: "attack", id }]);
-          setTimeout(() => {
-            if (!mounted) return;
-            setAttackPings((prev) => prev.filter((p) => p.id !== id));
-          }, 2400);
+          const id = `scan-${row.id}`;
+          setPings((prev) => [...prev.filter((p) => p.id !== id).slice(-8), { x: xy[0], y: xy[1], id }]);
         },
-      );
-    }
+      )
+      .subscribe();
 
-    channel.subscribe();
     return () => {
       mounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [attackPulses, visible]);
+  }, [visible, userId]);
 
   const heightClass = dense ? "h-[360px]" : "h-[220px]";
 
@@ -184,7 +184,7 @@ function TacticalWorldMapCanvas({
             vectorEffect="non-scaling-stroke"
           />
         ))}
-        {scanPings.map((p) => (
+        {pings.map((p) => (
           <g key={p.id} transform={`translate(${p.x},${p.y})`}>
             <circle r={4} fill="none" stroke={SCAN_COLOR} strokeWidth={2} opacity={0.9}>
               <animate attributeName="r" values="2;10;2" dur="2s" repeatCount="indefinite" />
@@ -193,58 +193,24 @@ function TacticalWorldMapCanvas({
             <circle r={2} fill={SCAN_COLOR} />
           </g>
         ))}
-        {attackPings.map((p) => (
-          <g key={p.id} transform={`translate(${p.x},${p.y})`}>
-            <circle r={4} fill="none" stroke={ATTACK_COLOR} strokeWidth={2} opacity={0.95}>
-              <animate attributeName="r" values="2;12;2" dur="1.6s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.95;0;0.95" dur="1.6s" repeatCount="indefinite" />
-            </circle>
-            <circle r={2} fill={ATTACK_COLOR} />
-          </g>
-        ))}
       </svg>
-      <div className="pointer-events-none absolute bottom-2 right-3 flex gap-3 font-mono text-[8px] uppercase tracking-widest text-white/35">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ADFF2F]" />
-          Scans
-        </span>
-        {attackPulses && (
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#A020F0]" />
-            Attacks
-          </span>
-        )}
-      </div>
+      {pings.length === 0 ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center font-mono text-[9px] uppercase tracking-widest text-white/25">
+          No geo-resolved targets — pulses appear on breach/strike with a valid scan target URL
+        </div>
+      ) : null}
     </div>
   );
 }
 
-export function TacticalWorldMap({
-  activeScans: activeScansProp,
-  scanTargets: scanTargetsProp,
-  pulseNodeIds,
-  dense = false,
-  attackPulses = false,
-}: LiveWorldMapProps) {
-  const activeScans = activeScansProp ?? 0;
-  const scanTargets = scanTargetsProp ?? [];
-
+export function TacticalWorldMap(props: LiveWorldMapProps) {
   if (!LAND_PATHS?.length) {
     return (
       <div
-        className={`relative w-full overflow-hidden rounded-xs bg-[#050505] ${dense ? "h-[360px]" : "h-[220px]"}`}
+        className={`relative w-full overflow-hidden rounded-xs bg-[#050505] ${props.dense ? "h-[360px]" : "h-[220px]"}`}
         aria-label="Tactical world map loading"
       />
     );
   }
-
-  return (
-    <TacticalWorldMapCanvas
-      activeScans={activeScans}
-      scanTargets={scanTargets}
-      pulseNodeIds={pulseNodeIds}
-      dense={dense}
-      attackPulses={attackPulses}
-    />
-  );
+  return <TacticalWorldMapCanvas {...props} />;
 }

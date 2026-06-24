@@ -69,34 +69,7 @@ const QUICK_ACTIONS: {
   { label: "Post Mission",   icon: Swords,     href: "/dashboard/missions/new", viewModes: ["hacker"] },
 ];
 
-/* -------------------------------------------------------------------------- */
-/* Theme hook                                                                  */
-/* -------------------------------------------------------------------------- */
-
-function useTheme() {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-
-  useEffect(() => {
-    // Read from cookie; default to dark
-    const match = document.cookie.match(/(?:^|;\s*)theme=([^;]+)/);
-    const saved = (match?.[1] ?? "dark") as "dark" | "light";
-    setTheme(saved);
-    document.documentElement.classList.toggle("light-mode", saved === "light");
-  }, []);
-
-  const toggle = useCallback(() => {
-    setTheme((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      document.cookie = `theme=${next};path=/;max-age=31536000;SameSite=Lax`;
-      document.documentElement.classList.toggle("light-mode", next === "light");
-      return next;
-    });
-  }, []);
-
-  return { theme, toggle };
-}
-
-/* -------------------------------------------------------------------------- */
+import { useTheme } from "@/components/theme/theme-provider";
 /* Quick-action dropdown                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -451,7 +424,7 @@ export function TopBar({
   systemDegraded?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
-  const { theme, toggle: toggleTheme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [lockedFeature, setLockedFeature] = useState("The Forge");
 
@@ -496,12 +469,12 @@ export function TopBar({
       {/* ── Main header ───────────────────────────────────────────────────── */}
       <header
         className={cn(
-          "fixed inset-x-0 z-40 flex h-14 items-stretch border-b-[0.5px] border-white/10 bg-[#050505]/80 backdrop-blur-xl",
+          "fixed inset-x-0 z-40 flex h-14 items-stretch border-b-[0.5px] border-border bg-background/80 backdrop-blur-xl",
           systemDegraded ? "top-7" : "top-0",
         )}
       >
         {/* Logo cell */}
-        <div className="flex min-w-0 items-center gap-2.5 border-r-[0.5px] border-white/[0.06] px-5">
+        <div className="flex min-w-0 items-center gap-2.5 border-r-[0.5px] border-border px-5">
           {/* Hamburger — mobile only */}
           <div className="shrink-0 md:hidden">
             <MobileNav
@@ -629,6 +602,7 @@ export function TopBar({
             identityVerified={user.identityVerified}
             companyTag={user.companyTag}
             domainVerified={user.domainVerified}
+            trustTier={user.trustTier}
             viewMode={dashboardViewMode}
             trustScore={user.trustScore ?? 0}
           />

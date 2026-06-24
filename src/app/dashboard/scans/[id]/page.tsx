@@ -28,6 +28,12 @@ import { SCAN_REPORT_SELECT } from "@/lib/scans/queries";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { buildAttackReplaySteps } from "@/lib/evolve/replay-steps";
 import { AttackReplayTheater } from "@/components/scans/attack-replay-theater";
+import { AegisZipDownload } from "@/components/scans/aegis-zip-download";
+import { AegisVerifyPanel } from "@/components/scans/aegis-verify-panel";
+import { defaultAegisAppId } from "@/lib/aegis/shield-rules";
+import { fetchCustomToolsForScan } from "@/lib/evolve/custom-tools-sync";
+import { createAdminSupabase } from "@/lib/supabase/admin";
+import { ScanReconContext } from "@/components/scans/scan-recon-context";
 
 /**
  * /dashboard/scans/[id] — single-scan detail.
@@ -147,11 +153,16 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .select("id", { count: "exact", head: true })
     .eq("origin_scan_id", id);
 
+  const admin = createAdminSupabase();
+  const customTools = await fetchCustomToolsForScan(admin, id);
+  const aegisAppId = defaultAegisAppId(user.id);
+
   const replaySteps =
     scan.status === "sealed" || scan.status === "failed"
       ? buildAttackReplaySteps(
           (logs ?? []) as import("@/lib/evolve/replay-steps").ReplayLogRow[],
           (scanReport?.attack_path as unknown[] | undefined) ?? null,
+          customTools,
         )
       : [];
 
@@ -243,7 +254,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
           <Card>
             <CardHead icon={Wrench} label="Evolved tools" />
             <p className="font-mono text-2xl text-lime-400 tabular-nums">
-              {customToolsCount ?? 0}
+              {customTools.length || customToolsCount || 0}
             </p>
             <p className="mt-1 text-[11px] text-foreground-subtle">
               custom_tools from Agathon Brain
@@ -254,6 +265,14 @@ export default async function ScanDetailPage({ params }: PageProps) {
 
       {(scan.status === "sealed" || scan.status === "failed") && replaySteps.length > 0 ? (
         <AttackReplayTheater steps={replaySteps} />
+      ) : null}
+
+      {scan.status === "sealed" && scanReport?.aegis_zip_b64 ? (
+        <AegisZipDownload scanId={scan.id} zipB64={scanReport.aegis_zip_b64} />
+      ) : null}
+
+      {scan.status === "sealed" ? (
+        <AegisVerifyPanel appId={aegisAppId} />
       ) : null}
 
       {scan.status === "sealed" && !scanReport && (logs ?? []).some((l) => {
@@ -326,6 +345,8 @@ export default async function ScanDetailPage({ params }: PageProps) {
         aegisZipB64={scanReport?.aegis_zip_b64 ?? null}
         agentMemories={agentMemories}
       />
+
+      <ScanReconContext scanId={scan.id} />
 
       <p className="mt-6 text-[11px] text-foreground-subtle">
         Last server snapshot: {formatDateTime(new Date())}

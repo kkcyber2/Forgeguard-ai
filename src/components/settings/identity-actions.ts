@@ -11,6 +11,11 @@ import {
   persistSovereignBypass,
 } from "@/lib/verify/identity-audit-pipeline";
 import type { IdentityAuditResult } from "@/lib/verify/ai-audit";
+import {
+  companyTagFromDomain,
+  emailMatchesCompanyDomain,
+  validateReservedTagForDomain,
+} from "@/lib/trust/identity";
 
 export interface RunAiAuditResponse {
   ok?: boolean;
@@ -287,13 +292,17 @@ export async function checkDomainVerification(
     }
 
     const admin = createAdminSupabase();
-    const tag = cleaned.split(".")[0]?.toUpperCase() ?? "CORP";
+    const tag = companyTagFromDomain(cleaned);
+    const reservedErr = validateReservedTagForDomain(tag, cleaned);
+    if (reservedErr) {
+      return { error: reservedErr };
+    }
     const { error: dbErr } = await admin
       .from("profiles")
       .update({
         domain_verified: true,
         company_domain: cleaned,
-        company_tag: `${tag} SEC`,
+        company_tag: tag,
       })
       .eq("id", user.id);
 
@@ -308,4 +317,60 @@ export async function checkDomainVerification(
     console.error("[verify:domain] DNS lookup:", e);
     return { error: "DNS lookup failed. Try again in a moment." };
   }
+}
+
+export async function verifyWorkEmail(): Promise<{
+  verified?: boolean;
+  error?: string;
+}> {
+  const user = await getSessionUser();
+  if (!user) return { error: "Not authenticated." };
+
+  let admin: ReturnType<typeof createAdminSupabase>;
+  try {
+    admin = createAdminSupabase();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Admin client unavailable";
+    return { error: msg };
+  }
+
+  const { data: profile, error: profileErr } = await admin
+    .from("profiles")
+    .select("domain_verified, company_domain, work_email_verified, email")
+    .eq("id", user.id)
+    .single();
+
+  if (profileErr || !profile) {
+    return { error: "Could not load profile." };
+  }
+
+  if (!profile.domain_verified) {
+    return { error: "Verify your corporate domain first." };
+  }
+
+  if (!profile.company_domain) {
+    return { error: "No company domain on file." };
+  }
+
+  const authEmail = user.email ?? profile.email;
+  if (!authEmail || !emailMatchesCompanyDomain(authEmail, profile.company_domain)) {
+    return {
+      error: `Sign in with a @${profile.company_domain} email to verify work email.`,
+    };
+  }
+
+  if (profile.work_email_verified) {
+    return { verified: true };
+  }
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ work_email_verified: true })
+    .eq("id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard");
+  return { verified: true };
 }

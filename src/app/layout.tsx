@@ -3,6 +3,10 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { assertPublicEnv } from "@/lib/env";
 import { CookieConsentGate } from "@/components/legal/cookie-consent-gate";
+import { ThemeProvider } from "@/components/theme/theme-provider";
+import { ThemeScript } from "@/components/theme/theme-script";
+import { getServerTheme } from "@/lib/theme/server";
+import { cn } from "@/lib/utils";
 import "./globals.css";
 
 /**
@@ -64,21 +68,33 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#050505",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F9FAFB" },
+    { color: "#050505" },
+  ],
   width: "device-width",
   initialScale: 1,
-  colorScheme: "dark",
+  colorScheme: "dark light",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const theme = await getServerTheme();
+
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} dark`}
+      className={cn(
+        GeistSans.variable,
+        GeistMono.variable,
+        theme === "light" && "light-mode",
+      )}
       suppressHydrationWarning
     >
+      <head>
+        <ThemeScript />
+      </head>
       <body
         className="bg-background text-foreground antialiased selection:bg-acid/25"
         suppressHydrationWarning
@@ -86,14 +102,16 @@ export default function RootLayout({
         {/* Ambient grain — single fixed layer for the entire app */}
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-0 z-0 opacity-[0.04] mix-blend-overlay"
+          className="app-grain pointer-events-none fixed inset-0 z-0 opacity-[0.04] mix-blend-overlay"
           style={{
             backgroundImage:
               "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
           }}
         />
-        <div className="relative z-10">{children}</div>
-        <CookieConsentGate />
+        <ThemeProvider initialTheme={theme}>
+          <div className="relative z-10">{children}</div>
+          <CookieConsentGate />
+        </ThemeProvider>
       </body>
     </html>
   );

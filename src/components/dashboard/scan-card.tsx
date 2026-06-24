@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Radar, GitBranch, ChevronRight, Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
 import { SeverityMeter, type SeverityCounts } from "./severity-meter";
 import { cn, formatRelativeTime, truncate } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export interface ScanCardData {
   startedAt: string;
   findings?: SeverityCounts;
   href?: string;
+  operatorCompanyTag?: string | null;
 }
 
 const STATUS_LABEL: Record<ScanCardData["status"], string> = {
@@ -95,6 +97,9 @@ export function ScanCard({ scan }: { scan: ScanCardData }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
+          {scan.operatorCompanyTag ? (
+            <TrustTagBadge tag={scan.operatorCompanyTag} verified tier="domain" />
+          ) : null}
           <Badge tone={tone} dot={isActive}>
             {STATUS_LABEL[scan.status]}
           </Badge>

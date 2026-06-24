@@ -1,34 +1,49 @@
 "use client";
 
 /**
- * DomainVerifier — [GOOGLE SEC] style corporate badge system
- * ───────────────────────────────────────────────────────────
- * Flow:
- * 1. User enters corporate domain (e.g. google.com)
- * 2. System generates a TXT record challenge token
- * 3. User adds TXT record to their DNS
- * 4. "Verify" button triggers DNS lookup API
- * 5. On success: profile gets domain_verified = true + company_tag set
- *
- * Aesthetic: Sovereign OS — Steel Blue badge, Acid Green on success.
+ * DomainVerifier — corporate badge via DNS TXT + optional work-email tier.
  */
 
 import { useState, useTransition } from "react";
-import { Globe, BadgeCheck, Loader2, Copy, CheckCheck } from "lucide-react";
-import { initiateDomainVerification, checkDomainVerification } from "./identity-actions";
+import { Globe, Loader2, Copy, CheckCheck } from "lucide-react";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
+import {
+  companyTagFromDomain,
+  resolveVerifiedCompanyTag,
+} from "@/lib/trust/identity";
+import {
+  initiateDomainVerification,
+  checkDomainVerification,
+  verifyWorkEmail,
+} from "./identity-actions";
 
 interface Props {
   existingDomain: string | null;
   domainVerified: boolean;
+  companyTag?: string | null;
+  workEmailVerified?: boolean;
 }
 
-export function DomainVerifier({ existingDomain, domainVerified }: Props) {
+export function DomainVerifier({
+  existingDomain,
+  domainVerified,
+  companyTag = null,
+  workEmailVerified = false,
+}: Props) {
   const [domain, setDomain] = useState(existingDomain ?? "");
   const [token, setToken] = useState<string | null>(null);
   const [verified, setVerified] = useState(domainVerified);
+  const [workVerified, setWorkVerified] = useState(workEmailVerified);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const displayTag =
+    resolveVerifiedCompanyTag({
+      company_tag: companyTag ?? companyTagFromDomain(domain),
+      domain_verified: verified,
+      company_domain: domain,
+    }) ?? (verified ? companyTagFromDomain(domain) : null);
 
   function handleCopy() {
     if (token) {
@@ -60,6 +75,15 @@ export function DomainVerifier({ existingDomain, domainVerified }: Props) {
     });
   }
 
+  function handleWorkEmailVerify() {
+    setError(null);
+    startTransition(async () => {
+      const res = await verifyWorkEmail();
+      if (res.error) setError(res.error);
+      else if (res.verified) setWorkVerified(true);
+    });
+  }
+
   if (verified) {
     return (
       <div className="flex flex-col gap-3">
@@ -68,40 +92,61 @@ export function DomainVerifier({ existingDomain, domainVerified }: Props) {
           <p className="font-mono text-[11px] uppercase tracking-[0.18em]" style={{ color: "#38BDF8" }}>
             Corporate Identity
           </p>
-          <span
-            className="ml-auto flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.12em] px-2 py-0.5 rounded-[3px]"
-            style={{
-              background: "rgba(56,189,248,0.08)",
-              border: "0.5px solid rgba(56,189,248,0.3)",
-              color: "#38BDF8",
-            }}
-          >
-            <BadgeCheck size={9} strokeWidth={2} />
-            Verified
+          <span className="ml-auto font-mono text-[9px] uppercase tracking-[0.12em] text-sky-300">
+            Domain verified
           </span>
         </div>
         <div
-          className="flex items-center gap-2 rounded-[3px] px-4 py-3"
+          className="flex flex-wrap items-center gap-3 rounded-[3px] px-4 py-3"
           style={{
             background: "rgba(56,189,248,0.05)",
             border: "0.5px solid rgba(56,189,248,0.2)",
           }}
         >
-          <BadgeCheck size={14} style={{ color: "#38BDF8" }} strokeWidth={1.5} />
-          <span className="font-mono text-sm font-semibold" style={{ color: "#38BDF8" }}>
-            [{String(domain ?? "").toUpperCase()}]
-          </span>
-          <span className="text-xs ml-2" style={{ color: "rgba(255,255,255,0.35)" }}>
-            Domain ownership confirmed. Badge active on all missions.
+          {displayTag ? (
+            <TrustTagBadge
+              tag={displayTag}
+              tier={workVerified ? "work-email" : "domain"}
+              verified
+              size="md"
+            />
+          ) : null}
+          <span className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
+            Badge active on missions, feed, and scan cards.
           </span>
         </div>
+
+        {!workVerified ? (
+          <div className="flex flex-col gap-2 rounded-[3px] border border-white/[0.06] p-3">
+            <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+              Optional: verify work email ({domain}) for elevated trust tier.
+            </p>
+            <button
+              type="button"
+              onClick={handleWorkEmailVerify}
+              disabled={isPending}
+              className="flex items-center justify-center gap-2 rounded-[3px] py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] disabled:opacity-50"
+              style={{ background: "rgba(56,189,248,0.15)", color: "#38BDF8", border: "0.5px solid rgba(56,189,248,0.3)" }}
+            >
+              {isPending ? <Loader2 size={12} className="animate-spin" /> : null}
+              Verify work email
+            </button>
+          </div>
+        ) : (
+          <p className="text-[10px] font-mono uppercase tracking-wider text-sky-300/80">
+            Work email verified
+          </p>
+        )}
+
+        {error && (
+          <p className="text-xs" style={{ color: "rgba(255,100,100,0.85)" }}>{error}</p>
+        )}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header */}
       <div className="flex items-center gap-2">
         <Globe size={13} style={{ color: "#38BDF8" }} strokeWidth={1.5} />
         <p className="font-mono text-[11px] uppercase tracking-[0.18em]" style={{ color: "#38BDF8" }}>
@@ -111,10 +156,9 @@ export function DomainVerifier({ existingDomain, domainVerified }: Props) {
 
       <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
         Verify your corporate domain to display a{" "}
-        <span style={{ color: "#38BDF8" }}>[COMPANY SEC]</span> badge on your missions. Increases proposal rate by 3×.
+        <span style={{ color: "#38BDF8" }}>[COMPANY SEC]</span> badge. Reserved brands (GOOGLE, META, etc.) require DNS proof on the official domain.
       </p>
 
-      {/* Step 1: Enter domain */}
       {!token ? (
         <div className="flex gap-2">
           <input
@@ -143,7 +187,6 @@ export function DomainVerifier({ existingDomain, domainVerified }: Props) {
           </button>
         </div>
       ) : (
-        /* Step 2: DNS challenge */
         <div className="flex flex-col gap-3">
           <div
             className="rounded-[3px] p-4"
@@ -191,7 +234,7 @@ export function DomainVerifier({ existingDomain, domainVerified }: Props) {
             className="flex items-center justify-center gap-2 rounded-[3px] py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] disabled:opacity-50"
             style={{ background: "#38BDF8", color: "#050505" }}
           >
-            {isPending ? <Loader2 size={12} className="animate-spin" /> : <BadgeCheck size={12} strokeWidth={2} />}
+            {isPending ? <Loader2 size={12} className="animate-spin" /> : null}
             {isPending ? "Checking DNS…" : "Verify Domain"}
           </button>
 

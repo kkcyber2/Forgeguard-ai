@@ -1,5 +1,5 @@
 /**
- * GET /auth/oauth?provider=github|google|discord&next=<path>
+ * GET /auth/oauth?provider=github|google&next=<path>
  * ──────────────────────────────────────────────────────────────────────────
  * Initiates an OAuth flow with Supabase. The browser hits this route,
  * we ask Supabase for the provider's authorization URL, and we redirect
@@ -21,12 +21,6 @@
  *     - Authorized redirect URI: https://<project>.supabase.co/auth/v1/callback
  *     - Paste Client ID + Client Secret into Supabase
  *
- *   Discord
- *     - Enable Discord provider
- *     - Create app at discord.com/developers/applications
- *     - OAuth2 Redirect URI: https://<project>.supabase.co/auth/v1/callback
- *     - Paste Client ID + Client Secret into Supabase
- *
  * No env vars needed in Next.js — all OAuth credentials live in Supabase.
  */
 
@@ -36,7 +30,7 @@ import type { Provider } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-const ALLOWED_PROVIDERS: Provider[] = ["github", "google", "discord"];
+const ALLOWED_PROVIDERS: Provider[] = ["github", "google"];
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);

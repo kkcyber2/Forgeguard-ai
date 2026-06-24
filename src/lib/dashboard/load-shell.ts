@@ -16,6 +16,10 @@ import { hasSovereignBypass } from "@/lib/access/sovereign-bypass";
 import { canEnableGhostMode, normalizeSubscriptionTier } from "@/lib/access/ghost-mode";
 import { resolveAccessRank, type UserType } from "@/lib/access/ranks";
 import { resolveTrustLevelFromHackerRank } from "@/lib/access/trust-score";
+import {
+  resolveTrustTier,
+  resolveVerifiedCompanyTag,
+} from "@/lib/trust/identity";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
 
@@ -354,6 +358,18 @@ function buildShellPayload(args: {
     coerceString(args.userMetadata?.full_name) ??
     null;
 
+  const sovereignBypass = hasSovereignBypass(args.email);
+  const trustProfile = {
+    company_tag: args.profile.company_tag,
+    domain_verified: args.profile.domain_verified,
+    company_domain: args.profile.company_domain,
+    work_email_verified: args.profile.work_email_verified,
+    identity_verified: args.profile.identity_verified,
+    sovereign_pending: args.profile.sovereign_pending,
+    clearance_tier: args.profile.clearance_tier,
+    email: args.email,
+  };
+
   return {
     primaryNav: primary,
     secondaryNav: secondary,
@@ -366,9 +382,10 @@ function buildShellPayload(args: {
       walletBalance: args.walletBalance,
       walletFrozen: args.walletFrozen,
       identityVerified:
-        hasSovereignBypass(args.email) || Boolean(args.profile.identity_verified),
-      companyTag: coerceString(args.profile.company_tag),
+        sovereignBypass || Boolean(args.profile.identity_verified),
+      companyTag: resolveVerifiedCompanyTag(trustProfile),
       domainVerified: Boolean(args.profile.domain_verified),
+      trustTier: resolveTrustTier(trustProfile, sovereignBypass),
       trustScore: resolveTrustLevelFromHackerRank(
         coerceString(args.profile.hacker_rank),
       ),

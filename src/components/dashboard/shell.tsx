@@ -10,6 +10,7 @@ import type { SovereignRole, ViewMode } from "@/lib/access/parallel-sovereignty"
 import { cn } from "@/lib/utils";
 import {
   Activity,
+  BookOpen,
   CalendarClock,
   CreditCard,
   Crosshair,
@@ -56,7 +57,8 @@ export type NavIconName =
   | "git-branch"
   | "landmark"
   | "zap"
-  | "swords";
+  | "swords"
+  | "book-open";
 
 export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
@@ -76,6 +78,7 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   landmark: Landmark,
   zap: Zap,
   swords: Swords,
+  "book-open": BookOpen,
 };
 
 export interface NavItem {
@@ -99,6 +102,7 @@ export interface ShellUser {
   identityVerified?: boolean;
   companyTag?: string | null;
   domainVerified?: boolean;
+  trustTier?: import("@/lib/trust/identity").TrustTier;
   trustScore?: number;
 }
 

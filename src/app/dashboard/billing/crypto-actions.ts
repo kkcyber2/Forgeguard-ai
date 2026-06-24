@@ -5,6 +5,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { resolveAppUrl } from "@/lib/app-url";
 import {
+  buildCryptoPaymentUri,
   buildCryptoQrCodeUrl,
   createNowPayment,
   fetchNowPaymentStatus,
@@ -24,6 +25,7 @@ type CryptoDepositInsert = {
   plan_id: string;
   deposit_type: "subscription" | "credit_pack";
   amount_usdt: number;
+  pay_amount?: number;
   deposit_address: string;
   pay_currency: string;
   payment_id: string | null;
@@ -63,9 +65,13 @@ export type GenerateDepositResult =
       depositId: string;
       depositAddress: string;
       qrCode: string;
+      paymentUri: string;
       amountUsdt: number;
+      payAmount: number;
       planName: string;
       payCurrency: string;
+      invoiceUrl?: string;
+      payUrl?: string;
     }
   | { ok: false; error: string };
 
@@ -105,6 +111,8 @@ export async function generateDepositAddress(planName: string): Promise<Generate
   let paymentId: string | null = null;
   let payCurrency = "usdttrc20";
   let payAmount = planMeta.amountUsdt;
+  let invoiceUrl: string | undefined;
+  let payUrl: string | undefined;
 
   try {
     const appUrl = resolveAppUrl();
@@ -118,6 +126,8 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     paymentId = payment.paymentId;
     payCurrency = payment.payCurrency;
     payAmount = payment.payAmount;
+    invoiceUrl = payment.invoiceUrl;
+    payUrl = payment.payUrl;
   } catch (err) {
     if (!depositAddress) {
       console.error("[crypto/generateDepositAddress]", err);
@@ -136,6 +146,7 @@ export async function generateDepositAddress(planName: string): Promise<Generate
       plan_id: planMeta.planId,
       deposit_type: "subscription",
       amount_usdt: payAmount,
+      pay_amount: payAmount,
       deposit_address: depositAddress,
       pay_currency: payCurrency,
       payment_id: paymentId,
@@ -147,14 +158,20 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     return { ok: false, error: "Failed to record deposit" };
   }
 
+  const paymentUri = buildCryptoPaymentUri(payCurrency, depositAddress, payAmount);
+
   return {
     ok: true,
     depositId,
     depositAddress,
-    qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount),
+    qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency),
+    paymentUri,
     amountUsdt: payAmount,
+    payAmount,
     planName: planMeta.planName,
     payCurrency,
+    invoiceUrl,
+    payUrl,
   };
 }
 
@@ -189,6 +206,8 @@ export async function generateCreditPackDeposit(
   let paymentId: string | null = null;
   let payCurrency = "usdttrc20";
   let payAmount = packMeta.amountUsdt;
+  let invoiceUrl: string | undefined;
+  let payUrl: string | undefined;
 
   try {
     const appUrl = resolveAppUrl();
@@ -202,6 +221,8 @@ export async function generateCreditPackDeposit(
     paymentId = payment.paymentId;
     payCurrency = payment.payCurrency;
     payAmount = payment.payAmount;
+    invoiceUrl = payment.invoiceUrl;
+    payUrl = payment.payUrl;
   } catch (err) {
     if (!depositAddress) {
       console.error("[crypto/generateCreditPackDeposit]", err);
@@ -219,6 +240,7 @@ export async function generateCreditPackDeposit(
       plan_id: "credit_pack",
       deposit_type: "credit_pack",
       amount_usdt: payAmount,
+      pay_amount: payAmount,
       credit_amount: packMeta.creditAmount,
       deposit_address: depositAddress,
       pay_currency: payCurrency,
@@ -231,14 +253,20 @@ export async function generateCreditPackDeposit(
     return { ok: false, error: "Failed to record deposit" };
   }
 
+  const paymentUri = buildCryptoPaymentUri(payCurrency, depositAddress, payAmount);
+
   return {
     ok: true,
     depositId,
     depositAddress,
-    qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount),
+    qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency),
+    paymentUri,
     amountUsdt: payAmount,
+    payAmount,
     planName: packMeta.packName,
     payCurrency,
+    invoiceUrl,
+    payUrl,
   };
 }
 

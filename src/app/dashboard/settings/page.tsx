@@ -105,6 +105,8 @@ export default async function SettingsPage() {
             <DomainVerifier
               existingDomain={(data.profile?.company_domain as string | null) ?? null}
               domainVerified={data.domainVerified}
+              companyTag={(data.profile?.company_tag as string | null) ?? null}
+              workEmailVerified={Boolean(data.profile?.work_email_verified)}
             />
           </Section>
 

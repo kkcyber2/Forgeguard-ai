@@ -25,7 +25,7 @@ export function SovereignMasterSidebar({
   return (
     <aside
       className={cn(
-        "fixed left-0 top-14 z-30 hidden h-[calc(100vh-56px)] w-[220px] flex-col border-r border-white/[0.06] bg-[#050505] lg:flex",
+        "fg-sidebar fixed left-0 top-14 z-30 hidden h-[calc(100vh-56px)] w-[220px] flex-col border-r border-border bg-background lg:flex",
         className,
       )}
     >
@@ -42,7 +42,7 @@ export function SovereignMasterSidebar({
           });
           return (
             <div key={sectionKey} className="mb-4">
-              <p className="px-4 py-1 font-mono text-[8px] uppercase tracking-[0.28em] text-white/30">
+              <p className="fg-sidebar-section px-4 py-1 font-mono text-[8px] uppercase tracking-[0.28em] text-foreground-subtle">
                 {sectionKey}
               </p>
               <ul className="space-y-0.5">
@@ -69,10 +69,10 @@ function SidebarLink({ item, pathname }: { item: NavItem; pathname: string }) {
       <Link
         href={item.href}
         className={cn(
-          "flex items-center gap-2 px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest transition-colors",
+          "fg-sidebar-link flex items-center gap-2 px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest transition-colors",
           active
             ? "border-r-2 border-[#D1FF00] bg-[#D1FF00]/[0.06] text-[#D1FF00]"
-            : "text-white/40 hover:bg-white/[0.03] hover:text-white/70",
+            : "text-foreground-subtle hover:bg-foreground/5 hover:text-foreground-muted",
         )}
       >
         <Icon size={11} strokeWidth={1.5} className="shrink-0" />

@@ -10,7 +10,9 @@ import {
 } from "@/lib/scans/finding-counts";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { ingestScanCompletedCorpus } from "@/lib/training/corpus";
+import { ingestScanFindingsToAlmanac } from "@/lib/almanac/ingest";
 import { autoPersistAegisRulesForScan } from "@/lib/evolve/aegis-auto-export";
+import { syncCustomToolsFromScanLogs } from "@/lib/evolve/custom-tools-sync";
 import {
   applyFortressBlock,
   verifyWebhookToken,
@@ -314,9 +316,20 @@ export async function POST(request: NextRequest) {
           riskLabel: String(prepared.risk_label ?? riskLabel),
           attacksRun: attacksRunInt,
         });
-        const aegisResult = await autoPersistAegisRulesForScan(admin, event.scanId);
+        const almanacResult = await ingestScanFindingsToAlmanac(admin, {
+          scanId: event.scanId,
+          findings: findingsArr,
+        });
+        if (almanacResult.inserted > 0 || almanacResult.updated > 0) {
+          console.info("[webhook:agathon] almanac ingest:", almanacResult);
+        }
+        const aegisResult = await autoPersistAegisRulesForScan(admin, event.scanId, ownerId);
         if (!aegisResult.ok) {
           console.warn("[webhook:agathon] aegis auto-evolve skipped:", aegisResult.error);
+        }
+        const toolsSynced = await syncCustomToolsFromScanLogs(admin, event.scanId, ownerId);
+        if (toolsSynced > 0) {
+          console.info("[webhook:agathon] custom_tools synced from logs:", toolsSynced);
         }
       }
 

@@ -1,6 +1,7 @@
 # SCAN_STUCK_DEBUG — P0 Pipeline Fix
 
-**Date:** 2026-06-19 · **Supabase:** `nlginrukltrwpkyujzzx` · **Commit:** `6fa7c81`
+**Date:** 2026-06-21 · **Supabase:** `nlginrukltrwpkyujzzx`  
+**Commits:** forgeguard-ai `11bd6fd` · AI-red-team `85c55d0`
 
 ---
 
@@ -221,3 +222,47 @@ ORDER BY created_at DESC LIMIT 20;
 ### Allowed scan_logs types (production)
 
 From `20260607_emergency_brain_reset.sql` + kinetic migration: `info`, `thought`, `strike`, `breach`, `finance` (and legacy expanded set if applied). **Always use `info` for webhook ingress.**
+
+---
+
+## Error taxonomy (quick reference)
+
+| Code | Symptom | Root cause | Fix location |
+|------|---------|------------|--------------|
+| `STUCK_QUEUED` | status=queued, 0 logs, greasy/aggressive | Vercel fire-and-forget `runScan()` | `scan-launcher.service.ts` |
+| `STUCK_PROBING_90_GROQ_429` | 90% probing, nudge loop, Groq 429 | Brain+target share quota; no tool calls | `orchestrator.py` nudge cap + OpenRouter brain |
+| `LIST_ZERO_DETAIL_N` | List 0 findings, detail shows breaches | `scans.finding_count` not synced on seal | webhook + orchestrator PATCH |
+| `REPORT_23502` | `[SYNC] Supabase sync failed: 23502` | Genesis partial INSERT missing NOT NULL cols | Genesis UPDATE-only SYNC |
+| `KINETIC_CHECK` | `scan_logs_type_kinetic_check` in Vercel logs | Ingress used `type: "webhook"` | webhook `type: "info"` |
+| `WEBHOOK_DOWNGRADE` | Sealed scan reverts to probing | Late `status_update` after seal | webhook terminal guard |
+| `WEBHOOK_TIMEOUT` | `webhook_notify_failed` in engine logs | POST timeout too short | `_notify_agathon_webhook` timeout 30s |
+
+---
+
+## When OpenRouter recharges — 5-step smoke test
+
+Run only after **OpenRouter credits are live** on Railway (`OPENROUTER_API_KEY`) and both stacks are redeployed.
+
+1. **Preflight** — `GET https://forgeguard-ai.com/api/debug/launch-check` → `engineProbe.ok: true`, `openrouter: true`.
+2. **Launch standard scan** — non-Groq target (e.g. OpenAI `gpt-4o-mini`) OR Groq target only after 60m cooldown with OpenRouter brain set on Railway.
+3. **Timeline** — queued → probing within 5s → progress increases → **sealed or failed within 15m** (never infinite 90% + nudge loop).
+4. **Data parity** — list grid `finding_count` matches detail breakdown; Enterprise Report + PDF visible on sealed scan.
+5. **Log hygiene** — no `scan_logs_type_kinetic_check` in Vercel logs; no `[SYNC] 23502` on new scans; `failure_reason` readable if failed (e.g. rate limit circuit breaker).
+
+### Pass / fail SQL
+
+```sql
+-- Replace <scan_id> after smoke run
+SELECT s.id, s.status, s.progress_pct, s.finding_count, s.high_severity_count,
+       s.failure_reason, sr.scan_id IS NOT NULL AS has_report,
+       jsonb_array_length(COALESCE(sr.findings, '[]'::jsonb)) AS report_findings
+FROM scans s
+LEFT JOIN scan_reports sr ON sr.scan_id = s.id
+WHERE s.id = '<scan_id>';
+```
+
+```sql
+SELECT type, severity, attack_name, left(payload::text, 120) AS payload_preview
+FROM scan_logs WHERE scan_id = '<scan_id>'
+ORDER BY created_at DESC LIMIT 25;
+```

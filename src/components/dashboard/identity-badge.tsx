@@ -2,7 +2,9 @@
 
 import { cn } from "@/lib/utils";
 import { normalizeHackerRankLabel, rankBadgeClass } from "@/lib/access/ranks";
-import { VerifiedCheckmark, CompanyTagBadge } from "@/components/dashboard/verified-badge";
+import { VerifiedCheckmark } from "@/components/dashboard/verified-badge";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
+import type { TrustTier } from "@/lib/trust/identity";
 import { WalletCredits } from "@/components/dashboard/wallet-credits";
 import type { LiveWalletState } from "@/hooks/use-live-wallet";
 import type { ViewMode } from "@/lib/access/parallel-sovereignty";
@@ -15,6 +17,7 @@ export interface IdentityBadgeProps {
   identityVerified?: boolean;
   companyTag?: string | null;
   domainVerified?: boolean;
+  trustTier?: TrustTier;
   viewMode?: ViewMode;
   trustScore?: number;
 }
@@ -27,6 +30,7 @@ export function IdentityBadge({
   identityVerified = false,
   companyTag = null,
   domainVerified = false,
+  trustTier = "domain",
   viewMode = "hacker",
   trustScore = 0,
 }: IdentityBadgeProps) {
@@ -36,7 +40,11 @@ export function IdentityBadge({
   return (
     <div className="hidden items-center gap-2 md:flex">
       {identityVerified && <VerifiedCheckmark />}
-      {domainVerified && companyTag && <CompanyTagBadge tag={companyTag} />}
+      <TrustTagBadge
+        tag={companyTag}
+        tier={trustTier}
+        verified={Boolean(domainVerified && companyTag)}
+      />
       {isClient ? (
         <span
           className="rounded-[3px] border-[0.5px] border-violet-400/35 bg-violet-400/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-violet-300"

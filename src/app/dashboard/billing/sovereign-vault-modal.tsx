@@ -35,6 +35,9 @@ export function SovereignVaultModal({
   const [qrCode, setQrCode] = React.useState<string | null>(null);
   const [amountUsdt, setAmountUsdt] = React.useState<number>(plan.price);
   const [payCurrency, setPayCurrency] = React.useState("USDT");
+  const [payAmount, setPayAmount] = React.useState<number>(plan.price);
+  const [paymentUri, setPaymentUri] = React.useState<string | null>(null);
+  const [invoiceUrl, setInvoiceUrl] = React.useState<string | null>(null);
   const [verifyMsg, setVerifyMsg] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [addressPrefix, setAddressPrefix] = React.useState("");
@@ -74,7 +77,10 @@ export function SovereignVaultModal({
       setDepositAddress(result.depositAddress);
       setQrCode(result.qrCode);
       setAmountUsdt(result.amountUsdt);
+      setPayAmount(result.payAmount);
       setPayCurrency(String(result.payCurrency ?? "USDT").toUpperCase());
+      setPaymentUri(result.paymentUri);
+      setInvoiceUrl(result.invoiceUrl ?? result.payUrl ?? null);
     });
 
     return () => {
@@ -177,7 +183,7 @@ export function SovereignVaultModal({
             {"// ghost_mode.checkout.init"}
           </p>
           <h2 className="mt-1 text-sm font-semibold text-lime-400">
-            {plan.name} — {amountUsdt} USDT
+            {plan.name} — {payAmount.toFixed(6)} {payCurrency}
           </h2>
 
           {error && (
@@ -199,15 +205,18 @@ export function SovereignVaultModal({
             <div className="mt-5 space-y-5">
               <div className="rounded-sm border border-lime-500/15 bg-[#0a0a0a] p-4">
                 <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-600">
-                  Total Amount (USDT)
+                  Send exactly
                 </p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-lime-400">
-                  {amountUsdt.toFixed(2)}{" "}
-                  <span className="text-sm font-normal text-zinc-500">USDT</span>
+                  {payAmount.toFixed(6)}{" "}
+                  <span className="text-sm font-normal text-zinc-500">{payCurrency}</span>
+                </p>
+                <p className="mt-0.5 text-[10px] text-zinc-600">
+                  ≈ ${amountUsdt.toFixed(2)} USD list price
                 </p>
                 {!revenueSimulation && (
                   <p className="mt-1 text-[10px] text-zinc-600">
-                    Pay via {payCurrency} — send exact amount to activate
+                    Network: {payCurrency} — send exact crypto amount to activate
                   </p>
                 )}
               </div>
@@ -239,6 +248,24 @@ export function SovereignVaultModal({
                       <Copy size={10} />
                       {copied ? "Copied" : "Copy address"}
                     </button>
+                    {paymentUri && (
+                      <a
+                        href={paymentUri}
+                        className="mt-2 block text-[10px] uppercase tracking-widest text-lime-400/80 underline-offset-2 hover:underline"
+                      >
+                        Open in wallet
+                      </a>
+                    )}
+                    {invoiceUrl && (
+                      <a
+                        href={invoiceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 block text-[10px] uppercase tracking-widest text-zinc-400 underline-offset-2 hover:text-lime-400 hover:underline"
+                      >
+                        Pay on NOWPayments
+                      </a>
+                    )}
                   </div>
                 </div>
               )}

@@ -4,7 +4,10 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveEngineAuthToken } from "@/lib/agathon-config";
-import { getClientIp, logBlacklistedEntity } from "@/services/scraper-defense.service";
+import { geoFromRequest } from "@/lib/perimeter/geo-from-request";
+import { recordPerimeterViolation } from "@/lib/perimeter/record-violation";
+import { THREAT_DELTAS } from "@/lib/perimeter/threat-score";
+import { getClientIp } from "@/services/scraper-defense.service";
 
 export const FORTRESS_BLOCK_COOKIE = "aegis-fortress-block";
 export const BUNKER_CLEARED_COOKIE = "aegis-bunker-cleared";
@@ -67,7 +70,13 @@ export function enforceAgathonWebhookGate(request: NextRequest): NextResponse | 
   if (pathname !== WEBHOOK_PATH) return null;
 
   if (request.method !== "POST") {
-    logBlacklistedEntity(request, "webhook_method_violation");
+    recordPerimeterViolation(request, {
+      reason: "webhook_method_violation",
+      severity: "critical",
+      threatDelta: THREAT_DELTAS.webhook,
+      forceBlock: true,
+      source: "fortress",
+    });
     const res = NextResponse.json({ error: "Method not allowed" }, { status: 405 });
     applyFortressBlock(res);
     return res;
@@ -77,7 +86,13 @@ export function enforceAgathonWebhookGate(request: NextRequest): NextResponse | 
   const provided = resolveProvidedWebhookToken(request);
 
   if (!expected || !provided || provided !== expected) {
-    logBlacklistedEntity(request, "webhook_token_violation");
+    recordPerimeterViolation(request, {
+      reason: "webhook_token_violation",
+      severity: "critical",
+      threatDelta: THREAT_DELTAS.webhook,
+      forceBlock: true,
+      source: "fortress",
+    });
     logAttackLogCritical(request, "webhook_unauthorized");
     const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     applyFortressBlock(res);
@@ -90,7 +105,10 @@ export function enforceAgathonWebhookGate(request: NextRequest): NextResponse | 
 function logAttackLogCritical(request: NextRequest, reason: string): void {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const ip = getClientIp(request);
   if (!url || !key) return;
+
+  const geo = geoFromRequest(request, ip);
 
   void fetch(`${url}/rest/v1/attack_logs`, {
     method: "POST",
@@ -106,7 +124,7 @@ function logAttackLogCritical(request: NextRequest, reason: string): void {
       method: request.method,
       user_agent: request.headers.get("user-agent"),
       reason,
-      metadata: { severity: "CRITICAL", defense: "fortress_webhook" },
+      metadata: { severity: "CRITICAL", defense: "fortress_webhook", geo_country: geo.country },
     }),
   }).catch(() => {
     /* fire-and-forget */

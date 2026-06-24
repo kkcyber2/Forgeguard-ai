@@ -62,6 +62,92 @@ export async function fetchThreatsBlockedAnalytics(
   };
 }
 
+/** User-scoped analytics for /dashboard/analytics */
+export async function fetchUserDashboardAnalytics(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<DashboardAnalytics> {
+  const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+  const { data: userScans } = await supabase
+    .from("scans")
+    .select("id")
+    .eq("user_id", userId);
+  const scanIds = (userScans ?? []).map((s) => s.id);
+
+  const [
+    { data: scans },
+    { data: logs },
+    { data: txs },
+  ] = await Promise.all([
+    scanIds.length > 0
+      ? supabase
+          .from("scans")
+          .select("id, status, finding_count, high_severity_count, created_at")
+          .eq("user_id", userId)
+          .gte("created_at", since30)
+          .order("created_at", { ascending: false })
+          .limit(5000)
+      : Promise.resolve({ data: [] }),
+    scanIds.length > 0
+      ? supabase
+          .from("scan_logs")
+          .select("severity, created_at")
+          .in("scan_id", scanIds)
+          .gte("created_at", since30)
+          .limit(5000)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from("platform_transactions")
+      .select("amount_usd, created_at")
+      .or(
+        `buyer_id.eq.${userId},sender_id.eq.${userId},receiver_id.eq.${userId},seller_id.eq.${userId}`,
+      )
+      .gte("created_at", since30)
+      .limit(2000),
+  ]);
+
+  const scanRows = scans ?? [];
+  const logRows = logs ?? [];
+  const txRows = txs ?? [];
+
+  const severityCounts: SeverityCounts = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    info: 0,
+  };
+
+  for (const row of logRows) {
+    const s = (row.severity ?? "info").toLowerCase();
+    if (s in severityCounts) {
+      severityCounts[s as keyof SeverityCounts]! += 1;
+    } else {
+      severityCounts.info! += 1;
+    }
+  }
+
+  return {
+    totalScans: scanRows.length,
+    completedScans: scanRows.filter((s) => s.status === "completed").length,
+    failedScans: scanRows.filter((s) => s.status === "failed").length,
+    totalFindings: scanRows.reduce((a, s) => a + (s.finding_count ?? 0), 0),
+    highSeverityScans: scanRows.filter((s) => (s.high_severity_count ?? 0) > 0).length,
+    scanTrend: bucketByDay(scanRows.map((s) => s.created_at)),
+    severityCounts,
+    operatorsTotal: 1,
+    operatorsWeek: 0,
+    operatorsMonth: 0,
+    operatorTrend: Array.from({ length: 30 }, () => 0),
+    txVolumeUsd: txRows.reduce((a, t) => a + Number(t.amount_usd ?? 0), 0),
+    txCount: txRows.length,
+    threatsBlockedTotal: 0,
+    threatsBlockedTrend: Array.from({ length: 30 }, () => 0),
+  };
+}
+
+/** Platform-wide analytics for /admin/analytics (service-role or admin session). */
 export async function fetchDashboardAnalytics(
   supabase: SupabaseClient<Database>,
 ): Promise<DashboardAnalytics> {

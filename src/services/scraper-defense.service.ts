@@ -113,32 +113,11 @@ export function isScraperRequest(request: NextRequest): boolean {
   return false;
 }
 
+import { recordPerimeterViolation } from "@/lib/perimeter/record-violation";
+
 /**
- * Persist violation to Supabase blacklisted_entities (fire-and-forget).
+ * Persist violation — perimeter_events (hashed IP + GeoIP) + threat score + blocklist.
  */
 export function logBlacklistedEntity(request: NextRequest, reason: string): void {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return;
-
-  void fetch(`${url}/rest/v1/blacklisted_entities`, {
-    method: "POST",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify({
-      ip_address: getClientIp(request),
-      user_agent: request.headers.get("user-agent"),
-      reason,
-      metadata: {
-        path: request.nextUrl.pathname,
-        method: request.method,
-      },
-    }),
-  }).catch(() => {
-    /* never block the edge */
-  });
+  recordPerimeterViolation(request, { reason, source: "scraper-defense" });
 }

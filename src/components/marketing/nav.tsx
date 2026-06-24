@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Logo } from "@/components/ui/logo";
 import { buttonStyles } from "@/components/ui/button";
+import { useTheme } from "@/components/theme/theme-provider";
 import { cn } from "@/lib/utils";
 import { ArrowUpRight, Menu, X } from "lucide-react";
 
@@ -28,16 +29,21 @@ export interface MarketingNavSession {
 }
 
 export function MarketingNav({ session }: { session: MarketingNavSession }) {
+  const { theme } = useTheme();
   const { scrollY } = useScroll();
   const bg = useTransform(
     scrollY,
     [0, 120],
-    ["rgba(5,5,5,0)", "rgba(5,5,5,0.78)"],
+    theme === "light"
+      ? ["rgba(249,250,251,0)", "rgba(249,250,251,0.92)"]
+      : ["rgba(5,5,5,0)", "rgba(5,5,5,0.78)"],
   );
   const border = useTransform(
     scrollY,
     [0, 120],
-    ["rgba(255,255,255,0)", "rgba(255,255,255,0.06)"],
+    theme === "light"
+      ? ["rgba(0,0,0,0)", "rgba(0,0,0,0.08)"]
+      : ["rgba(255,255,255,0)", "rgba(255,255,255,0.06)"],
   );
   const [open, setOpen] = React.useState(false);
 

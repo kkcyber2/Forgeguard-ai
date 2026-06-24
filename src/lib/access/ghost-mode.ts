@@ -97,4 +97,15 @@ export function maskAuthorIfGhost(
   };
 }
 
+export function resolvePublicDisplayName(
+  userId: string,
+  displayName: string | null | undefined,
+  isGhostActive: boolean | null | undefined,
+  hackerRank: string | null | undefined,
+): string {
+  const ghost = maskAuthorIfGhost(userId, isGhostActive, hackerRank);
+  if (ghost) return ghost.display_name;
+  return displayName?.trim() || operatorAlias(userId);
+}
+
 export const SOVEREIGN_VERIFIED_LABEL = "Verified by ForgeGuard Sovereign";

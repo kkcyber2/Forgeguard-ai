@@ -3,8 +3,8 @@
 import * as React from "react";
 import { Search } from "lucide-react";
 import type { ScanTargetPulse } from "@/components/dashboard/tactical-world-map";
-import { TacticalMapClientWrapper } from "@/components/dashboard/tactical-map-client-wrapper";
-import type { PopNodeId } from "@/lib/admin/resolve-scan-node";
+import { LiveCommandMapClient } from "@/components/dashboard/live-command-map-client";
+import type { LiveMapBootstrap } from "@/lib/live-map/platform-events";
 import {
   AdminScanFeed,
   ScanInspectorDrawer,
@@ -28,7 +28,7 @@ export interface CommandCenterProps {
   pendingTriage: number;
   applicantCount: number;
   scanTargets: ScanTargetPulse[];
-  pulseNodeIds: PopNodeId[];
+  liveMapBootstrap: LiveMapBootstrap;
   operators: AdminOperatorRow[];
   scans: AdminScanRow[];
   pendingScripts: PendingBazaarScript[];
@@ -41,7 +41,7 @@ export function CommandCenter({
   pendingTriage,
   applicantCount,
   scanTargets,
-  pulseNodeIds,
+  liveMapBootstrap,
   operators,
   scans,
   pendingScripts,
@@ -91,16 +91,15 @@ export function CommandCenter({
             <div className="relative flex min-h-[360px] flex-1 flex-col overflow-hidden rounded border border-white/[0.06] bg-black/30">
               <div className="border-b border-white/[0.06] px-3 py-2">
                 <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-[#D1FF00]/80">
-                  Live world map · scans + attack_logs
+                  Live command map · real telemetry
                 </p>
               </div>
               <PanelErrorBoundary label="Live map">
-                <TacticalMapClientWrapper
-                  activeScans={activeScans}
+                <LiveCommandMapClient
+                  bootstrap={liveMapBootstrap}
                   scanTargets={scanTargets}
-                  pulseNodeIds={pulseNodeIds}
                   dense
-                  attackPulses
+                  showPerimeter
                 />
               </PanelErrorBoundary>
               <PanelErrorBoundary label="Scan feed">

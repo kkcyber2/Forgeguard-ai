@@ -14,22 +14,24 @@ const TacticalWorldMapLazy = dynamic(
 );
 
 export type TacticalMapClientWrapperProps = {
-  activeScans?: number | null;
   scanTargets?: LiveWorldMapProps["scanTargets"] | null;
-  pulseNodeIds?: LiveWorldMapProps["pulseNodeIds"] | null;
+  scanTargetById?: Record<string, string> | null;
   dense?: boolean;
+  /** @deprecated No fake attack pulses — use LiveCommandMapClient for fortress telemetry */
   attackPulses?: boolean;
+  /** @deprecated Use scanTargets only */
+  activeScans?: number | null;
+  /** @deprecated Removed — geo derived from target_url only */
+  pulseNodeIds?: null;
 };
 
 /**
  * Client-only boundary for TacticalWorldMap — safe to import from Server Components.
  */
 export function TacticalMapClientWrapper({
-  activeScans = 0,
   scanTargets = null,
-  pulseNodeIds = null,
+  scanTargetById = null,
   dense = false,
-  attackPulses = false,
 }: TacticalMapClientWrapperProps) {
   const [mounted, setMounted] = React.useState(false);
 
@@ -44,11 +46,9 @@ export function TacticalMapClientWrapper({
   return (
     <React.Suspense fallback={<TacticalWorldMapSkeleton dense={dense} />}>
       <TacticalWorldMapLazy
-        activeScans={activeScans ?? 0}
         scanTargets={scanTargets ?? []}
-        pulseNodeIds={pulseNodeIds ?? undefined}
+        scanTargetById={scanTargetById ?? {}}
         dense={dense}
-        attackPulses={attackPulses}
       />
     </React.Suspense>
   );

@@ -15,7 +15,8 @@ import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { buttonStyles } from "@/components/ui/button";
-import { TacticalMapClientWrapper } from "@/components/dashboard/tactical-map-client-wrapper";
+import { LiveCommandMapClient } from "@/components/dashboard/live-command-map-client";
+import { fetchLiveMapBootstrap } from "@/lib/live-map/platform-events";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { severityWeight } from "@/lib/utils";
 import type { Database } from "@/types/supabase";
@@ -99,9 +100,12 @@ export default async function ThreatsPage() {
     data: (Pick<ScanRow, "id" | "user_id" | "target_url"> & { status?: string })[] | null;
   };
 
-  const activeScans = (scans ?? []).filter(
-    (s) => s.status === "queued" || s.status === "probing",
-  ).length;
+  const scanTargets = (scans ?? [])
+    .filter((s) => s.status === "queued" || s.status === "probing")
+    .map((s) => ({ id: s.id, target_url: s.target_url ?? "" }))
+    .filter((s) => s.target_url);
+
+  const liveMapBootstrap = await fetchLiveMapBootstrap(20);
 
   const logs = (rawLogs ?? []) as ScanLogRow[];
   const scanIndex = new Map((scans ?? []).map((s) => [s.id, { user: s.user_id, target: s.target_url ?? "" }]));
@@ -136,7 +140,12 @@ export default async function ThreatsPage() {
             Tactical world map · live telemetry
           </p>
         </div>
-        <TacticalMapClientWrapper activeScans={activeScans} attackPulses dense />
+        <LiveCommandMapClient
+          bootstrap={liveMapBootstrap}
+          scanTargets={scanTargets}
+          dense
+          showPerimeter
+        />
       </div>
 
       <Stagger className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

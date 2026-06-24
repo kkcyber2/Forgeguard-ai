@@ -20,6 +20,8 @@ export interface NowPaymentResult {
   payAmount: number;
   payCurrency: CryptoPayCurrency;
   status: string;
+  invoiceUrl?: string;
+  payUrl?: string;
 }
 
 /** Map display plan name → plan id + USDT amount (subscription checkout). */
@@ -57,11 +59,44 @@ export function resolveCreditPack(planName: string): CryptoCreditPackMeta {
   };
 }
 
-/** Lime-on-obsidian QR for terminal checkout. */
-export function buildCryptoQrCodeUrl(depositAddress: string, amountUsdt?: number): string {
+/** Wallet-compatible payment URI for QR / deep links. */
+export function buildCryptoPaymentUri(
+  payCurrency: string,
+  address: string,
+  payAmount: number,
+): string {
+  const currency = payCurrency.trim().toLowerCase();
+  const amount = String(payAmount);
+
+  if (currency === "btc" || currency === "bitcoin") {
+    return `bitcoin:${address}?amount=${amount}`;
+  }
+  if (currency === "sol" || currency === "solana") {
+    return `solana:${address}?amount=${amount}`;
+  }
+  if (
+    currency === "usdttrc20" ||
+    currency === "trx" ||
+    currency === "tron" ||
+    currency.startsWith("usdt") && currency.includes("trc")
+  ) {
+    return `tron:${address}?amount=${amount}`;
+  }
+  if (currency === "usdterc20" || currency === "eth" || currency === "ethereum") {
+    return `ethereum:${address}?value=${amount}`;
+  }
+  return `${address}?amount=${amount}`;
+}
+
+/** Lime-on-obsidian QR for terminal checkout — encodes payment URI, not raw address. */
+export function buildCryptoQrCodeUrl(
+  depositAddress: string,
+  payAmount?: number,
+  payCurrency = "usdttrc20",
+): string {
   const payload =
-    amountUsdt != null && amountUsdt > 0
-      ? `${depositAddress}?amount=${amountUsdt}`
+    payAmount != null && payAmount > 0
+      ? buildCryptoPaymentUri(payCurrency, depositAddress, payAmount)
       : depositAddress;
   const params = new URLSearchParams({
     size: "240x240",
@@ -136,6 +171,8 @@ export async function createNowPayment(params: {
     pay_amount?: number;
     pay_currency?: string;
     payment_status?: string;
+    invoice_url?: string;
+    pay_url?: string;
   };
 
   const paymentId = data.payment_id != null ? String(data.payment_id) : "";
@@ -151,6 +188,8 @@ export async function createNowPayment(params: {
     payAmount: Number(data.pay_amount ?? params.amountUsdt),
     payCurrency: (data.pay_currency as CryptoPayCurrency) ?? payCurrency,
     status: data.payment_status ?? "waiting",
+    invoiceUrl: data.invoice_url?.trim() || undefined,
+    payUrl: data.pay_url?.trim() || undefined,
   };
 }
 
@@ -269,7 +308,7 @@ export async function grantConfirmedCryptoDeposit(
   const depositType = deposit.deposit_type ?? "subscription";
 
   if (depositType === "credit_pack") {
-    const amount = Number(deposit.credit_amount ?? deposit.amount_usdt ?? 0);
+    const amount = Number(deposit.amount_usdt ?? 0);
     if (amount <= 0) {
       return { ok: false, error: "Invalid credit pack amount" };
     }

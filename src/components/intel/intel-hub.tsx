@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Intel Hub — Chat | Feed | Teams tabs (+ threat ticker).
+ * Intel Hub — Chat | Feed | Teams | Vault tabs (+ threat ticker).
  */
 
 import * as React from "react";
@@ -11,9 +11,14 @@ import {
   Heart,
   MessageSquare,
   Send,
+  Shield,
   Users,
   Zap,
 } from "lucide-react";
+import { IntelVaultPanel } from "@/components/intel/intel-vault-panel";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
+import { resolvePublicDisplayName } from "@/lib/access/ghost-mode";
+import type { ExternalIntelItem } from "@/lib/live-map/external-intel";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -30,7 +35,7 @@ import {
   type TeamRow,
 } from "@/lib/teams/team-actions";
 
-type Tab = "chat" | "feed" | "teams";
+type Tab = "chat" | "feed" | "teams" | "vault";
 
 interface ChatMessage {
   id: string;
@@ -38,6 +43,31 @@ interface ChatMessage {
   display_name: string;
   content: string;
   created_at: string;
+}
+
+function ThreatTicker({ items }: { items: ExternalIntelItem[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="font-mono text-[10px] uppercase tracking-wider text-foreground-subtle">
+        Threat ticker · advisories unavailable
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden">
+      <p className="mb-1 font-mono text-[9px] uppercase tracking-wider text-acid/70">
+        CISA KEV · live advisories
+      </p>
+      <div className="flex gap-6 overflow-x-auto pb-1">
+        {items.map((item) => (
+          <span key={item.id} className="shrink-0 font-mono text-[10px] text-foreground-muted">
+            <span className="text-acid">{item.id}</span> · {item.title}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function CommunityChat() {
@@ -57,22 +87,58 @@ function CommunityChat() {
       .select("id, user_id, content, created_at, display_name")
       .order("created_at", { ascending: true })
       .limit(50)
-      .then(({ data }) => {
-        if (data) setMessages(data as unknown as ChatMessage[]);
+      .then(async ({ data }) => {
+        if (!data?.length) return;
+        const userIds = Array.from(new Set(data.map((m) => m.user_id)));
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, is_ghost_active, hacker_rank, full_name")
+          .in("id", userIds);
+        const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+        setMessages(
+          data.map((m) => {
+            const prof = profileMap.get(m.user_id);
+            return {
+              ...m,
+              id: String(m.id),
+              display_name: resolvePublicDisplayName(
+                m.user_id,
+                m.display_name,
+                prof?.is_ghost_active,
+                prof?.hacker_rank,
+              ),
+            } as ChatMessage;
+          }),
+        );
       });
     const channel = supabase
       .channel("intel_messages:hub")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "intel_messages" },
-        (payload) => {
-          const row = payload.new as { id: string; user_id: string; content: string; created_at: string };
+        async (payload) => {
+          const row = payload.new as {
+            id: string;
+            user_id: string;
+            content: string;
+            created_at: string;
+          };
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("full_name, is_ghost_active, hacker_rank")
+            .eq("id", row.user_id)
+            .maybeSingle();
           setMessages((prev) => [
             ...prev,
             {
               ...row,
               id: String(row.id),
-              display_name: row.user_id.slice(0, 8),
+              display_name: resolvePublicDisplayName(
+                row.user_id,
+                prof?.full_name,
+                prof?.is_ghost_active,
+                prof?.hacker_rank,
+              ),
             },
           ]);
         },
@@ -193,6 +259,11 @@ function FeedPanel() {
             >
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs text-acid">{p.author_name}</span>
+                <TrustTagBadge
+                  tag={p.author_company_tag}
+                  tier={p.author_trust_tier}
+                  verified={Boolean(p.author_company_tag)}
+                />
                 <span className="rounded-sm border border-white/10 px-1.5 py-0.5 font-mono text-[10px] uppercase text-foreground-subtle">
                   {p.rank_label}
                 </span>
@@ -340,7 +411,15 @@ function TeamsPanel() {
             <ul className="space-y-2">
               {teamPosts.map((p) => (
                 <li key={p.id} className="rounded-sm border border-white/[0.06] p-3 text-sm">
-                  <span className="font-mono text-[10px] text-acid">{p.author_name}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-[10px] text-acid">{p.author_name}</span>
+                    <TrustTagBadge
+                      tag={p.author_company_tag}
+                      tier={p.author_trust_tier}
+                      verified={Boolean(p.author_company_tag)}
+                      size="md"
+                    />
+                  </div>
                   <p className="mt-1 text-foreground-muted">{p.content}</p>
                 </li>
               ))}
@@ -354,7 +433,7 @@ function TeamsPanel() {
   );
 }
 
-export function IntelHub() {
+export function IntelHub({ tickerItems = [] }: { tickerItems?: ExternalIntelItem[] }) {
   const reduce = useReducedMotion();
   const [tab, setTab] = React.useState<Tab>("chat");
 
@@ -362,12 +441,13 @@ export function IntelHub() {
     { id: "chat", label: "Chat", icon: MessageSquare },
     { id: "feed", label: "Feed", icon: Zap },
     { id: "teams", label: "Teams", icon: Users },
+    { id: "vault", label: "Intel Vault", icon: Shield },
   ];
 
   return (
     <div className="flex flex-col gap-0 pb-12 -mx-6 -mt-6">
       <div className="border-b border-white/[0.05] bg-obsidian-950/60 py-2 px-4">
-        <p className="font-mono text-[10px] uppercase tracking-wider text-acid">Threat ticker · live advisories</p>
+        <ThreatTicker items={tickerItems} />
       </div>
 
       <div className="px-6 pt-6">
@@ -406,6 +486,7 @@ export function IntelHub() {
           {tab === "chat" && <CommunityChat />}
           {tab === "feed" && <FeedPanel />}
           {tab === "teams" && <TeamsPanel />}
+          {tab === "vault" && <IntelVaultPanel />}
         </div>
       </div>
     </div>

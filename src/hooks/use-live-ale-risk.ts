@@ -43,6 +43,18 @@ export function useLiveAleRisk(userId: string | null, initialTotal: number) {
   React.useEffect(() => {
     if (!userId) return;
 
+    let userScanIds = new Set<string>();
+    let cancelled = false;
+
+    void supabase
+      .from("scans")
+      .select("id")
+      .eq("user_id", userId)
+      .then(({ data }) => {
+        if (cancelled) return;
+        userScanIds = new Set((data ?? []).map((s) => s.id));
+      });
+
     const channel = supabase
       .channel(`ale-risk:${userId}`)
       .on(
@@ -54,7 +66,8 @@ export function useLiveAleRisk(userId: string | null, initialTotal: number) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          const next = payload.new as { progress_pct?: number };
+          const next = payload.new as { progress_pct?: number; id?: string };
+          if (next.id) userScanIds.add(next.id);
           if (typeof next.progress_pct === "number") {
             void refetchTotal();
           } else {
@@ -69,13 +82,17 @@ export function useLiveAleRisk(userId: string | null, initialTotal: number) {
           schema: "public",
           table: "scan_reports",
         },
-        () => {
-          void refetchTotal();
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { scan_id?: string } | undefined;
+          if (row?.scan_id && userScanIds.has(row.scan_id)) {
+            void refetchTotal();
+          }
         },
       )
       .subscribe();
 
     return () => {
+      cancelled = true;
       void supabase.removeChannel(channel);
     };
   }, [supabase, userId, refetchTotal, bumpPulse]);

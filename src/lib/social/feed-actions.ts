@@ -2,6 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import {
+  resolveTrustTier,
+  resolveVerifiedCompanyTag,
+  type TrustTier,
+} from "@/lib/trust/identity";
+import { hasSovereignBypass } from "@/lib/access/sovereign-bypass";
+import { maskAuthorIfGhost } from "@/lib/access/ghost-mode";
 
 export type FeedPost = {
   id: string;
@@ -14,6 +21,8 @@ export type FeedPost = {
   created_at: string;
   author_name: string;
   rank_label: string;
+  author_company_tag: string | null;
+  author_trust_tier: TrustTier;
   liked_by_me: boolean;
 };
 
@@ -43,17 +52,40 @@ export async function listFeed(limit = 30, teamId?: string | null): Promise<Feed
   ) as string[];
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, email, hacker_rank")
+    .select(
+      "id, full_name, email, hacker_rank, is_ghost_active, company_tag, domain_verified, company_domain, work_email_verified, identity_verified, sovereign_pending, clearance_tier",
+    )
     .in("id", userIds);
 
   const profileMap = new Map(
-    (profiles ?? []).map((p) => [
-      p.id,
-      {
-        name: p.full_name ?? p.email?.split("@")[0] ?? "operator",
-        rank: p.hacker_rank ?? "RECRUIT",
-      },
-    ]),
+    (profiles ?? []).map((p) => {
+      const trustFields = {
+        company_tag: p.company_tag,
+        domain_verified: p.domain_verified,
+        company_domain: p.company_domain,
+        work_email_verified: p.work_email_verified,
+        identity_verified: p.identity_verified,
+        sovereign_pending: p.sovereign_pending,
+        clearance_tier: p.clearance_tier,
+        email: p.email,
+      };
+      return [
+        p.id,
+        {
+          name: (() => {
+            const ghost = maskAuthorIfGhost(p.id, p.is_ghost_active, p.hacker_rank);
+            if (ghost) return ghost.display_name;
+            return p.full_name ?? p.email?.split("@")[0] ?? "operator";
+          })(),
+          rank: p.hacker_rank ?? "RECRUIT",
+          companyTag: resolveVerifiedCompanyTag(trustFields),
+          trustTier: resolveTrustTier(
+            trustFields,
+            hasSovereignBypass(p.email),
+          ),
+        },
+      ];
+    }),
   );
 
   const postIds = posts.map((p: { id: string }) => p.id);
@@ -71,6 +103,8 @@ export async function listFeed(limit = 30, teamId?: string | null): Promise<Feed
       ...p,
       author_name: prof?.name ?? "operator",
       rank_label: prof?.rank ?? "RECRUIT",
+      author_company_tag: prof?.companyTag ?? null,
+      author_trust_tier: prof?.trustTier ?? "unverified",
       liked_by_me: likedSet.has(p.id),
     };
   });

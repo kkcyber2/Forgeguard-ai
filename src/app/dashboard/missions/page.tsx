@@ -8,13 +8,14 @@ import {
   CheckCircle2,
   Circle,
   ChevronRight,
-  Shield,
   Zap,
   AlertTriangle,
 } from "lucide-react";
 import { buttonStyles } from "@/components/ui/button";
 import { createServerSupabase, getSessionUser, getCurrentProfile } from "@/lib/supabase/server";
-import { VerifiedCheckmark, CompanyTagBadge } from "@/components/dashboard/verified-badge";
+import { VerifiedCheckmark } from "@/components/dashboard/verified-badge";
+import { TrustTagBadge } from "@/components/trust/trust-tag-badge";
+import { resolveVerifiedCompanyTag } from "@/lib/trust/identity";
 
 /**
  * /dashboard/missions — Mission Vault
@@ -86,6 +87,12 @@ function MissionRow({
 }) {
   const created = new Date(m.created_at);
   const age = Math.floor((Date.now() - created.getTime()) / 86_400_000);
+  const displayTag = clientProfile
+    ? resolveVerifiedCompanyTag({
+        company_tag: clientProfile.company_tag,
+        domain_verified: clientProfile.domain_verified,
+      })
+    : null;
 
   return (
     <Link
@@ -102,11 +109,8 @@ function MissionRow({
           {clientProfile?.identity_verified && (
             <VerifiedCheckmark className="flex-shrink-0" />
           )}
-          {(m.domain_verified || clientProfile?.domain_verified) && m.company_tag && (
-            <CompanyTagBadge tag={m.company_tag as string} />
-          )}
-          {m.domain_verified && !m.company_tag && (
-            <Shield size={9} className="flex-shrink-0 text-[#D1FF00]" />
+          {displayTag && (
+            <TrustTagBadge tag={displayTag} verified tier="domain" />
           )}
           {isOwner && (
             <span className="flex-shrink-0 font-mono text-[9px] tracking-[0.15em] text-white/55">
@@ -126,10 +130,8 @@ function MissionRow({
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <StatusChip status={m.status} />
           <RankChip rank={m.required_rank} />
-          {m.company_tag && (
-            <span className="font-mono text-[9px] tracking-wider text-white/55">
-              {m.company_tag}
-            </span>
+          {displayTag && (
+            <TrustTagBadge tag={displayTag} verified tier="domain" size="md" />
           )}
           <span className="flex items-center gap-1 font-mono text-[9px] text-white/55">
             <Clock size={8} />
@@ -169,23 +171,6 @@ export default async function MissionsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  const { data: clientProfiles } = await db
-    .from("profiles")
-    .select("id, identity_verified, company_tag, domain_verified, full_name")
-    .limit(500);
-
-  type ClientProfileRow = {
-    id: string;
-    identity_verified: boolean | null;
-    company_tag: string | null;
-    domain_verified: boolean | null;
-    full_name: string | null;
-  };
-
-  const clientMap = new Map<string, ClientProfileRow>(
-    ((clientProfiles ?? []) as ClientProfileRow[]).map((p) => [p.id, p]),
-  );
-
   const query = db
     .from("missions")
     .select(
@@ -201,6 +186,32 @@ export default async function MissionsPage() {
   if (error) console.error("[missions] list:", error.message);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const missions = (data ?? []) as any[];
+
+  const clientIds = [
+    ...new Set(
+      missions.map((m) => m.client_id as string | null).filter(Boolean),
+    ),
+  ] as string[];
+
+  const { data: clientProfiles } =
+    clientIds.length > 0
+      ? await db
+          .from("profiles")
+          .select("id, identity_verified, company_tag, domain_verified, full_name")
+          .in("id", clientIds)
+      : { data: [] };
+
+  type ClientProfileRow = {
+    id: string;
+    identity_verified: boolean | null;
+    company_tag: string | null;
+    domain_verified: boolean | null;
+    full_name: string | null;
+  };
+
+  const clientMap = new Map<string, ClientProfileRow>(
+    ((clientProfiles ?? []) as ClientProfileRow[]).map((p) => [p.id, p]),
+  );
 
   /* ── Derived stats ── */
   const openCount   = missions.filter((m) => m.status === "open").length;

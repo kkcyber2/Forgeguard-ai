@@ -102,7 +102,8 @@ export async function fetchDashboardOverview(
         supabase
           .from("missions")
           .select("id", { count: "exact", head: true })
-          .eq("status", "in_progress"),
+          .eq("status", "in_progress")
+          .or(`client_id.eq.${userId},selected_hacker_id.eq.${userId}`),
         supabase
           .from("bazaar_purchases")
           .select("id", { count: "exact", head: true })
@@ -146,17 +147,20 @@ export async function fetchDashboardOverview(
 
     let rawLogs: DashboardOverviewData["rawLogs"] = [];
     try {
-      const { data } = await safeQueryRows<DashboardOverviewData["rawLogs"][0]>(
-        "dashboard/scan_logs",
-        () =>
-          supabase
-            .from("scan_logs")
-            .select("id, scan_id, type, severity, attack_name, payload, created_at")
-            .gte("created_at", since)
-            .order("created_at", { ascending: false })
-            .limit(50),
-      );
-      rawLogs = data;
+      if (scanIds.length > 0) {
+        const { data } = await safeQueryRows<DashboardOverviewData["rawLogs"][0]>(
+          "dashboard/scan_logs",
+          () =>
+            supabase
+              .from("scan_logs")
+              .select("id, scan_id, type, severity, attack_name, payload, created_at")
+              .in("scan_id", scanIds)
+              .gte("created_at", since)
+              .order("created_at", { ascending: false })
+              .limit(50),
+        );
+        rawLogs = data;
+      }
     } catch (err) {
       console.error("[dashboard] scan_logs:", err);
     }

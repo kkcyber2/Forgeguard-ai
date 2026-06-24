@@ -11,6 +11,12 @@ import { createScan, type CreateScanState } from "../actions";
 import { issueScanOwnershipToken, verifyScanOwnership } from "../ownership-actions";
 import { LegalVerificationModal } from "@/components/scans/LegalVerificationModal";
 import type { LegalIntensity } from "../legal-actions";
+import {
+  budgetForUiIntensity,
+  formatCostBand,
+  type UiIntensity,
+} from "@/lib/scans/intensity-budget";
+import type { ProbeSuggestion } from "@/lib/training/corpus-suggest";
 
 /**
  * NewScanForm — client-side wrapper around the `createScan` Server Action.
@@ -138,9 +144,11 @@ export type ScanQuotaSnapshot = {
 export function NewScanForm({
   isSovereign = false,
   quota = null,
+  probeSuggestion = null,
 }: {
   isSovereign?: boolean;
   quota?: ScanQuotaSnapshot | null;
+  probeSuggestion?: ProbeSuggestion | null;
 }) {
   const [state, formAction, pending] = useActionState(createScan, initial);
   const [showKey,    setShowKey]    = React.useState(false);
@@ -175,6 +183,7 @@ export function NewScanForm({
   const selectedTarget = TARGET_TYPES.find((t) => t.value === surfaceKind)!;
   const setTargetType = setSurfaceKind;
   const needsOwnership = intensity !== "standard";
+  const intensityBudget = budgetForUiIntensity(intensity as UiIntensity);
 
   async function handleIssueToken() {
     if (!targetUrl) {
@@ -528,7 +537,46 @@ export function NewScanForm({
               );
             })}
           </div>
+
+          <div className="mt-3 rounded-sm border border-white/[0.08] bg-black/30 p-4">
+            <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-acid/80">
+              Request budget · {intensityBudget.label}
+            </p>
+            <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+              <BudgetRow label="Max probe attempts" value={String(intensityBudget.maxAttacks)} />
+              <BudgetRow label="Wall-clock cap" value={`${intensityBudget.maxWallMinutes} min`} />
+              <BudgetRow label="Brain tool calls" value={String(intensityBudget.maxToolCalls)} />
+              <BudgetRow
+                label="Custom tools (Brain)"
+                value={String(intensityBudget.maxCustomTools)}
+              />
+              <BudgetRow
+                label="Est. LLM API calls"
+                value={`${intensityBudget.estimatedLlmCalls.low}–${intensityBudget.estimatedLlmCalls.high}`}
+              />
+              <BudgetRow
+                label="Est. cost band"
+                value={formatCostBand(intensityBudget.costBandUsd)}
+              />
+            </dl>
+            <p className="mt-2 text-[10px] text-white/40">
+              Hard ceilings enforced by Agathon engine. Estimates assume stable Groq/OpenRouter APIs.
+            </p>
+          </div>
         </div>
+
+        {probeSuggestion && (
+          <div className="rounded-sm border border-violet-400/20 bg-violet-400/5 p-4">
+            <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-violet-300">
+              Corpus suggestion
+            </p>
+            <p className="mt-2 text-sm text-white/75">
+              Next probe family:{" "}
+              <span className="font-mono text-acid">{probeSuggestion.label}</span>
+            </p>
+            <p className="mt-1 text-xs text-white/50">{probeSuggestion.reason}</p>
+          </div>
+        )}
 
         {needsOwnership && !isSovereign && (
           <div className="rounded-sm border border-amber-400/25 bg-amber-400/5 p-4">
@@ -626,5 +674,14 @@ export function NewScanForm({
       </div>
     </form>
     </>
+  );
+}
+
+function BudgetRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] pb-1">
+      <dt className="font-mono text-[10px] text-white/45">{label}</dt>
+      <dd className="font-mono text-[10px] tabular-nums text-white/80">{value}</dd>
+    </div>
   );
 }

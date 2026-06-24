@@ -39,16 +39,24 @@ function payloadText(payload: unknown): string {
 function mapLogPhase(type: string): ReplayStep["phase"] | null {
   const t = type.toLowerCase();
   if (t === "breach") return "breach";
-  if (t === "strike" || t === "attempt") return "strike";
+  if (t === "strike" || t === "attempt" || t === "tool_authored") return "strike";
   if (t === "thought" || t === "brain_decision") return "thought";
   if (t === "finding" || t === "report") return "report";
   if (t === "info" || t === "progress") return "recon";
   return null;
 }
 
+export interface CustomToolReplayItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  created_at: string;
+}
+
 export function buildAttackReplaySteps(
   logs: ReplayLogRow[],
   attackPath: unknown[] | null | undefined,
+  customTools?: CustomToolReplayItem[],
 ): ReplayStep[] {
   const steps: ReplayStep[] = [];
   const chronological = [...logs].sort(
@@ -84,6 +92,17 @@ export function buildAttackReplaySteps(
     });
   }
 
+  for (const tool of customTools ?? []) {
+    steps.push({
+      id: `tool-${tool.id}`,
+      phase: "strike",
+      title: `custom_tool.${tool.name}`,
+      detail: tool.description?.trim() || "Brain-authored probe executed in sandbox.",
+      severity: "high",
+      at: tool.created_at,
+    });
+  }
+
   if (steps.length === 0 && chronological.length > 0) {
     const last = chronological[chronological.length - 1]!;
     steps.push({
@@ -96,5 +115,9 @@ export function buildAttackReplaySteps(
     });
   }
 
-  return steps;
+  return steps.sort((a, b) => {
+    const ta = a.at ? new Date(a.at).getTime() : 0;
+    const tb = b.at ? new Date(b.at).getTime() : 0;
+    return ta - tb;
+  });
 }

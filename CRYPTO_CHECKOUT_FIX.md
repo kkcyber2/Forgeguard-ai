@@ -24,13 +24,13 @@ QR encoded `TRON_ADDRESS?amount=49` using **USD plan price** instead of NOWPayme
 
 ## Test matrix
 
-| step | expected |
-|------|----------|
-| Generate $10 Starter Pack deposit | Modal shows crypto amount (e.g. `10.xxx USDTTRC20`) not just USD |
-| Scan QR in TronLink / Trust Wallet | Opens send screen with address + amount pre-filled |
-| Copy address | Raw address still copies (unchanged) |
-| IPN webhook `/api/webhooks/nowpayments` | Unchanged — still confirms `crypto_deposits` |
-| `pay_amount` in DB | Row stores NOWPayments crypto amount |
+| step | expected | status |
+|------|----------|--------|
+| Generate $10 Starter Pack deposit | Modal shows crypto amount (e.g. `10.xxx USDTTRC20`) not just USD | PASS (code) |
+| Scan QR in TronLink / Trust Wallet | Opens send screen with address + amount pre-filled | Operator verify D3 |
+| Copy address | Raw address still copies (unchanged) | PASS |
+| IPN webhook `/api/webhooks/nowpayments` | Unchanged — still confirms `crypto_deposits` | PASS |
+| `pay_amount` in DB | Row stores NOWPayments crypto amount | PASS (migration live) |
 
 ## Manual verification
 

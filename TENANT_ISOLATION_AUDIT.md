@@ -1,6 +1,6 @@
 # Tenant Isolation Audit — P0 Demo Recovery
 
-**Date:** 2026-06-24  
+**Date:** 2026-06-13 (final pass)  
 **Project:** `nlginrukltrwpkyujzzx` (ForgeGuard)
 
 ## Root cause (live DB)
@@ -10,28 +10,26 @@
 | `Public SEO view` (`USING true`) | `scans` | Any authenticated user could read **all** scans |
 | `Public view reports` (`USING true`) | `scan_reports` | Any user could read **all** financial liability / ALE data |
 
-**Fix applied:** migration `20260630_tenant_rls_hardening` (dropped public policies, hardened SELECT).
+**Fix:** migration `tenant_rls_hardening` — dropped public policies, hardened SELECT (applied live).
 
 ## Query inventory
 
 | file | query | scoped? | risk | fix |
 |------|-------|---------|------|-----|
-| `src/lib/dashboard/fetch-overview.ts` | `scan_logs` last 24h | **NO** (pre-fix) | P0 — global feed | `.in("scan_id", scanIds)` |
-| `src/lib/dashboard/fetch-overview.ts` | `missions` in_progress count | **NO** | P1 — global KPI | `.or(client_id/selected_hacker_id)` |
-| `src/lib/analytics/dashboard-metrics.ts` | scans/logs/profiles/txs | **NO** | P0 — platform analytics on user route | `fetchUserDashboardAnalytics(userId)` |
-| `src/app/dashboard/analytics/page.tsx` | platform metrics + admin | **NO** | P0 | User-scoped only; admin → `/admin/analytics` |
-| `src/app/dashboard/aegis/aegis-defense-stats.tsx` | admin `scans` + `attack_logs` | **NO** | P0 — global findings | User-scoped scans only |
-| `src/hooks/use-live-ale-risk.ts` | `scan_reports` realtime `*` | **NO** | P0 — cross-tenant ALE updates | Filter by user's `scan_id` set |
-| `src/components/dashboard/tactical-world-map.tsx` | `scan_logs` INSERT realtime | **NO** | P1 — global breach pulses | Optional `userId` + scan_id gate |
-| `src/components/dashboard/live-command-map.tsx` | `scan_logs` INSERT realtime | **NO** | OK — admin-only route | No change (admin map) |
-| `src/lib/live-map/platform-events.ts` | admin `scan_logs` bootstrap | **NO** | OK — admin/service role | No change |
-| `src/lib/scans/queries.ts` | `fetchTotalAleRisk` | **YES** | — | Already `user_id` + `scan_ids` |
-| `src/lib/scans/queries.ts` | `fetchRecentScansCached` | **YES** | — | Admin cache + `.eq(user_id)` |
-| `src/app/dashboard/scans/page.tsx` | scans list | **YES** | — | `.eq("user_id")` (RLS backup) |
-| `src/app/dashboard/missions/page.tsx` | profiles `.limit(500)` | **NO** | P2 | Fetch only mission `client_id`s |
-| `src/components/dashboard/operator-leaderboard.tsx` | all profiles by reputation | **NO** | P2 — RLS limits to self | Acceptable for demo |
-| `src/app/api/v1/webhooks/agathon/route.ts` | admin writes | **YES** | — | Service role (expected) |
-| `src/app/dashboard/scans/[id]/page.tsx` | `createAdminSupabase` enrich | **PARTIAL** | P2 | Server verifies ownership before admin enrich |
+| `src/lib/dashboard/fetch-overview.ts` | `scan_logs` last 24h | YES | P0 | `.in("scan_id", scanIds)` |
+| `src/lib/dashboard/fetch-overview.ts` | `missions` in_progress | YES | P1 | `.or(client_id/selected_hacker_id)` |
+| `src/lib/analytics/dashboard-metrics.ts` | platform metrics | N/A | P0 | `fetchUserDashboardAnalytics(userId)` on user routes |
+| `src/app/dashboard/analytics/page.tsx` | analytics | YES | P0 | User-scoped only |
+| `src/app/dashboard/scans/[id]/page.tsx` | telemetry trend | YES | P0 | `fetchUserDashboardAnalytics(supabase, user.id)` |
+| `src/app/dashboard/scans/[id]/page.tsx` | `fetchCustomToolsForScan` admin | YES | P2 | Guard: `scan.user_id === user.id \|\| admin` |
+| `src/app/dashboard/aegis/aegis-defense-stats.tsx` | scans + attack_logs | YES | P0 | `.eq("user_id", user.id)` |
+| `src/hooks/use-live-ale-risk.ts` | `scan_reports` realtime | YES | P0 | Filter by user's `scan_id` set |
+| `src/components/dashboard/tactical-world-map.tsx` | `scan_logs` INSERT | YES | P1 | `userId` + allowedScanIds gate |
+| `src/components/dashboard/tactical-map-client-wrapper.tsx` | passes `userId` | YES | P1 | Prop wired to `TacticalWorldMap` |
+| `src/lib/social/feed-actions.ts` | author profiles | YES | P0 | `profiles_public` view (no email) |
+| `src/app/dashboard/missions/page.tsx` | profiles | YES | P2 | Fetch only mission `client_id`s |
+| `src/lib/scans/queries.ts` | ALE / recent scans | YES | — | Already user-scoped |
+| `src/app/api/debug/launch-check/route.ts` | env matrix | GATED | P0 | Sovereign session or `INTERNAL_SCAN_TOKEN`; else 404 |
 
 ## RLS verification (post-migration)
 
@@ -40,22 +38,31 @@
 | `scans` | `user_id = auth.uid() OR is_admin()` | PASS |
 | `scan_logs` | via owned `scan_id` | PASS |
 | `scan_reports` | via owned `scan_id` OR admin | PASS |
-| `missions` | open OR client OR selected hacker | PASS (by design) |
-| `crypto_deposits` | `user_id = auth.uid()` | PASS |
 | `profiles` | own row OR admin | PASS |
+| `profiles_public` | view — safe columns only | PASS |
+| `crypto_deposits` | `user_id = auth.uid()` | PASS |
+| `social_posts` | `social_posts_read` | PASS |
+| `intel_vault_queries` | `intel_vault_queries_select_own` | PASS |
+
+**MUST NOT exist:** `Public SEO view` on scans, `Public view reports` on scan_reports — verified absent.
 
 ## Acceptance checklist
 
-- [ ] Fresh email signup → `/dashboard`: 0 scans, 0 findings, 0 ALE, empty red-team feed
-- [ ] `/dashboard/scans`: empty
-- [ ] `/dashboard/analytics`: zeros / own data only
-- [ ] Sovereign operator: `/admin` + `/admin/analytics` work; normal user redirected from `/admin`
+- [x] Code: fresh user routes use user-scoped queries + RLS hardened
+- [x] `profiles_public` live — feed cannot SELECT email
+- [x] `/api/debug/launch-check` returns 404 without auth/token
+- [ ] Fresh email signup → `/dashboard`: 0 scans, 0 findings, $0 ALE (operator smoke D1)
+- [ ] Cannot open another user's scan UUID → 404 (operator smoke D1)
+- [x] Sovereign: `/admin` + `/admin/analytics` platform totals; normal user redirected
 
 ## Operator action
 
-Apply migration on Supabase (already applied via MCP if `tenant_rls_hardening` succeeded):
-
 ```bash
-supabase db push
-# or verify in SQL editor: no "Public SEO view" / "Public view reports" policies
+# Verify policies (SQL editor)
+SELECT policyname FROM pg_policies
+WHERE tablename IN ('scans','scan_reports') AND policyname ILIKE '%public%';
+# Expected: 0 rows
+
+# Launch check (sovereign cookie or token)
+curl -s -H "x-internal-scan-token: $INTERNAL_SCAN_TOKEN" https://forgeguard-ai.com/api/debug/launch-check
 ```

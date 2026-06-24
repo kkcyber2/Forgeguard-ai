@@ -111,7 +111,7 @@ export function buildSovereignMasterNav(): {
   const client: NavItem[] = [
     { href: "/dashboard/aegis", label: "Aegis Shield", icon: "shield-check", section: "CLIENT" },
     { href: "/dashboard/bounties", label: "Bounty Management", icon: "shield-alert", section: "CLIENT" },
-    { href: "/dashboard/scans", label: "Financial Risk", icon: "radar", section: "CLIENT" },
+    { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "CLIENT" },
     { href: "/dashboard/billing", label: "Billing", icon: "credit-card", section: "CLIENT" },
   ];
   const ops: NavItem[] = [
@@ -166,7 +166,7 @@ export function buildSovereignNav(
           { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations" },
           { href: "/dashboard/aegis", label: "Aegis Shield", icon: "shield-check", section: "Operations" },
           { href: "/dashboard/bounties", label: "Bounty Management", icon: "shield-alert", section: "Operations" },
-          { href: "/dashboard/scans", label: "Financial Risk", icon: "radar", section: "Operations" },
+          { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "Operations" },
         ]
       : [
           { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold" },

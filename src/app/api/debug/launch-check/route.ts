@@ -1,19 +1,40 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import {
   buildEngineHealthUrl,
   engineAuthHeaders,
   resolveEngineBaseUrl,
   resolveEngineAuthToken,
 } from "@/lib/agathon-config";
+import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { isCryptoCheckoutConfigured } from "@/lib/payments/crypto";
+import { getSessionUser } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function resolveInternalToken(request: NextRequest): string | null {
+  const header =
+    request.headers.get("x-internal-scan-token") ??
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  return header?.trim() || null;
+}
+
 /**
- * GET /api/debug/launch-check — production smoke probe (no Stripe, no debug ingest).
+ * GET /api/debug/launch-check — sovereign operator or INTERNAL_SCAN_TOKEN only.
+ * Returns 404 for unauthenticated public probes (no env matrix leak).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const expected = process.env.INTERNAL_SCAN_TOKEN?.trim();
+  const provided = resolveInternalToken(request);
+  const tokenOk = Boolean(expected && provided && provided === expected);
+
+  if (!tokenOk) {
+    const user = await getSessionUser();
+    if (!user || !isSovereignOperator(user.email)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+  }
+
   const checks: Record<string, unknown> = {};
 
   checks.crypto = {

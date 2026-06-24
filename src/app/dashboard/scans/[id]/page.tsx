@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/dashboard/shell";
 import { FindingsBreakdown } from "./findings-breakdown";
 import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { buttonStyles } from "@/components/ui/button";
-import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import { createServerSupabase, getCurrentProfile, getSessionUser } from "@/lib/supabase/server";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils";
 import { ScanLiveLog } from "./live-log";
 import { ScanDispatchError } from "./scan-dispatch-error";
@@ -23,7 +23,7 @@ import { ScanResult } from "./findings-report";
 import type { ScanReport } from "./findings-report-types";
 import { GenesisTabs, type DiscoveryReport, type SocialTemplate, type AgentMemoryRow } from "./genesis-tabs";
 import { deleteScan } from "../actions";
-import { fetchDashboardAnalytics } from "@/lib/analytics/dashboard-metrics";
+import { fetchUserDashboardAnalytics } from "@/lib/analytics/dashboard-metrics";
 import { SCAN_REPORT_SELECT } from "@/lib/scans/queries";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { buildAttackReplaySteps } from "@/lib/evolve/replay-steps";
@@ -74,6 +74,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
   type ScanStatus = keyof typeof STATUS_TONE;
   type ScanDetailRow = {
     id: string;
+    user_id: string;
     target_model: string;
     target_url: string;
     status: ScanStatus;
@@ -91,7 +92,7 @@ export default async function ScanDetailPage({ params }: PageProps) {
   const { data: scan, error: scanErr } = (await supabase
     .from("scans")
     .select(
-      "id, target_model, target_url, status, intensity, progress_pct, finding_count, high_severity_count, notes, failure_reason, target_diagnostic_logs, created_at, started_at, completed_at",
+      "id, user_id, target_model, target_url, status, intensity, progress_pct, finding_count, high_severity_count, notes, failure_reason, target_diagnostic_logs, created_at, started_at, completed_at",
     )
     .eq("id", id)
     .maybeSingle()) as {
@@ -130,9 +131,11 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .eq("user_id", user.id)
     .maybeSingle();
   const userPlan = (sub?.plan as "free" | "startup" | "enterprise" | null) ?? "free";
+  const profile = await getCurrentProfile();
   const isSovereign = isSovereignOperator(user.email);
+  const isAdminUser = profile?.role === "admin" || isSovereign;
 
-  const analytics = await fetchDashboardAnalytics(supabase);
+  const analytics = await fetchUserDashboardAnalytics(supabase, user.id);
 
   const { data: rawMemories } = await supabase
     .from("agent_memories")
@@ -153,8 +156,10 @@ export default async function ScanDetailPage({ params }: PageProps) {
     .select("id", { count: "exact", head: true })
     .eq("origin_scan_id", id);
 
-  const admin = createAdminSupabase();
-  const customTools = await fetchCustomToolsForScan(admin, id);
+  const customTools =
+    scan.user_id === user.id || isAdminUser
+      ? await fetchCustomToolsForScan(createAdminSupabase(), id)
+      : [];
   const aegisAppId = defaultAegisAppId(user.id);
 
   const replaySteps =

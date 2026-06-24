@@ -5,7 +5,43 @@
 
 ---
 
-## Deploy gap verification (2026-06-13)
+## Deploy gap verification (2026-06-13 P0 pass)
+
+| Repo | GitHub `main` | Local | Prod | Gap |
+|------|---------------|-------|------|-----|
+| **forgeguard-ai** | pending push | P0 hardening commit | Vercel auto-deploy | Closing this session |
+| **AI-red-team** | pending push | orchestrator webhook fixes | Railway | Push + redeploy |
+| **war-machine** | `33a5037` | clean | — | No gap |
+
+### Supabase migrations (live)
+
+| migration | status |
+|-----------|--------|
+| `tenant_rls_hardening` | Applied |
+| `intel_vault_queries` | Applied |
+| `vulnerability_almanac` | Applied (this session) |
+| `perimeter_events` + `fortress_perimeter_v2` | Applied |
+| `profiles_public_read` + `work_email_verified` | Applied (this session) |
+
+### P0 fixes in this pass
+
+- Scan detail: user-scoped analytics + admin enrich guard
+- Launch-check: sovereign / `INTERNAL_SCAN_TOKEN` gate
+- Feed: `profiles_public` (no email leak)
+- Nav label: "Financial Risk" → "Scans"
+- Tactical map wrapper: `userId` prop
+- `PERIMETER_CLOUDFLARE.md` added
+
+### Deploy steps (operator)
+
+1. Push `forgeguard-ai` + `AI-red-team` (authorized)
+2. Vercel: confirm green deploy on `main`
+3. Railway: redeploy engine; `curl engine.forgeguard-ai.com/health`
+4. Smoke D1–D4 per `TENANT_ISOLATION_AUDIT.md` + `OPERATOR_DEBUG.md`
+
+---
+
+## Deploy gap verification (2026-06-13 — prior)
 
 | Repo | GitHub `main` | Local HEAD | Vercel / Railway prod | Gap |
 |------|---------------|------------|------------------------|-----|

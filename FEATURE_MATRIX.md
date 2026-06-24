@@ -20,6 +20,7 @@
 | `/admin` | required | 5 | platform (admin) | PASS |
 | `/admin/analytics` | required | 5 | platform-wide | PASS |
 | `/admin/threats` | required | 5 | global live map | PASS |
+| `/api/debug/launch-check` | sovereign / token | — | env matrix (gated) | PASS |
 | Theme toggle | required | 1 | profile preference | PASS |
 
 ## Personas
@@ -54,5 +55,5 @@
 | item | note |
 |------|------|
 | Operator leaderboard | RLS hides other profiles — shows self only |
-| Mission client tags for hackers | needs limited public profile policy |
+| Mission client tags for hackers | `profiles_public` view — PASS |
 | OpenRouter scan E2E | separate prompt |

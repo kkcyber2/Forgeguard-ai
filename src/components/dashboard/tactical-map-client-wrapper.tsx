@@ -16,6 +16,8 @@ const TacticalWorldMapLazy = dynamic(
 export type TacticalMapClientWrapperProps = {
   scanTargets?: LiveWorldMapProps["scanTargets"] | null;
   scanTargetById?: Record<string, string> | null;
+  /** Scope realtime breach pulses to this user's scans only */
+  userId?: string | null;
   dense?: boolean;
   /** @deprecated No fake attack pulses — use LiveCommandMapClient for fortress telemetry */
   attackPulses?: boolean;
@@ -31,6 +33,7 @@ export type TacticalMapClientWrapperProps = {
 export function TacticalMapClientWrapper({
   scanTargets = null,
   scanTargetById = null,
+  userId = null,
   dense = false,
 }: TacticalMapClientWrapperProps) {
   const [mounted, setMounted] = React.useState(false);
@@ -48,6 +51,7 @@ export function TacticalMapClientWrapper({
       <TacticalWorldMapLazy
         scanTargets={scanTargets ?? []}
         scanTargetById={scanTargetById ?? {}}
+        userId={userId}
         dense={dense}
       />
     </React.Suspense>

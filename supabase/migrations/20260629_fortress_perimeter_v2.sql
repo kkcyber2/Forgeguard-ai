@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS public.perimeter_ip_blocklist (
 
 CREATE INDEX IF NOT EXISTS idx_perimeter_ip_blocklist_hash
   ON public.perimeter_ip_blocklist (ip_hash, expires_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_perimeter_ip_blocklist_expires
   ON public.perimeter_ip_blocklist (expires_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_perimeter_ip_blocklist_created

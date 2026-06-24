@@ -7,7 +7,6 @@ import {
   resolveVerifiedCompanyTag,
   type TrustTier,
 } from "@/lib/trust/identity";
-import { hasSovereignBypass } from "@/lib/access/sovereign-bypass";
 import { maskAuthorIfGhost } from "@/lib/access/ghost-mode";
 
 export type FeedPost = {
@@ -50,15 +49,31 @@ export async function listFeed(limit = 30, teamId?: string | null): Promise<Feed
   const userIds = Array.from(
     new Set(posts.map((p: { user_id: string }) => p.user_id)),
   ) as string[];
-  const { data: profiles } = await supabase
-    .from("profiles")
+  // profiles_public view — no email / identity_document_path (see migration profiles_public_read)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profiles } = await (supabase as any)
+    .from("profiles_public")
     .select(
-      "id, full_name, email, hacker_rank, is_ghost_active, company_tag, domain_verified, company_domain, work_email_verified, identity_verified, sovereign_pending, clearance_tier",
+      "id, full_name, hacker_rank, is_ghost_active, company_tag, domain_verified, company_domain, work_email_verified, identity_verified, sovereign_pending, clearance_tier",
     )
     .in("id", userIds);
 
+  type PublicProfileRow = {
+    id: string;
+    full_name: string | null;
+    hacker_rank: string | null;
+    is_ghost_active: boolean | null;
+    company_tag: string | null;
+    domain_verified: boolean | null;
+    company_domain: string | null;
+    work_email_verified: boolean | null;
+    identity_verified: boolean | null;
+    sovereign_pending: boolean | null;
+    clearance_tier: string | null;
+  };
+
   const profileMap = new Map(
-    (profiles ?? []).map((p) => {
+    ((profiles ?? []) as PublicProfileRow[]).map((p) => {
       const trustFields = {
         company_tag: p.company_tag,
         domain_verified: p.domain_verified,
@@ -67,7 +82,6 @@ export async function listFeed(limit = 30, teamId?: string | null): Promise<Feed
         identity_verified: p.identity_verified,
         sovereign_pending: p.sovereign_pending,
         clearance_tier: p.clearance_tier,
-        email: p.email,
       };
       return [
         p.id,
@@ -75,14 +89,11 @@ export async function listFeed(limit = 30, teamId?: string | null): Promise<Feed
           name: (() => {
             const ghost = maskAuthorIfGhost(p.id, p.is_ghost_active, p.hacker_rank);
             if (ghost) return ghost.display_name;
-            return p.full_name ?? p.email?.split("@")[0] ?? "operator";
+            return p.full_name ?? "operator";
           })(),
           rank: p.hacker_rank ?? "RECRUIT",
           companyTag: resolveVerifiedCompanyTag(trustFields),
-          trustTier: resolveTrustTier(
-            trustFields,
-            hasSovereignBypass(p.email),
-          ),
+          trustTier: resolveTrustTier(trustFields),
         },
       ];
     }),

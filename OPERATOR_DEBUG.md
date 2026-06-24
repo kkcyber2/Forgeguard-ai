@@ -47,8 +47,21 @@ Expected: no `Public SEO view` or `Public view reports`.
 
 ## Launch check endpoint
 
+**Auth required** — public unauthenticated requests return `404`.
+
 ```bash
-curl -s https://YOUR_APP/api/debug/launch-check | jq
+# Sovereign operator (browser session cookie)
+curl -s -H "Cookie: <session>" https://forgeguard-ai.com/api/debug/launch-check | jq
+
+# Or internal token (CI / operator script)
+curl -s -H "x-internal-scan-token: $INTERNAL_SCAN_TOKEN" https://forgeguard-ai.com/api/debug/launch-check | jq
+```
+
+Unauthenticated probe must **not** return env matrix:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" https://forgeguard-ai.com/api/debug/launch-check
+# Expected: 404
 ```
 
 | field | healthy |

@@ -14,8 +14,10 @@ import {
   mapNowPaymentStatus,
   resolveCryptoPlan,
   resolveCreditPack,
-  resolveCatalogPayAmount,
+} from "@/lib/payments/crypto";
+import {
   isUsdtStableCoin,
+  resolveCatalogPayAmount,
 } from "@/lib/payments/crypto-format";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";

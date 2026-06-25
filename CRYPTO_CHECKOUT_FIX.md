@@ -17,7 +17,7 @@ QR encoded `TRON_ADDRESS?amount=49` using **USD plan price** instead of NOWPayme
 
 | `pay_currency` | URI format |
 |----------------|------------|
-| `usdttrc20` / tron | `tron:{address}?amount={payAmount}` |
+| `usdttrc20` / tron | `tron:{address}` (amount in UI only) |
 | `btc` | `bitcoin:{address}?amount={payAmount}` |
 | `sol` | `solana:{address}?amount={payAmount}` |
 | `usdterc20` / eth | `ethereum:{address}?value={payAmount}` |

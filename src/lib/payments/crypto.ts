@@ -3,6 +3,10 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCreditPack, getPlanMeta, type PlanId } from "@/lib/plans";
+import {
+  isUsdtStableCoin,
+  resolveCatalogPayAmount,
+} from "@/lib/payments/crypto-format";
 
 const NOWPAYMENTS_API = "https://api.nowpayments.io/v1";
 
@@ -60,6 +64,16 @@ export function resolveCreditPack(planName: string): CryptoCreditPackMeta {
 }
 
 /** Wallet-compatible payment URI for QR / deep links. */
+function isTronCurrency(payCurrency: string): boolean {
+  const currency = payCurrency.trim().toLowerCase();
+  return (
+    currency === "usdttrc20" ||
+    currency === "trx" ||
+    currency === "tron" ||
+    (currency.startsWith("usdt") && currency.includes("trc"))
+  );
+}
+
 export function buildCryptoPaymentUri(
   payCurrency: string,
   address: string,
@@ -74,13 +88,8 @@ export function buildCryptoPaymentUri(
   if (currency === "sol" || currency === "solana") {
     return `solana:${address}?amount=${amount}`;
   }
-  if (
-    currency === "usdttrc20" ||
-    currency === "trx" ||
-    currency === "tron" ||
-    currency.startsWith("usdt") && currency.includes("trc")
-  ) {
-    return `tron:${address}?amount=${amount}`;
+  if (isTronCurrency(currency)) {
+    return `tron:${address}`;
   }
   if (currency === "usdterc20" || currency === "eth" || currency === "ethereum") {
     return `ethereum:${address}?value=${amount}`;
@@ -88,20 +97,21 @@ export function buildCryptoPaymentUri(
   return `${address}?amount=${amount}`;
 }
 
-/** Lime-on-obsidian QR for terminal checkout — encodes payment URI, not raw address. */
+/** Standard black-on-white QR — best wallet scanner compatibility. */
 export function buildCryptoQrCodeUrl(
   depositAddress: string,
   payAmount?: number,
   payCurrency = "usdttrc20",
 ): string {
-  const payload =
-    payAmount != null && payAmount > 0
+  const payload = isTronCurrency(payCurrency)
+    ? `tron:${depositAddress}`
+    : payAmount != null && payAmount > 0
       ? buildCryptoPaymentUri(payCurrency, depositAddress, payAmount)
       : depositAddress;
   const params = new URLSearchParams({
     size: "240x240",
-    color: "84ff00",
-    bgcolor: "0a0a0a",
+    color: "000000",
+    bgcolor: "ffffff",
     margin: "12",
     data: payload,
   });
@@ -142,6 +152,7 @@ export async function createNowPayment(params: {
   }
 
   const payCurrency = params.payCurrency ?? "usdttrc20";
+  const stableUsdt = isUsdtStableCoin(payCurrency);
 
   const res = await fetch(`${NOWPAYMENTS_API}/payment`, {
     method: "POST",
@@ -151,7 +162,7 @@ export async function createNowPayment(params: {
     },
     body: JSON.stringify({
       price_amount: params.amountUsdt,
-      price_currency: "usd",
+      price_currency: stableUsdt ? "usdt" : "usd",
       pay_currency: payCurrency,
       order_id: params.orderId,
       order_description: params.orderDescription,
@@ -182,10 +193,14 @@ export async function createNowPayment(params: {
     throw new Error("NOWPayments returned an incomplete payment payload");
   }
 
+  const catalogPay = resolveCatalogPayAmount(params.amountUsdt, payCurrency);
+
   return {
     paymentId,
     depositAddress,
-    payAmount: Number(data.pay_amount ?? params.amountUsdt),
+    payAmount: stableUsdt
+      ? catalogPay
+      : Number(data.pay_amount ?? params.amountUsdt),
     payCurrency: (data.pay_currency as CryptoPayCurrency) ?? payCurrency,
     status: data.payment_status ?? "waiting",
     invoiceUrl: data.invoice_url?.trim() || undefined,

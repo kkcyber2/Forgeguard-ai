@@ -5,6 +5,10 @@ import { motion } from "framer-motion";
 import { Copy, Loader2, Terminal, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanMeta } from "@/lib/plans";
+import {
+  formatCryptoPayAmount,
+  isUsdtStableCoin,
+} from "@/lib/payments/crypto-format";
 import { generateDepositAddress, generateCreditPackDeposit, verifyCryptoDeposit } from "./crypto-actions";
 
 export interface SovereignVaultModalProps {
@@ -183,7 +187,7 @@ export function SovereignVaultModal({
             {"// ghost_mode.checkout.init"}
           </p>
           <h2 className="mt-1 text-sm font-semibold text-lime-400">
-            {plan.name} — {payAmount.toFixed(6)} {payCurrency}
+            {plan.name} — {formatCryptoPayAmount(payAmount, payCurrency)} {payCurrency}
           </h2>
 
           {error && (
@@ -208,12 +212,14 @@ export function SovereignVaultModal({
                   Send exactly
                 </p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-lime-400">
-                  {payAmount.toFixed(6)}{" "}
+                  {formatCryptoPayAmount(payAmount, payCurrency)}{" "}
                   <span className="text-sm font-normal text-zinc-500">{payCurrency}</span>
                 </p>
-                <p className="mt-0.5 text-[10px] text-zinc-600">
-                  ≈ ${amountUsdt.toFixed(2)} USD list price
-                </p>
+                {!isUsdtStableCoin(payCurrency) && (
+                  <p className="mt-0.5 text-[10px] text-zinc-600">
+                    ≈ ${amountUsdt.toFixed(2)} USD list price
+                  </p>
+                )}
                 {!revenueSimulation && (
                   <p className="mt-1 text-[10px] text-zinc-600">
                     Network: {payCurrency} — send exact crypto amount to activate
@@ -223,7 +229,7 @@ export function SovereignVaultModal({
 
               {!revenueSimulation && qrCode && (
                 <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                  <div className="shrink-0 overflow-hidden rounded-sm border border-lime-500/20 bg-[#0a0a0a] p-2">
+                  <div className="shrink-0 overflow-hidden rounded-sm border border-white/15 bg-white p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={qrCode}

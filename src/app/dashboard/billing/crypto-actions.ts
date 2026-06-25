@@ -14,7 +14,9 @@ import {
   mapNowPaymentStatus,
   resolveCryptoPlan,
   resolveCreditPack,
-} from "@/lib/payments/crypto";
+  resolveCatalogPayAmount,
+  isUsdtStableCoin,
+} from "@/lib/payments/crypto-format";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";
 
@@ -110,14 +112,15 @@ export async function generateDepositAddress(planName: string): Promise<Generate
   let depositAddress = getSovereignCryptoWallet() ?? "";
   let paymentId: string | null = null;
   let payCurrency = "usdttrc20";
-  let payAmount = planMeta.amountUsdt;
+  const catalogAmount = planMeta.amountUsdt;
+  let payAmount = resolveCatalogPayAmount(catalogAmount, payCurrency);
   let invoiceUrl: string | undefined;
   let payUrl: string | undefined;
 
   try {
     const appUrl = resolveAppUrl();
     const payment = await createNowPayment({
-      amountUsdt: planMeta.amountUsdt,
+      amountUsdt: catalogAmount,
       orderId,
       orderDescription: `ForgeGuard ${planMeta.planName} — ${user.email ?? user.id}`,
       ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
@@ -125,7 +128,9 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     depositAddress = payment.depositAddress;
     paymentId = payment.paymentId;
     payCurrency = payment.payCurrency;
-    payAmount = payment.payAmount;
+    payAmount = isUsdtStableCoin(payCurrency)
+      ? resolveCatalogPayAmount(catalogAmount, payCurrency)
+      : payment.payAmount;
     invoiceUrl = payment.invoiceUrl;
     payUrl = payment.payUrl;
   } catch (err) {
@@ -145,7 +150,7 @@ export async function generateDepositAddress(planName: string): Promise<Generate
       plan_name: planMeta.planName,
       plan_id: planMeta.planId,
       deposit_type: "subscription",
-      amount_usdt: payAmount,
+      amount_usdt: catalogAmount,
       pay_amount: payAmount,
       deposit_address: depositAddress,
       pay_currency: payCurrency,
@@ -166,7 +171,7 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     depositAddress,
     qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency),
     paymentUri,
-    amountUsdt: payAmount,
+    amountUsdt: catalogAmount,
     payAmount,
     planName: planMeta.planName,
     payCurrency,
@@ -205,14 +210,15 @@ export async function generateCreditPackDeposit(
   let depositAddress = getSovereignCryptoWallet() ?? "";
   let paymentId: string | null = null;
   let payCurrency = "usdttrc20";
-  let payAmount = packMeta.amountUsdt;
+  const catalogAmount = packMeta.amountUsdt;
+  let payAmount = resolveCatalogPayAmount(catalogAmount, payCurrency);
   let invoiceUrl: string | undefined;
   let payUrl: string | undefined;
 
   try {
     const appUrl = resolveAppUrl();
     const payment = await createNowPayment({
-      amountUsdt: packMeta.amountUsdt,
+      amountUsdt: catalogAmount,
       orderId,
       orderDescription: `ForgeGuard ${packMeta.packName} (${packMeta.creditAmount} credits)`,
       ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
@@ -220,7 +226,9 @@ export async function generateCreditPackDeposit(
     depositAddress = payment.depositAddress;
     paymentId = payment.paymentId;
     payCurrency = payment.payCurrency;
-    payAmount = payment.payAmount;
+    payAmount = isUsdtStableCoin(payCurrency)
+      ? resolveCatalogPayAmount(catalogAmount, payCurrency)
+      : payment.payAmount;
     invoiceUrl = payment.invoiceUrl;
     payUrl = payment.payUrl;
   } catch (err) {
@@ -239,7 +247,7 @@ export async function generateCreditPackDeposit(
       plan_name: packMeta.packName,
       plan_id: "credit_pack",
       deposit_type: "credit_pack",
-      amount_usdt: payAmount,
+      amount_usdt: catalogAmount,
       pay_amount: payAmount,
       credit_amount: packMeta.creditAmount,
       deposit_address: depositAddress,
@@ -261,7 +269,7 @@ export async function generateCreditPackDeposit(
     depositAddress,
     qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency),
     paymentUri,
-    amountUsdt: payAmount,
+    amountUsdt: catalogAmount,
     payAmount,
     planName: packMeta.packName,
     payCurrency,

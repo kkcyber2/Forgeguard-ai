@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import {
   Activity,
   BookOpen,
+  Cpu,
   CalendarClock,
   CreditCard,
   Crosshair,
@@ -58,7 +59,8 @@ export type NavIconName =
   | "landmark"
   | "zap"
   | "swords"
-  | "book-open";
+  | "book-open"
+  | "cpu";
 
 export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
@@ -79,6 +81,7 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   zap: Zap,
   swords: Swords,
   "book-open": BookOpen,
+  cpu: Cpu,
 };
 
 export interface NavItem {

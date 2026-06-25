@@ -1,7 +1,19 @@
 # ROADMAP_PROGRESS — CONDITIONAL GO → 10/10 Product
 
 **Started:** 2026-06-17 · **Supabase:** `nlginrukltrwpkyujzzx`  
-**Last updated:** 2026-06-13 (no-E2E session — OpenRouter credits depleted)
+**Last updated:** 2026-06-25 (UX polish + responsive nav)
+
+---
+
+## UX Polish v2 (2026-06-25)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Responsive nav overflow → single "More" menu (`use-responsive-nav.ts`) | **DONE** |
+| 2 | Theme polish v2 — light mode tokens, default dark for new profiles | **DONE** |
+| 3 | Developer identity — eyebrow, Integrations page, Admin chip rename | **DONE** |
+| 4 | Empty dashboard hero + collapsed ScanOpsKpis | **DONE** |
+| 5 | `npm run build` PASS | **DONE** |
 
 ---
 

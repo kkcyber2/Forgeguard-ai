@@ -70,10 +70,14 @@ export async function syncThemeFromProfile(): Promise<ThemeMode> {
     return profileTheme;
   }
 
+  cookieStore.set(THEME_COOKIE, DEFAULT_THEME, {
+    path: "/",
+    maxAge: THEME_COOKIE_MAX_AGE,
+    sameSite: "lax",
+  });
   await supabase
     .from("profiles")
-    .update({ theme_preference: cookieTheme })
+    .update({ theme_preference: DEFAULT_THEME })
     .eq("id", user.id);
-
-  return cookieTheme;
+  return DEFAULT_THEME;
 }

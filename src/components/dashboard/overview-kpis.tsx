@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Activity, DollarSign, Radar, ShieldCheck, Store, Swords, Trophy } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Stagger, StaggerItem } from "@/components/dashboard/stagger";
 import { StatTile } from "@/components/ui/stat-tile";
 import { LiveAleRiskTile } from "@/components/dashboard/live-ale-risk-tile";
@@ -36,7 +37,7 @@ export function OverviewKpis({
             footer={
               <Link
                 href="/dashboard/settings"
-                className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 hover:text-white/70"
+                className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle hover:text-foreground-muted"
               >
                 Operator rank
               </Link>
@@ -52,7 +53,7 @@ export function OverviewKpis({
             footer={
               <Link
                 href="/dashboard/missions"
-                className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 hover:text-white/70"
+                className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle hover:text-foreground-muted"
               >
                 Mission feed
               </Link>
@@ -68,7 +69,7 @@ export function OverviewKpis({
             footer={
               <Link
                 href="/dashboard/bazaar"
-                className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 hover:text-white/70"
+                className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle hover:text-foreground-muted"
               >
                 Open bazaar
               </Link>
@@ -88,7 +89,7 @@ export function OverviewKpis({
           tone={client.aegisRules > 0 ? "secure" : "neutral"}
           icon={ShieldCheck}
           footer={
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-white/50">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-foreground-subtle">
               {client.aegisRules} rule{client.aegisRules !== 1 ? "s" : ""} deployed
             </span>
           }
@@ -126,7 +127,7 @@ export function OverviewKpis({
             footer={
               <Link
                 href="/dashboard/scans"
-                className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45 hover:text-white/70"
+                className="font-mono text-[10px] uppercase tracking-[0.14em] text-foreground-subtle hover:text-foreground-muted"
               >
                 Financial risk
               </Link>
@@ -148,6 +149,7 @@ export function ScanOpsKpis({
   sealed,
   scanTotal,
   logCount,
+  isEmpty = false,
 }: {
   activeCount: number;
   blockedCount: number;
@@ -157,9 +159,18 @@ export function ScanOpsKpis({
   sealed: number;
   scanTotal: number;
   logCount: number;
+  isEmpty?: boolean;
 }) {
+  if (isEmpty) {
+    return (
+      <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-foreground-subtle">
+        No scan activity yet — launch your first audit to populate ops metrics.
+      </p>
+    );
+  }
+
   return (
-    <Stagger className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <Stagger className={cn("mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4")}>
       <StaggerItem>
         <StatTile label="Active scans" value={activeCount} tone="neutral" icon={Radar} />
       </StaggerItem>
@@ -170,7 +181,7 @@ export function ScanOpsKpis({
           tone="secure"
           icon={ShieldCheck}
           footer={
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-white/50">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-foreground-subtle">
               {logCount} log lines
             </span>
           }
@@ -183,7 +194,7 @@ export function ScanOpsKpis({
           tone="threat"
           icon={Activity}
           footer={
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-white/50">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-foreground-subtle">
               {totalFindings} total
             </span>
           }
@@ -195,7 +206,7 @@ export function ScanOpsKpis({
           value={coveragePct}
           tone={sealed > 0 ? "secure" : "neutral"}
           footer={
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-white/50">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] tabular-nums text-foreground-subtle">
               {sealed} of {scanTotal} scans
             </span>
           }

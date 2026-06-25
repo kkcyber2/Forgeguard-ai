@@ -24,7 +24,7 @@ const PERSONA_MODES: Array<{
 }> = [
   { role: "client", label: "Client", Icon: Building2 },
   { role: "hacker", label: "Researcher", Icon: Terminal },
-  { role: "dev", label: "Dev", Icon: Cpu },
+  { role: "dev", label: "Admin", Icon: Cpu },
 ];
 
 /**

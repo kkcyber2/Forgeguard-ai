@@ -52,7 +52,7 @@ const IDENTITIES: {
   {
     type: "developer",
     label: "DEVELOPER",
-    subtitle: "API & Integration",
+    subtitle: "Builder — API keys, CI/CD scans, Repos",
     description:
       "You build on top of ForgeGuard. Access the API, SDKs, and webhook integrations to embed AI red-teaming into your CI/CD pipeline.",
     icon: Code2,

@@ -20,7 +20,8 @@ export interface NavAccessItem {
 
 export const DASHBOARD_NAV: NavAccessItem[] = [
   { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold", minRank: 1 },
-  { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "Stronghold", minRank: 1 },
+  { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "Operations", minRank: 1 },
+  { href: "/dashboard/integrations", label: "Integrations", icon: "cpu", section: "Operations", minRank: 1 },
   { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations", minRank: 2 },
   { href: "/dashboard/missions", label: "Missions", icon: "crosshair", section: "Stronghold", minRank: 3 },
   { href: "/dashboard/aegis", label: "Aegis", icon: "shield-check", section: "Operations", minRank: 1, userTypes: ["client", "developer"] },
@@ -147,6 +148,9 @@ export function isPathAllowed(
     return rank >= 1;
   }
   if (pathname.startsWith("/dashboard/billing") || pathname.startsWith("/dashboard/settings")) {
+    return rank >= 1;
+  }
+  if (pathname.startsWith("/dashboard/integrations")) {
     return rank >= 1;
   }
   if (RANK_2_PREFIXES.some((p) => pathname.startsWith(p))) {

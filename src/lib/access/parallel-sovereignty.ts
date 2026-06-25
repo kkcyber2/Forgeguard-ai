@@ -53,8 +53,11 @@ const ACCOUNT_NAV: NavItem[] = [
 ];
 
 /** Secondary nav — rank-gated overflow items */
-const SECONDARY_NAV: Array<NavItem & { minRank: number; viewModes?: ViewMode[] }> = [
+const SECONDARY_NAV: Array<
+  NavItem & { minRank: number; viewModes?: ViewMode[]; userTypes?: UserType[] }
+> = [
   { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "Operations", minRank: 1 },
+  { href: "/dashboard/integrations", label: "Integrations", icon: "cpu", section: "Operations", minRank: 1 },
   { href: "/dashboard/repos", label: "Repository", icon: "git-branch", section: "Operations", minRank: 3, viewModes: ["hacker"] },
   { href: "/dashboard/intel", label: "Intel", icon: "zap", section: "Operations", minRank: 3 },
   { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations", minRank: 2 },
@@ -112,7 +115,6 @@ export function buildSovereignMasterNav(): {
     { href: "/dashboard/aegis", label: "Aegis Shield", icon: "shield-check", section: "CLIENT" },
     { href: "/dashboard/bounties", label: "Bounty Management", icon: "shield-alert", section: "CLIENT" },
     { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "CLIENT" },
-    { href: "/dashboard/billing", label: "Billing", icon: "credit-card", section: "CLIENT" },
   ];
   const ops: NavItem[] = [
     { href: "/dashboard/repos", label: "Repository", icon: "git-branch", section: "OPS" },
@@ -124,7 +126,6 @@ export function buildSovereignMasterNav(): {
     { href: "/admin/system", label: "System", icon: "activity", section: "OPS" },
     { href: "/admin/training-corpus", label: "Training Corpus", icon: "flask-conical", section: "OPS" },
     { href: "/admin/almanac", label: "Almanac", icon: "book-open", section: "OPS" },
-    { href: "/dashboard/settings", label: "Settings", icon: "settings", section: "OPS" },
   ];
 
   const primary = [...system, ...hacker, ...client];
@@ -191,11 +192,12 @@ export function buildSovereignNav(
 
   const secondary = SECONDARY_NAV.filter((item) => {
     if (rank < item.minRank) return false;
+    if (item.userTypes && !item.userTypes.includes(userType)) return false;
     if (item.viewModes && !item.viewModes.includes(viewMode)) return false;
     if (viewMode === "client" && item.href === "/dashboard/scans") return false;
     if (viewMode === "hacker" && item.href === "/dashboard/missions") return false;
     return isPathAllowed(item.href, rank, userType);
-  }).map(({ minRank: _r, viewModes: _v, ...item }) => item);
+  }).map(({ minRank: _r, viewModes: _v, userTypes: _u, ...item }) => item);
 
   const secondaryNav = [...secondary, ...ACCOUNT_NAV];
   if (rank >= 5) {

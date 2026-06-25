@@ -36,6 +36,11 @@ import { IdentityBadge } from "@/components/dashboard/identity-badge";
 import { IdentitySwitcher } from "@/components/dashboard/identity-switcher";
 import { WalletCredits } from "@/components/dashboard/wallet-credits";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
+import {
+  ACCOUNT_NAV_HREFS,
+  mergeNavForResponsive,
+  useResponsiveNav,
+} from "@/components/dashboard/use-responsive-nav";
 import { UpgradeRequiredModal } from "@/components/dashboard/upgrade-required-modal";
 import { NAV_ICONS, type NavItem, type ShellUser } from "@/components/dashboard/shell";
 import {
@@ -53,10 +58,7 @@ import { useLiveWallet } from "@/hooks/use-live-wallet";
 /* -------------------------------------------------------------------------- */
 
 /** Account section items — rendered in a right-side user dropdown */
-const ACCOUNT_HREFS = new Set([
-  "/dashboard/billing",
-  "/dashboard/settings",
-]);
+const ACCOUNT_HREFS = ACCOUNT_NAV_HREFS;
 
 const QUICK_ACTIONS: {
   label: string;
@@ -249,8 +251,8 @@ function AccountMenu({
                     className={cn(
                       "flex items-center gap-2.5 rounded-[3px] px-2.5 py-2 transition-colors",
                       active
-                        ? "bg-white/[0.05] text-white"
-                        : "text-white/50 hover:bg-white/[0.04] hover:text-white/80",
+                        ? "bg-surface-raised text-foreground"
+                        : "text-foreground-muted hover:bg-surface-raised hover:text-foreground",
                     )}
                   >
                     <Icon size={12} strokeWidth={1.5} className="flex-shrink-0" />
@@ -329,7 +331,7 @@ function OverflowMenu({
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "relative flex h-full items-center gap-1 px-3.5 font-mono text-[10px] uppercase tracking-widest transition-colors duration-150",
-          hasActive || open ? "text-white" : "text-white/35 hover:text-white/65",
+          hasActive || open ? "text-foreground" : "text-foreground-subtle hover:text-foreground-muted",
         )}
       >
         <span>More</span>
@@ -371,8 +373,8 @@ function OverflowMenu({
                     className={cn(
                       "flex items-center gap-2.5 rounded-[3px] px-2.5 py-2 transition-colors",
                       active
-                        ? "bg-white/[0.05] text-white"
-                        : "text-white/50 hover:bg-white/[0.04] hover:text-white/80",
+                        ? "bg-surface-raised text-foreground"
+                        : "text-foreground-muted hover:bg-surface-raised hover:text-foreground",
                     )}
                   >
                     <Icon size={12} strokeWidth={1.5} className="flex-shrink-0" />
@@ -393,6 +395,158 @@ function OverflowMenu({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive desktop nav tabs                                                 */
+/* -------------------------------------------------------------------------- */
+
+function navItemActive(pathname: string, href: string): boolean {
+  return (
+    pathname === href ||
+    (href !== "/dashboard" && href !== "/admin" && pathname.startsWith(href))
+  );
+}
+
+function DesktopNavTab({
+  item,
+  pathname,
+  accentHex,
+  userEmail,
+  onLocked,
+}: {
+  item: NavItem;
+  pathname: string;
+  accentHex: string;
+  userEmail: string;
+  onLocked: (label: string) => void;
+}) {
+  const active = navItemActive(pathname, item.href);
+  const Icon = NAV_ICONS[item.icon];
+
+  if (item.locked && !isSovereignOperator(userEmail)) {
+    return (
+      <button
+        key={item.href}
+        type="button"
+        onClick={() => onLocked(item.label)}
+        className="relative flex h-full items-center gap-1.5 px-4 font-mono text-[10px] uppercase tracking-widest whitespace-nowrap text-foreground-subtle transition-colors hover:text-foreground-muted"
+      >
+        <Icon size={11} strokeWidth={1.5} className="flex-shrink-0 opacity-50" />
+        <span>{item.label}</span>
+        <span className="rounded-[2px] border border-violet-400/30 px-1 py-0.5 text-[8px] text-violet-300">
+          LOCK
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      key={item.href}
+      href={item.href}
+      className={cn(
+        "relative flex h-full items-center gap-1.5 px-4 font-mono text-[10px] uppercase tracking-widest whitespace-nowrap transition-colors duration-150",
+        active ? "text-foreground" : "text-foreground-subtle hover:text-foreground-muted",
+      )}
+    >
+      <Icon size={11} strokeWidth={1.5} className="flex-shrink-0" />
+      <span>{item.label}</span>
+      {active && (
+        <motion.span
+          layoutId="nav-underline"
+          className="absolute bottom-0 left-0 right-0 h-[1.5px]"
+          style={{ backgroundColor: accentHex }}
+          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+        />
+      )}
+    </Link>
+  );
+}
+
+function ResponsiveDesktopNav({
+  primaryNav,
+  secondaryNav,
+  pathname,
+  scope,
+  accentHex,
+  userEmail,
+  onLocked,
+}: {
+  primaryNav: NavItem[];
+  secondaryNav: NavItem[];
+  pathname: string;
+  scope: "user" | "admin";
+  accentHex: string;
+  userEmail: string;
+  onLocked: (label: string) => void;
+}) {
+  const navContainerRef = useRef<HTMLDivElement>(null);
+  const measureRefs = useRef<(HTMLSpanElement | null)[]>([]);
+
+  const allNavItems = React.useMemo(
+    () => mergeNavForResponsive(primaryNav, secondaryNav),
+    [primaryNav, secondaryNav],
+  );
+
+  const { visibleNav, overflowNav } = useResponsiveNav(
+    allNavItems,
+    pathname,
+    navContainerRef,
+    measureRefs,
+  );
+
+  return (
+    <nav
+      ref={navContainerRef}
+      className="relative hidden h-full min-w-0 flex-1 items-stretch overflow-hidden md:flex"
+    >
+      {/* Hidden measurement row */}
+      <div
+        className="pointer-events-none absolute left-0 top-0 -z-10 flex h-0 overflow-hidden opacity-0"
+        aria-hidden
+      >
+        {allNavItems.map((item, index) => {
+          const Icon = NAV_ICONS[item.icon];
+          return (
+            <span
+              key={`measure-${item.href}`}
+              ref={(el) => {
+                measureRefs.current[index] = el;
+              }}
+              className="inline-flex items-center gap-1.5 px-4 font-mono text-[10px] uppercase tracking-widest whitespace-nowrap"
+            >
+              <Icon size={11} strokeWidth={1.5} className="flex-shrink-0" />
+              <span>{item.label}</span>
+              {item.locked ? (
+                <span className="rounded-[2px] border px-1 py-0.5 text-[8px]">LOCK</span>
+              ) : null}
+            </span>
+          );
+        })}
+      </div>
+
+      {visibleNav.map((item) => (
+        <DesktopNavTab
+          key={item.href}
+          item={item}
+          pathname={pathname}
+          accentHex={scope === "admin" ? "#A78BFA" : accentHex}
+          userEmail={userEmail}
+          onLocked={onLocked}
+        />
+      ))}
+
+      {overflowNav.length > 0 && (
+        <OverflowMenu
+          items={overflowNav}
+          scope={scope}
+          pathname={pathname}
+          accentHex={accentHex}
+        />
+      )}
+    </nav>
   );
 }
 
@@ -440,9 +594,6 @@ export function TopBar({
 
   const resolvedPrimary = primaryNav ?? nav;
   const resolvedSecondary = secondaryNav ?? [];
-  const overflowNav = resolvedSecondary.filter(
-    (item) => !ACCOUNT_HREFS.has(item.href),
-  );
   const accountNav = nav.filter((item) => ACCOUNT_HREFS.has(item.href));
   const liveWallet = useLiveWallet(user.walletBalance ?? 0);
   const showPersonaSwitcher =
@@ -492,78 +643,25 @@ export function TopBar({
           </Link>
           {scope === "admin" && (
             <Badge tone="admin" className="hidden sm:flex">
-              Dev
+              Admin
             </Badge>
           )}
         </div>
 
-        {/* Primary nav tabs — desktop only */}
-        <nav className="hidden h-full flex-1 items-stretch overflow-x-auto scrollbar-none md:flex">
-          {resolvedPrimary.map((item) => {
-            const active =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-            const Icon = NAV_ICONS[item.icon];
+        <ResponsiveDesktopNav
+          primaryNav={resolvedPrimary}
+          secondaryNav={resolvedSecondary}
+          pathname={pathname}
+          scope={scope}
+          accentHex={accentHex}
+          userEmail={user.email}
+          onLocked={(label) => {
+            setLockedFeature(label);
+            setUpgradeOpen(true);
+          }}
+        />
 
-            if (item.locked && !isSovereignOperator(user.email)) {
-              return (
-                <button
-                  key={item.href}
-                  type="button"
-                  onClick={() => {
-                    setLockedFeature(item.label);
-                    setUpgradeOpen(true);
-                  }}
-                  className="relative flex h-full items-center gap-1.5 px-4 font-mono text-[10px] uppercase tracking-widest whitespace-nowrap text-white/25 transition-colors hover:text-white/45"
-                >
-                  <Icon size={11} strokeWidth={1.5} className="flex-shrink-0 opacity-50" />
-                  <span>{item.label}</span>
-                  <span className="rounded-[2px] border border-violet-400/30 px-1 py-0.5 text-[8px] text-violet-300">
-                    LOCK
-                  </span>
-                </button>
-              );
-            }
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "relative flex h-full items-center gap-1.5 px-4 font-mono text-[10px] uppercase tracking-widest whitespace-nowrap transition-colors duration-150",
-                  active
-                    ? "text-white"
-                    : "text-white/35 hover:text-white/70",
-                )}
-              >
-                <Icon size={11} strokeWidth={1.5} className="flex-shrink-0" />
-                <span>{item.label}</span>
-
-                {/* Animated active underline */}
-                {active && (
-                  <motion.span
-                    layoutId="nav-underline"
-                    className="absolute bottom-0 left-0 right-0 h-[1.5px]"
-                    style={{ backgroundColor: accentHex }}
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </Link>
-            );
-          })}
-
-          {/* Overflow → "More" */}
-          {overflowNav.length > 0 && (
-            <OverflowMenu
-              items={overflowNav}
-              scope={scope}
-              pathname={pathname}
-              accentHex={accentHex}
-            />
-          )}
-        </nav>
-
-        <div className="ml-auto flex items-center gap-1.5 border-l-[0.5px] border-white/[0.06] px-3">
+        <div className="ml-auto flex items-center gap-1.5 border-l-[0.5px] border-border px-3">
           {showPersonaSwitcher && personaReady && (
             <IdentitySwitcher
               activeMode={activeRole}
@@ -584,7 +682,7 @@ export function TopBar({
           <button
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="flex h-7 w-7 items-center justify-center rounded-[3px] text-white/35 transition-colors hover:bg-white/[0.04] hover:text-white/70"
+            className="flex h-7 w-7 items-center justify-center rounded-[3px] text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground-muted"
           >
             {theme === "dark" ? (
               <Sun size={13} strokeWidth={1.5} />
@@ -612,7 +710,7 @@ export function TopBar({
             <WalletCredits initialBalance={user.walletBalance ?? 0} wallet={liveWallet} />
           </div>
 
-          <div className="mx-0.5 hidden h-5 w-px bg-white/[0.07] sm:block" />
+          <div className="mx-0.5 hidden h-5 w-px bg-border sm:block" />
 
           {/* Account / avatar dropdown */}
           <AccountMenu

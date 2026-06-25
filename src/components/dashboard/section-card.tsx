@@ -30,13 +30,13 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        "relative bg-surface rounded-sm border-hairline border-white/[0.06]",
-        "shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+        "relative bg-surface rounded-sm border border-border shadow-sm",
+        "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
         "flex flex-col",
         className,
       )}
     >
-      <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b-[0.5px] border-white/[0.06]">
+      <header className="flex items-start justify-between gap-3 border-b border-border px-5 pt-4 pb-3">
         <div className="min-w-0">
           {eyebrow ? (
             <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-foreground-subtle">

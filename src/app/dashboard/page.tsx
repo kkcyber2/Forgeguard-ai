@@ -13,6 +13,7 @@ import { VerificationStatus } from "@/components/dashboard/VerificationStatus";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { DashboardGateModal } from "@/components/dashboard/dashboard-gate-modal";
 import { resolveViewMode, type ViewMode } from "@/lib/access/parallel-sovereignty";
+import type { UserType } from "@/lib/access/ranks";
 import { buttonStyles } from "@/components/ui/button";
 import { scansTableToCards } from "@/lib/scans/adapt";
 import {
@@ -57,7 +58,7 @@ export default async function UserDashboardPage({
   const supabase = await createServerSupabase();
   const overview = await fetchDashboardOverview(supabase, user.id);
 
-  const userType = overview.userType;
+  const userType = (overview.userType ?? "hacker") as UserType;
   const accessLevel = overview.accessLevel;
   const domainVerified = overview.domainVerified;
   const domainToken = overview.domainToken;
@@ -90,18 +91,56 @@ export default async function UserDashboardPage({
       ? "—"
       : `${Math.round((sealed / scanRows.length) * 100)}%`;
 
+  const isEmptyDashboard = scanRows.length === 0;
+
   return (
     <>
       <Suspense fallback={null}>
         <DashboardGateModal />
       </Suspense>
+
+      {isEmptyDashboard ? (
+        <div className="mb-6 rounded-sm border border-border bg-surface p-6 shadow-sm">
+          <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-foreground-subtle">
+            Welcome aboard
+          </p>
+          <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
+            Start your first audit
+          </h2>
+          <p className="mt-2 max-w-xl text-sm text-foreground-muted">
+            Paste a target endpoint and API key — ForgeGuard begins probing immediately.
+            Your dashboard, findings, and risk metrics populate after the first sealed scan.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/dashboard/scans/new"
+              className={buttonStyles({ variant: "primary", size: "sm" })}
+            >
+              <Plus size={14} strokeWidth={1.5} />
+              Start your first audit
+            </Link>
+            {userType === "developer" ? (
+              <Link
+                href="/dashboard/integrations"
+                className={buttonStyles({ variant: "secondary", size: "sm" })}
+              >
+                <Terminal size={14} strokeWidth={1.5} />
+                CI/CD integrations
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <PageHeader
-        eyebrow={viewMode === "client" ? "Client Sovereign" : "Researcher Sovereign"}
+        eyebrow={dashboardEyebrow(userType, viewMode)}
         title={greeting(profile?.full_name ?? user.email ?? "Operator")}
         description={
-          viewMode === "client"
-            ? "Aegis shield, bounty programs, and financial risk across your AI estate."
-            : "REP, missions, and bazaar velocity in your hacker workspace."
+          userType === "developer"
+            ? "API keys, repository scans, and CI/CD hooks for your pipeline."
+            : viewMode === "client"
+              ? "Aegis shield, bounty programs, and financial risk across your AI estate."
+              : "REP, missions, and bazaar velocity in your hacker workspace."
         }
         actions={
           <>
@@ -161,6 +200,7 @@ export default async function UserDashboardPage({
         sealed={sealed}
         scanTotal={scanRows.length}
         logCount={overview.rawLogs.length}
+        isEmpty={isEmptyDashboard}
       />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
@@ -234,6 +274,11 @@ export default async function UserDashboardPage({
       </div>
     </>
   );
+}
+
+function dashboardEyebrow(userType: UserType, viewMode: ViewMode): string {
+  if (userType === "developer") return "Developer";
+  return viewMode === "client" ? "Client Sovereign" : "Researcher Sovereign";
 }
 
 function greeting(name: string): string {

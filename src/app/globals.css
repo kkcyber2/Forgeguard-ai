@@ -466,8 +466,40 @@ html.light-mode .text-white\/30 {
   color: var(--fg-foreground-muted) !important;
 }
 
+html.light-mode .text-white\/45,
+html.light-mode .text-white\/65,
+html.light-mode .text-white\/60,
+html.light-mode .text-white\/70,
+html.light-mode .text-white\/80 {
+  color: var(--fg-foreground-muted) !important;
+}
+
+html.light-mode .hover\:text-white\/45:hover,
+html.light-mode .hover\:text-white\/65:hover,
+html.light-mode .hover\:text-white\/70:hover,
+html.light-mode .hover\:text-white\/80:hover {
+  color: var(--fg-foreground) !important;
+}
+
 html.light-mode .bg-surface {
   background-color: var(--fg-surface) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+html.light-mode .bg-surface-raised {
+  background-color: var(--fg-surface-raised) !important;
+}
+
+html.light-mode[data-persona="hacker"] body {
+  background-image:
+    linear-gradient(to right, rgba(125, 178, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(125, 178, 0, 0.06) 1px, transparent 1px);
+}
+
+html.light-mode[data-persona="client"] body {
+  background-image:
+    linear-gradient(to right, rgba(160, 32, 240, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(160, 32, 240, 0.05) 1px, transparent 1px);
 }
 
 html.light-mode .glass {

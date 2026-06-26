@@ -14,13 +14,10 @@ import {
   grantConfirmedCryptoDeposit,
   isCryptoCheckoutConfigured,
   mapNowPaymentStatus,
+  NowPaymentsRateLimitError,
   resolveCryptoPlan,
   resolveCreditPack,
 } from "@/lib/payments/crypto";
-import {
-  isUsdtStableCoin,
-  resolveCatalogPayAmount,
-} from "@/lib/payments/crypto-format";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";
 
@@ -73,17 +70,14 @@ export type GenerateDepositResult =
       depositId: string;
       depositAddress: string;
       paymentId: string;
-      /** Primary QR — prefers NOWPayments checkout URL when available. */
+      /** White-label tron URI QR — never a NOWPayments redirect URL. */
       qrCode: string;
-      checkoutQrCode: string;
       walletQrCode: string;
       paymentUri: string;
       amountUsdt: number;
       payAmount: number;
       planName: string;
       payCurrency: string;
-      invoiceUrl?: string;
-      payUrl?: string;
     }
   | { ok: false; error: string };
 
@@ -91,18 +85,11 @@ function buildDepositQrPayloads(
   depositAddress: string,
   payAmount: number,
   payCurrency: string,
-  payUrl?: string,
-  invoiceUrl?: string,
 ) {
-  const checkoutTarget = payUrl?.trim() || invoiceUrl?.trim();
-  const checkoutQrCode = checkoutTarget
-    ? buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency, checkoutTarget)
-    : buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency);
   const walletQrCode = buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency);
   return {
-    checkoutQrCode,
     walletQrCode,
-    qrCode: checkoutTarget ? checkoutQrCode : walletQrCode,
+    qrCode: walletQrCode,
   };
 }
 
@@ -132,6 +119,12 @@ async function createNowPaymentsDeposit(params: {
     });
   } catch (err) {
     console.error("[crypto/createNowPaymentsDeposit]", err);
+    if (
+      err instanceof NowPaymentsRateLimitError ||
+      (err instanceof Error && err.message.includes("429"))
+    ) {
+      return { ok: false, error: "Payment service busy, retry in 60s" };
+    }
     return { ok: false, error: PAYMENTS_UNAVAILABLE };
   }
 
@@ -140,9 +133,7 @@ async function createNowPaymentsDeposit(params: {
   }
 
   const payCurrency = payment.payCurrency;
-  const payAmount = isUsdtStableCoin(payCurrency)
-    ? resolveCatalogPayAmount(params.catalogAmount, payCurrency)
-    : payment.payAmount;
+  const payAmount = payment.payAmount;
 
   const { error } = await insertCryptoDeposit(admin, {
     ...params.depositRow,
@@ -164,8 +155,6 @@ async function createNowPaymentsDeposit(params: {
     payment.depositAddress,
     payAmount,
     payCurrency,
-    payment.payUrl,
-    payment.invoiceUrl,
   );
 
   return {
@@ -179,8 +168,6 @@ async function createNowPaymentsDeposit(params: {
     payAmount,
     planName: params.depositRow.plan_name,
     payCurrency,
-    invoiceUrl: payment.invoiceUrl,
-    payUrl: payment.payUrl,
   };
 }
 

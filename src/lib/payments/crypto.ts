@@ -28,8 +28,6 @@ export interface NowPaymentResult {
   payAmount: number;
   payCurrency: CryptoPayCurrency;
   status: string;
-  invoiceUrl?: string;
-  payUrl?: string;
 }
 
 /** Map display plan name → plan id + USDT amount (subscription checkout). */
@@ -78,19 +76,21 @@ function isTronCurrency(payCurrency: string): boolean {
   );
 }
 
-/** TronLink / wallet TRC20 URI + plain-address fallback for exchange manual paste. */
+/** Thrown when NOWPayments returns HTTP 429 (rate limit). */
+export class NowPaymentsRateLimitError extends Error {
+  constructor(message = "NOWPayments rate limit") {
+    super(message);
+    this.name = "NowPaymentsRateLimitError";
+  }
+}
+
+/** Tron white-label URI: tron:{address}?amount={pay_amount} — no token/contract params. */
 export function buildTronUsdtTrc20Uri(
   address: string,
   payAmount: number,
 ): { walletUri: string; plainAddress: string } {
-  const amount = formatTronPayAmount(payAmount);
-  const params = new URLSearchParams({
-    amount,
-    token: "USDT",
-    contractAddress: USDT_TRC20_CONTRACT,
-  });
   return {
-    walletUri: `tron:${address}?${params.toString()}`,
+    walletUri: `tron:${address}?amount=${formatTronPayAmount(payAmount)}`,
     plainAddress: address,
   };
 }
@@ -135,17 +135,12 @@ function buildQrServerUrl(payload: string): string {
   return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`;
 }
 
-/** Standard black-on-white QR — best wallet scanner compatibility. */
+/** Standard black-on-white QR — encodes tron URI for TRC20 (white-label, no redirect URLs). */
 export function buildCryptoQrCodeUrl(
   depositAddress: string,
   payAmount?: number,
   payCurrency = "usdttrc20",
-  payUrl?: string,
 ): string {
-  if (payUrl?.trim()) {
-    return buildQrServerUrl(payUrl.trim());
-  }
-
   if (isTronCurrency(payCurrency) && payAmount != null && payAmount > 0) {
     return buildQrServerUrl(buildTronUsdtTrc20Uri(depositAddress, payAmount).walletUri);
   }
@@ -212,6 +207,10 @@ export async function createNowPayment(params: {
     cache: "no-store",
   });
 
+  if (res.status === 429) {
+    throw new NowPaymentsRateLimitError();
+  }
+
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`NOWPayments payment failed (${res.status}): ${body.slice(0, 240)}`);
@@ -223,8 +222,6 @@ export async function createNowPayment(params: {
     pay_amount?: number;
     pay_currency?: string;
     payment_status?: string;
-    invoice_url?: string;
-    pay_url?: string;
   };
 
   const paymentId = data.payment_id != null ? String(data.payment_id) : "";
@@ -235,17 +232,22 @@ export async function createNowPayment(params: {
   }
 
   const catalogPay = resolveCatalogPayAmount(params.amountUsdt, payCurrency);
+  const apiPayAmount = data.pay_amount != null ? Number(data.pay_amount) : NaN;
+  const payAmount =
+    isTronCurrency(payCurrency) && Number.isFinite(apiPayAmount) && apiPayAmount > 0
+      ? apiPayAmount
+      : stableUsdt
+        ? catalogPay
+        : Number.isFinite(apiPayAmount) && apiPayAmount > 0
+          ? apiPayAmount
+          : params.amountUsdt;
 
   return {
     paymentId,
     depositAddress,
-    payAmount: stableUsdt
-      ? catalogPay
-      : Number(data.pay_amount ?? params.amountUsdt),
+    payAmount,
     payCurrency: (data.pay_currency as CryptoPayCurrency) ?? payCurrency,
     status: data.payment_status ?? "waiting",
-    invoiceUrl: data.invoice_url?.trim() || undefined,
-    payUrl: data.pay_url?.trim() || undefined,
   };
 }
 

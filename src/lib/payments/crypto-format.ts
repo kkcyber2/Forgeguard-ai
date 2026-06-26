@@ -1,3 +1,6 @@
+export const USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+export const USDT_TRC20_DECIMALS = 6;
+
 /** Client-safe crypto amount helpers (no server-only). */
 
 export function isUsdtStableCoin(payCurrency: string): boolean {

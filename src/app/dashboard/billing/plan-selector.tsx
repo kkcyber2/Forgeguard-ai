@@ -92,12 +92,14 @@ export function PlanSelector({
   plans,
   currentPlan,
   revenueSimulation = false,
+  showOperatorDebug = false,
 }: {
   plans: PlanMeta[];
   currentPlan: PlanId;
   userEmail?: string;
   userId?: string;
   revenueSimulation?: boolean;
+  showOperatorDebug?: boolean;
 }) {
   const [vaultPlan, setVaultPlan] = React.useState<PlanMeta | null>(null);
   const [vaultPending, setVaultPending] = React.useState(false);
@@ -150,6 +152,7 @@ export function PlanSelector({
             open={Boolean(vaultPlan)}
             plan={vaultPlan}
             revenueSimulation={revenueSimulation}
+            showOperatorDebug={showOperatorDebug}
             onClose={() => setVaultPlan(null)}
             onConfirmed={() => {
               setVaultPlan(null);

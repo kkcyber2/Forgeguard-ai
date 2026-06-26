@@ -115,8 +115,9 @@ export default async function BillingPage({
       {!cryptoConfigured && !isSovereign && !isRevenueSimulationMode() && (
         <div className="mb-4 rounded-sm border border-amber-400/30 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-300">
           Sovereign Vault not configured — set{" "}
-          <code className="text-lime-400">NOWPAYMENTS_API_KEY</code> or{" "}
-          <code className="text-lime-400">SOVEREIGN_CRYPTO_WALLET</code> on Vercel.
+          <code className="text-lime-400">NOWPAYMENTS_API_KEY</code>,{" "}
+          <code className="text-lime-400">NOWPAYMENTS_IPN_SECRET</code>, and{" "}
+          <code className="text-lime-400">NEXT_PUBLIC_APP_URL</code> on Vercel.
         </div>
       )}
 
@@ -194,13 +195,14 @@ export default async function BillingPage({
       {!isSovereign && (
         <>
           <RedeemCodeBox />
-          <CreditPackCard />
+          <CreditPackCard showOperatorDebug={isSovereign} />
           <PlanSelector
             plans={PLANS}
             currentPlan={currentPlan}
             userEmail={user.email ?? ""}
             userId={user.id}
             revenueSimulation={isRevenueSimulationMode()}
+            showOperatorDebug={isSovereign}
           />
         </>
       )}

@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Copy, Loader2, Terminal, X, Zap } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Smartphone, Terminal, Wallet, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanMeta } from "@/lib/plans";
 import {
   formatCryptoPayAmount,
   isUsdtStableCoin,
+  USDT_TRC20_CONTRACT,
 } from "@/lib/payments/crypto-format";
 import { generateDepositAddress, generateCreditPackDeposit, verifyCryptoDeposit } from "./crypto-actions";
 
@@ -20,6 +21,8 @@ export interface SovereignVaultModalProps {
   onSimulate?: () => Promise<void>;
   /** Subscription plans vs Bazaar credit pack top-ups. */
   depositKind?: "subscription" | "credit_pack";
+  /** Show NOWPayments payment_id footer for operator / dev lookup. */
+  showOperatorDebug?: boolean;
 }
 
 export function SovereignVaultModal({
@@ -30,18 +33,25 @@ export function SovereignVaultModal({
   revenueSimulation = false,
   onSimulate,
   depositKind = "subscription",
+  showOperatorDebug = false,
 }: SovereignVaultModalProps) {
   const [loading, setLoading] = React.useState(false);
   const [verifying, setVerifying] = React.useState(false);
+  const [autoPolling, setAutoPolling] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [depositId, setDepositId] = React.useState<string | null>(null);
+  const [paymentId, setPaymentId] = React.useState<string | null>(null);
+  const [depositStatus, setDepositStatus] = React.useState<"pending" | "confirming" | "confirmed">("pending");
   const [depositAddress, setDepositAddress] = React.useState<string | null>(null);
-  const [qrCode, setQrCode] = React.useState<string | null>(null);
+  const [checkoutQrCode, setCheckoutQrCode] = React.useState<string | null>(null);
+  const [walletQrCode, setWalletQrCode] = React.useState<string | null>(null);
+  const [qrMode, setQrMode] = React.useState<"checkout" | "wallet">("checkout");
   const [amountUsdt, setAmountUsdt] = React.useState<number>(plan.price);
   const [payCurrency, setPayCurrency] = React.useState("USDT");
   const [payAmount, setPayAmount] = React.useState<number>(plan.price);
   const [paymentUri, setPaymentUri] = React.useState<string | null>(null);
   const [invoiceUrl, setInvoiceUrl] = React.useState<string | null>(null);
+  const [payUrl, setPayUrl] = React.useState<string | null>(null);
   const [verifyMsg, setVerifyMsg] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [addressPrefix, setAddressPrefix] = React.useState("");
@@ -61,8 +71,14 @@ export function SovereignVaultModal({
     setError(null);
     setVerifyMsg(null);
     setDepositId(null);
+    setPaymentId(null);
+    setDepositStatus("pending");
+    setAutoPolling(false);
     setDepositAddress(null);
-    setQrCode(null);
+    setCheckoutQrCode(null);
+    setWalletQrCode(null);
+    setQrMode("checkout");
+    setPayUrl(null);
     setAmountUsdt(plan.price);
     setAddressPrefix("");
     setAddressSuffix("");
@@ -78,12 +94,16 @@ export function SovereignVaultModal({
         return;
       }
       setDepositId(result.depositId);
+      setPaymentId(result.paymentId);
       setDepositAddress(result.depositAddress);
-      setQrCode(result.qrCode);
+      setCheckoutQrCode(result.checkoutQrCode);
+      setWalletQrCode(result.walletQrCode);
+      setQrMode(result.payUrl || result.invoiceUrl ? "checkout" : "wallet");
       setAmountUsdt(result.amountUsdt);
       setPayAmount(result.payAmount);
       setPayCurrency(String(result.payCurrency ?? "USDT").toUpperCase());
       setPaymentUri(result.paymentUri);
+      setPayUrl(result.payUrl ?? null);
       setInvoiceUrl(result.invoiceUrl ?? result.payUrl ?? null);
     });
 
@@ -92,41 +112,69 @@ export function SovereignVaultModal({
     };
   }, [open, plan.name, plan.price, revenueSimulation, depositKind]);
 
-  async function handleVerify() {
-    if (revenueSimulation && onSimulate) {
-      setVerifying(true);
-      setError(null);
-      try {
-        await onSimulate();
-        onConfirmed();
-      } catch {
-        setError("Simulation failed");
-      } finally {
-        setVerifying(false);
+  const pollDeposit = React.useCallback(
+    async (silent = false) => {
+      if (revenueSimulation && onSimulate) {
+        if (!silent) {
+          setVerifying(true);
+          setError(null);
+          try {
+            await onSimulate();
+            onConfirmed();
+          } catch {
+            setError("Simulation failed");
+          } finally {
+            setVerifying(false);
+          }
+        }
+        return;
       }
+
+      if (!depositId || depositStatus === "confirmed") return;
+
+      if (!silent) {
+        setVerifying(true);
+        setError(null);
+        setVerifyMsg(null);
+      } else {
+        setAutoPolling(true);
+      }
+
+      try {
+        const result = await verifyCryptoDeposit(depositId);
+        if (!result.ok) {
+          if (!silent) setError(result.error);
+          return;
+        }
+        if (result.status === "confirmed") {
+          setDepositStatus("confirmed");
+          onConfirmed();
+          return;
+        }
+        if (result.status === "confirming") {
+          setDepositStatus("confirming");
+        }
+        setVerifyMsg(result.message);
+      } finally {
+        if (!silent) setVerifying(false);
+        else setAutoPolling(false);
+      }
+    },
+    [depositId, depositStatus, onConfirmed, onSimulate, revenueSimulation],
+  );
+
+  React.useEffect(() => {
+    if (!open || revenueSimulation || !depositId || depositStatus === "confirmed") {
       return;
     }
+    const timer = window.setInterval(() => {
+      void pollDeposit(true);
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [open, revenueSimulation, depositId, depositStatus, pollDeposit]);
 
-    if (!depositId) return;
-
-    setVerifying(true);
-    setError(null);
-    setVerifyMsg(null);
-
-    try {
-      const result = await verifyCryptoDeposit(depositId);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      if (result.status === "confirmed") {
-        onConfirmed();
-        return;
-      }
-      setVerifyMsg(result.message);
-    } finally {
-      setVerifying(false);
-    }
+  async function handleVerify() {
+    await pollDeposit(false);
   }
 
   async function copyAddress() {
@@ -135,6 +183,11 @@ export function SovereignVaultModal({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  const checkoutLink = payUrl ?? invoiceUrl;
+  const activeQr = qrMode === "checkout" && checkoutQrCode ? checkoutQrCode : walletQrCode;
+  const isTrc20 = payCurrency.includes("TRC") || payCurrency === "USDTTRC20";
+  const showDebugFooter = showOperatorDebug || process.env.NODE_ENV === "development";
 
   if (!open) return null;
 
@@ -227,51 +280,140 @@ export function SovereignVaultModal({
                 )}
               </div>
 
-              {!revenueSimulation && qrCode && (
-                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-                  <div className="shrink-0 overflow-hidden rounded-sm border border-white/15 bg-white p-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={qrCode}
-                      alt="Deposit QR code"
-                      width={160}
-                      height={160}
-                      className="block"
-                    />
+              {!revenueSimulation && activeQr && (
+                <div className="space-y-4">
+                  {checkoutLink && (
+                    <div className="flex gap-1 rounded-sm border border-lime-500/15 bg-[#0a0a0a] p-1">
+                      <button
+                        type="button"
+                        onClick={() => setQrMode("checkout")}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-2 text-[9px] uppercase tracking-[0.14em] transition-colors",
+                          qrMode === "checkout"
+                            ? "bg-lime-500/15 text-lime-400"
+                            : "text-zinc-500 hover:text-zinc-300",
+                        )}
+                      >
+                        <Smartphone size={11} />
+                        Crypto app
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQrMode("wallet")}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-2 text-[9px] uppercase tracking-[0.14em] transition-colors",
+                          qrMode === "wallet"
+                            ? "bg-lime-500/15 text-lime-400"
+                            : "text-zinc-500 hover:text-zinc-300",
+                        )}
+                      >
+                        <Wallet size={11} />
+                        Send from wallet
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="rounded-sm border border-lime-500/10 bg-lime-500/5 px-3 py-2.5 text-[10px] leading-relaxed text-zinc-400">
+                    {qrMode === "checkout" && checkoutLink ? (
+                      <>
+                        <strong className="text-lime-400">Recommended:</strong> Scan the QR or open the
+                        checkout page — NOWPayments handles network, amount, and confirmation. Works
+                        with Bybit, Trust Wallet, and exchange apps.
+                      </>
+                    ) : (
+                      <>
+                        <strong className="text-lime-400">Manual send:</strong> Open TronLink or Trust
+                        Wallet via <span className="text-lime-400/90">Open in wallet</span> below.
+                        Network: <span className="text-lime-400/90">TRON (TRC20)</span>, token{" "}
+                        <span className="text-lime-400/90">USDT</span>, contract{" "}
+                        <span className="break-all font-mono text-[9px] text-zinc-500">
+                          {USDT_TRC20_CONTRACT}
+                        </span>
+                        . Send exactly{" "}
+                        <span className="text-lime-400">
+                          {formatCryptoPayAmount(payAmount, payCurrency)} USDT
+                        </span>
+                        .
+                      </>
+                    )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-600">
-                      Deposit Address
-                    </p>
-                    <p className="mt-1 break-all text-[11px] leading-relaxed text-lime-400/90">
-                      {depositAddress}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void copyAddress()}
-                      className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-zinc-500 transition-colors hover:text-lime-400"
-                    >
-                      <Copy size={10} />
-                      {copied ? "Copied" : "Copy address"}
-                    </button>
-                    {paymentUri && (
-                      <a
-                        href={paymentUri}
-                        className="mt-2 block text-[10px] uppercase tracking-widest text-lime-400/80 underline-offset-2 hover:underline"
-                      >
-                        Open in wallet
-                      </a>
-                    )}
-                    {invoiceUrl && (
-                      <a
-                        href={invoiceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 block text-[10px] uppercase tracking-widest text-zinc-400 underline-offset-2 hover:text-lime-400 hover:underline"
-                      >
-                        Pay on NOWPayments
-                      </a>
-                    )}
+
+                  {qrMode === "wallet" && isTrc20 && (
+                    <div className="rounded-sm border border-zinc-700/50 bg-zinc-900/40 px-3 py-2.5 text-[10px] leading-relaxed text-zinc-400">
+                      <strong className="text-zinc-300">Bybit:</strong> Assets → Withdraw → USDT →
+                      Network <span className="text-lime-400/90">TRC20</span> → paste address below →
+                      amount{" "}
+                      <span className="text-lime-400">
+                        {formatCryptoPayAmount(payAmount, payCurrency)} USDT
+                      </span>
+                      . Exchanges cannot scan tron: QR — copy the address manually.
+                    </div>
+                  )}
+
+                  <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+                    <div className="shrink-0 overflow-hidden rounded-sm border border-white/15 bg-white p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={activeQr}
+                        alt={qrMode === "checkout" ? "Checkout QR code" : "Wallet send QR code"}
+                        width={160}
+                        height={160}
+                        className="block"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {qrMode === "checkout" && checkoutLink ? (
+                        <>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-600">
+                            NOWPayments checkout
+                          </p>
+                          <a
+                            href={checkoutLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-sm border border-lime-500/40 bg-lime-500/10 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-lime-400 transition-colors hover:bg-lime-500/20"
+                          >
+                            <ExternalLink size={12} />
+                            Open checkout page
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-600">
+                            TRC20 deposit address
+                          </p>
+                          <p className="mt-1 break-all text-[11px] leading-relaxed text-lime-400/90">
+                            {depositAddress}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void copyAddress()}
+                            className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-zinc-500 transition-colors hover:text-lime-400"
+                          >
+                            <Copy size={10} />
+                            {copied ? "Copied" : "Copy address"}
+                          </button>
+                          {paymentUri && isTrc20 && (
+                            <div className="mt-3 flex flex-col gap-1.5">
+                              <a
+                                href={paymentUri}
+                                className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-lime-400/90 underline-offset-2 hover:underline"
+                              >
+                                <Wallet size={10} />
+                                Open in TronLink
+                              </a>
+                              <a
+                                href={paymentUri}
+                                className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-lime-400/90 underline-offset-2 hover:underline"
+                              >
+                                <Wallet size={10} />
+                                Open in Trust Wallet
+                              </a>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -332,6 +474,15 @@ export function SovereignVaultModal({
               {verifyMsg && (
                 <div className="rounded-sm border border-lime-500/20 bg-lime-500/5 px-3 py-2 text-[10px] text-lime-400/80">
                   {verifyMsg}
+                  {autoPolling && (
+                    <span className="mt-1 block text-zinc-500">Auto-checking every 15s…</span>
+                  )}
+                </div>
+              )}
+
+              {depositStatus === "confirming" && !verifyMsg && (
+                <div className="rounded-sm border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[10px] text-amber-300/90">
+                  Transaction detected — awaiting blockchain confirmations…
                 </div>
               )}
 
@@ -366,6 +517,19 @@ export function SovereignVaultModal({
               <p className="text-center text-[9px] leading-relaxed text-zinc-700">
                 USDT · SOL · BTC accepted via Sovereign Vault · Credits auto-credit on confirmation
               </p>
+
+              {showDebugFooter && paymentId && (
+                <p className="border-t border-white/[0.04] pt-3 text-center font-mono text-[9px] text-zinc-600">
+                  NOWPayments payment_id:{" "}
+                  <span className="select-all text-zinc-500">{paymentId}</span>
+                  {depositId && (
+                    <>
+                      {" · "}deposit:{" "}
+                      <span className="select-all text-zinc-600">{depositId.slice(0, 8)}…</span>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
           )}
         </div>

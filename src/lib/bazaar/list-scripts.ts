@@ -46,28 +46,25 @@ export interface ListScriptsResult {
   error?: string;
 }
 
+/** PostgREST embed via profiles FK (author_id → profiles, not auth.users). */
+const AUTHOR_EMBED = `
+  author:profiles!bazaar_scripts_author_profiles_fkey (
+    id, full_name, hacker_rank, is_ghost_active
+  )
+`;
+
 const FULL_SELECT = `
   id, name, description, language, tags,
   price_usd, is_free, purchase_count,
   audit_verdict, audit_risk_score,
   is_published, is_certified, created_at, updated_at,
-  author:author_id (
-    id, full_name, hacker_rank, is_ghost_active
-  )
+  ${AUTHOR_EMBED.trim()}
 `;
 
 /** Public selector — columns confirmed live on production Supabase. */
 export const BAZAAR_LIST_SELECT = FULL_SELECT.trim();
 
-const FALLBACK_SELECT = `
-  id, name, description, language, tags,
-  price_usd, is_free, purchase_count,
-  audit_verdict, audit_risk_score,
-  is_published, is_certified, created_at, updated_at,
-  author:author_id (
-    id, full_name, hacker_rank, is_ghost_active
-  )
-`;
+const FALLBACK_SELECT = FULL_SELECT;
 
 const MINIMAL_SELECT = `
   id, name, description, language, tags,

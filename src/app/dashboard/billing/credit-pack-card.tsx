@@ -6,7 +6,7 @@ import { CREDIT_PACKS, type PlanMeta } from "@/lib/plans";
 import { SovereignVaultModal } from "./sovereign-vault-modal";
 
 /** Bazaar credit pack — wallet top-up via Sovereign Vault (not subscription). */
-export function CreditPackCard() {
+export function CreditPackCard({ showOperatorDebug = false }: { showOperatorDebug?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const pack = CREDIT_PACKS[0];
 
@@ -51,6 +51,7 @@ export function CreditPackCard() {
           open
           plan={planMeta}
           depositKind="credit_pack"
+          showOperatorDebug={showOperatorDebug}
           onClose={() => setOpen(false)}
           onConfirmed={() => {
             setOpen(false);

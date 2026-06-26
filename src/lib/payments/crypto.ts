@@ -10,6 +10,10 @@ import {
 
 const NOWPAYMENTS_API = "https://api.nowpayments.io/v1";
 
+/** USDT TRC20 mainnet — required for wallet deep links (Bybit, Trust, TronLink). */
+export const USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+export const USDT_TRC20_DECIMALS = 6;
+
 export type CryptoPayCurrency = "usdttrc20" | "usdterc20" | "sol" | "btc";
 
 export interface CryptoPlanMeta {
@@ -74,13 +78,36 @@ function isTronCurrency(payCurrency: string): boolean {
   );
 }
 
+/** TronLink / wallet TRC20 URI + plain-address fallback for exchange manual paste. */
+export function buildTronUsdtTrc20Uri(
+  address: string,
+  payAmount: number,
+): { walletUri: string; plainAddress: string } {
+  const amount = formatTronPayAmount(payAmount);
+  const params = new URLSearchParams({
+    amount,
+    token: "USDT",
+    contractAddress: USDT_TRC20_CONTRACT,
+  });
+  return {
+    walletUri: `tron:${address}?${params.toString()}`,
+    plainAddress: address,
+  };
+}
+
+function formatTronPayAmount(payAmount: number): string {
+  const n = Math.round(payAmount * 10 ** USDT_TRC20_DECIMALS) / 10 ** USDT_TRC20_DECIMALS;
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(USDT_TRC20_DECIMALS).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 export function buildCryptoPaymentUri(
   payCurrency: string,
   address: string,
   payAmount: number,
 ): string {
   const currency = payCurrency.trim().toLowerCase();
-  const amount = String(payAmount);
+  const amount = formatTronPayAmount(payAmount);
 
   if (currency === "btc" || currency === "bitcoin") {
     return `bitcoin:${address}?amount=${amount}`;
@@ -89,7 +116,7 @@ export function buildCryptoPaymentUri(
     return `solana:${address}?amount=${amount}`;
   }
   if (isTronCurrency(currency)) {
-    return `tron:${address}`;
+    return buildTronUsdtTrc20Uri(address, payAmount).walletUri;
   }
   if (currency === "usdterc20" || currency === "eth" || currency === "ethereum") {
     return `ethereum:${address}?value=${amount}`;
@@ -97,17 +124,7 @@ export function buildCryptoPaymentUri(
   return `${address}?amount=${amount}`;
 }
 
-/** Standard black-on-white QR — best wallet scanner compatibility. */
-export function buildCryptoQrCodeUrl(
-  depositAddress: string,
-  payAmount?: number,
-  payCurrency = "usdttrc20",
-): string {
-  const payload = isTronCurrency(payCurrency)
-    ? `tron:${depositAddress}`
-    : payAmount != null && payAmount > 0
-      ? buildCryptoPaymentUri(payCurrency, depositAddress, payAmount)
-      : depositAddress;
+function buildQrServerUrl(payload: string): string {
   const params = new URLSearchParams({
     size: "240x240",
     color: "000000",
@@ -116,6 +133,29 @@ export function buildCryptoQrCodeUrl(
     data: payload,
   });
   return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`;
+}
+
+/** Standard black-on-white QR — best wallet scanner compatibility. */
+export function buildCryptoQrCodeUrl(
+  depositAddress: string,
+  payAmount?: number,
+  payCurrency = "usdttrc20",
+  payUrl?: string,
+): string {
+  if (payUrl?.trim()) {
+    return buildQrServerUrl(payUrl.trim());
+  }
+
+  if (isTronCurrency(payCurrency) && payAmount != null && payAmount > 0) {
+    return buildQrServerUrl(buildTronUsdtTrc20Uri(depositAddress, payAmount).walletUri);
+  }
+
+  const payload =
+    payAmount != null && payAmount > 0
+      ? buildCryptoPaymentUri(payCurrency, depositAddress, payAmount)
+      : depositAddress;
+
+  return buildQrServerUrl(payload);
 }
 
 function readEnv(...keys: string[]): string | undefined {
@@ -135,7 +175,7 @@ export function getSovereignCryptoWallet(): string | undefined {
 }
 
 export function isCryptoCheckoutConfigured(): boolean {
-  return Boolean(getNowPaymentsApiKey() || getSovereignCryptoWallet());
+  return Boolean(getNowPaymentsApiKey());
 }
 
 /** Create a NOWPayments invoice and return the dynamic deposit address. */
@@ -162,7 +202,8 @@ export async function createNowPayment(params: {
     },
     body: JSON.stringify({
       price_amount: params.amountUsdt,
-      price_currency: stableUsdt ? "usdt" : "usd",
+      // NOWPayments merchant accounts often disallow price_currency=usdt; USD 1:1 for catalog USDT prices.
+      price_currency: "usd",
       pay_currency: payCurrency,
       order_id: params.orderId,
       order_description: params.orderDescription,

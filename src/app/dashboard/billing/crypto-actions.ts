@@ -9,7 +9,9 @@ import {
   buildCryptoQrCodeUrl,
   createNowPayment,
   fetchNowPaymentStatus,
+  getNowPaymentsApiKey,
   getSovereignCryptoWallet,
+  grantConfirmedCryptoDeposit,
   isCryptoCheckoutConfigured,
   mapNowPaymentStatus,
   resolveCryptoPlan,
@@ -21,6 +23,8 @@ import {
 } from "@/lib/payments/crypto-format";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";
+
+const PAYMENTS_UNAVAILABLE = "Payments temporarily unavailable";
 
 type CryptoDepositInsert = {
   id: string;
@@ -68,7 +72,11 @@ export type GenerateDepositResult =
       ok: true;
       depositId: string;
       depositAddress: string;
+      paymentId: string;
+      /** Primary QR — prefers NOWPayments checkout URL when available. */
       qrCode: string;
+      checkoutQrCode: string;
+      walletQrCode: string;
       paymentUri: string;
       amountUsdt: number;
       payAmount: number;
@@ -78,6 +86,103 @@ export type GenerateDepositResult =
       payUrl?: string;
     }
   | { ok: false; error: string };
+
+function buildDepositQrPayloads(
+  depositAddress: string,
+  payAmount: number,
+  payCurrency: string,
+  payUrl?: string,
+  invoiceUrl?: string,
+) {
+  const checkoutTarget = payUrl?.trim() || invoiceUrl?.trim();
+  const checkoutQrCode = checkoutTarget
+    ? buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency, checkoutTarget)
+    : buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency);
+  const walletQrCode = buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency);
+  return {
+    checkoutQrCode,
+    walletQrCode,
+    qrCode: checkoutTarget ? checkoutQrCode : walletQrCode,
+  };
+}
+
+async function createNowPaymentsDeposit(params: {
+  catalogAmount: number;
+  orderId: string;
+  orderDescription: string;
+  depositRow: Omit<
+    CryptoDepositInsert,
+    "deposit_address" | "pay_currency" | "payment_id" | "pay_amount" | "status" | "amount_usdt"
+  >;
+}): Promise<GenerateDepositResult> {
+  if (!getNowPaymentsApiKey()) {
+    return { ok: false, error: PAYMENTS_UNAVAILABLE };
+  }
+
+  const admin = createAdminSupabase();
+  let payment;
+
+  try {
+    const appUrl = resolveAppUrl();
+    payment = await createNowPayment({
+      amountUsdt: params.catalogAmount,
+      orderId: params.orderId,
+      orderDescription: params.orderDescription,
+      ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
+    });
+  } catch (err) {
+    console.error("[crypto/createNowPaymentsDeposit]", err);
+    return { ok: false, error: PAYMENTS_UNAVAILABLE };
+  }
+
+  if (!payment.paymentId) {
+    return { ok: false, error: PAYMENTS_UNAVAILABLE };
+  }
+
+  const payCurrency = payment.payCurrency;
+  const payAmount = isUsdtStableCoin(payCurrency)
+    ? resolveCatalogPayAmount(params.catalogAmount, payCurrency)
+    : payment.payAmount;
+
+  const { error } = await insertCryptoDeposit(admin, {
+    ...params.depositRow,
+    amount_usdt: params.catalogAmount,
+    pay_amount: payAmount,
+    deposit_address: payment.depositAddress,
+    pay_currency: payCurrency,
+    payment_id: payment.paymentId,
+    status: "pending",
+  });
+
+  if (error) {
+    logDepositDbError("createNowPaymentsDeposit", error);
+    return { ok: false, error: "Failed to record deposit" };
+  }
+
+  const paymentUri = buildCryptoPaymentUri(payCurrency, payment.depositAddress, payAmount);
+  const qrPayloads = buildDepositQrPayloads(
+    payment.depositAddress,
+    payAmount,
+    payCurrency,
+    payment.payUrl,
+    payment.invoiceUrl,
+  );
+
+  return {
+    ok: true,
+    depositId: params.depositRow.id,
+    depositAddress: payment.depositAddress,
+    paymentId: payment.paymentId,
+    ...qrPayloads,
+    paymentUri,
+    amountUsdt: params.catalogAmount,
+    payAmount,
+    planName: params.depositRow.plan_name,
+    payCurrency,
+    invoiceUrl: payment.invoiceUrl,
+    payUrl: payment.payUrl,
+  };
+}
 
 export type VerifyDepositResult =
   | { ok: true; status: "confirmed"; planName: string }
@@ -94,10 +199,7 @@ export async function generateDepositAddress(planName: string): Promise<Generate
   }
 
   if (!isCryptoCheckoutConfigured() && !isRevenueSimulationMode()) {
-    return {
-      ok: false,
-      error: "Configure NOWPAYMENTS_API_KEY or SOVEREIGN_CRYPTO_WALLET",
-    };
+    return { ok: false, error: PAYMENTS_UNAVAILABLE };
   }
 
   let planMeta: ReturnType<typeof resolveCryptoPlan>;
@@ -107,79 +209,21 @@ export async function generateDepositAddress(planName: string): Promise<Generate
     return { ok: false, error: `Unknown plan: ${planName}` };
   }
 
-  const admin = createAdminSupabase();
   const depositId = crypto.randomUUID();
   const orderId = `fg-${user.id.slice(0, 8)}-${depositId.slice(0, 8)}`;
 
-  let depositAddress = getSovereignCryptoWallet() ?? "";
-  let paymentId: string | null = null;
-  let payCurrency = "usdttrc20";
-  const catalogAmount = planMeta.amountUsdt;
-  let payAmount = resolveCatalogPayAmount(catalogAmount, payCurrency);
-  let invoiceUrl: string | undefined;
-  let payUrl: string | undefined;
-
-  try {
-    const appUrl = resolveAppUrl();
-    const payment = await createNowPayment({
-      amountUsdt: catalogAmount,
-      orderId,
-      orderDescription: `ForgeGuard ${planMeta.planName} — ${user.email ?? user.id}`,
-      ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
-    });
-    depositAddress = payment.depositAddress;
-    paymentId = payment.paymentId;
-    payCurrency = payment.payCurrency;
-    payAmount = isUsdtStableCoin(payCurrency)
-      ? resolveCatalogPayAmount(catalogAmount, payCurrency)
-      : payment.payAmount;
-    invoiceUrl = payment.invoiceUrl;
-    payUrl = payment.payUrl;
-  } catch (err) {
-    if (!depositAddress) {
-      console.error("[crypto/generateDepositAddress]", err);
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : "Failed to create crypto deposit",
-      };
-    }
-    console.warn("[crypto/generateDepositAddress] NOWPayments unavailable — using static wallet");
-  }
-
-  const { error } = await insertCryptoDeposit(admin, {
+  return createNowPaymentsDeposit({
+    catalogAmount: planMeta.amountUsdt,
+    orderId,
+    orderDescription: `ForgeGuard ${planMeta.planName} — ${user.email ?? user.id}`,
+    depositRow: {
       id: depositId,
       user_id: user.id,
       plan_name: planMeta.planName,
       plan_id: planMeta.planId,
       deposit_type: "subscription",
-      amount_usdt: catalogAmount,
-      pay_amount: payAmount,
-      deposit_address: depositAddress,
-      pay_currency: payCurrency,
-      payment_id: paymentId,
-      status: "pending",
+    },
   });
-
-  if (error) {
-    logDepositDbError("generateDepositAddress", error);
-    return { ok: false, error: "Failed to record deposit" };
-  }
-
-  const paymentUri = buildCryptoPaymentUri(payCurrency, depositAddress, payAmount);
-
-  return {
-    ok: true,
-    depositId,
-    depositAddress,
-    qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency),
-    paymentUri,
-    amountUsdt: catalogAmount,
-    payAmount,
-    planName: planMeta.planName,
-    payCurrency,
-    invoiceUrl,
-    payUrl,
-  };
 }
 
 /** Generate a credit-pack deposit ($10 → 100 Bazaar credits). */
@@ -192,10 +236,7 @@ export async function generateCreditPackDeposit(
   }
 
   if (!isCryptoCheckoutConfigured() && !isRevenueSimulationMode()) {
-    return {
-      ok: false,
-      error: "Configure NOWPAYMENTS_API_KEY or SOVEREIGN_CRYPTO_WALLET",
-    };
+    return { ok: false, error: PAYMENTS_UNAVAILABLE };
   }
 
   let packMeta: ReturnType<typeof resolveCreditPack>;
@@ -205,79 +246,22 @@ export async function generateCreditPackDeposit(
     return { ok: false, error: `Unknown credit pack: ${packName}` };
   }
 
-  const admin = createAdminSupabase();
   const depositId = crypto.randomUUID();
   const orderId = `fg-credits-${user.id.slice(0, 8)}-${depositId.slice(0, 8)}`;
 
-  let depositAddress = getSovereignCryptoWallet() ?? "";
-  let paymentId: string | null = null;
-  let payCurrency = "usdttrc20";
-  const catalogAmount = packMeta.amountUsdt;
-  let payAmount = resolveCatalogPayAmount(catalogAmount, payCurrency);
-  let invoiceUrl: string | undefined;
-  let payUrl: string | undefined;
-
-  try {
-    const appUrl = resolveAppUrl();
-    const payment = await createNowPayment({
-      amountUsdt: catalogAmount,
-      orderId,
-      orderDescription: `ForgeGuard ${packMeta.packName} (${packMeta.creditAmount} credits)`,
-      ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
-    });
-    depositAddress = payment.depositAddress;
-    paymentId = payment.paymentId;
-    payCurrency = payment.payCurrency;
-    payAmount = isUsdtStableCoin(payCurrency)
-      ? resolveCatalogPayAmount(catalogAmount, payCurrency)
-      : payment.payAmount;
-    invoiceUrl = payment.invoiceUrl;
-    payUrl = payment.payUrl;
-  } catch (err) {
-    if (!depositAddress) {
-      console.error("[crypto/generateCreditPackDeposit]", err);
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : "Failed to create credit deposit",
-      };
-    }
-  }
-
-  const { error } = await insertCryptoDeposit(admin, {
+  return createNowPaymentsDeposit({
+    catalogAmount: packMeta.amountUsdt,
+    orderId,
+    orderDescription: `ForgeGuard ${packMeta.packName} (${packMeta.creditAmount} credits)`,
+    depositRow: {
       id: depositId,
       user_id: user.id,
       plan_name: packMeta.packName,
       plan_id: "credit_pack",
       deposit_type: "credit_pack",
-      amount_usdt: catalogAmount,
-      pay_amount: payAmount,
       credit_amount: packMeta.creditAmount,
-      deposit_address: depositAddress,
-      pay_currency: payCurrency,
-      payment_id: paymentId,
-      status: "pending",
+    },
   });
-
-  if (error) {
-    logDepositDbError("generateCreditPackDeposit", error);
-    return { ok: false, error: "Failed to record deposit" };
-  }
-
-  const paymentUri = buildCryptoPaymentUri(payCurrency, depositAddress, payAmount);
-
-  return {
-    ok: true,
-    depositId,
-    depositAddress,
-    qrCode: buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency),
-    paymentUri,
-    amountUsdt: catalogAmount,
-    payAmount,
-    planName: packMeta.packName,
-    payCurrency,
-    invoiceUrl,
-    payUrl,
-  };
 }
 
 /** Poll crypto_deposits (and NOWPayments when available) for payment confirmation. */
@@ -300,6 +284,8 @@ export async function verifyCryptoDeposit(depositId: string): Promise<VerifyDepo
   }
 
   if (deposit.status === "confirmed") {
+    const admin = createAdminSupabase();
+    await grantConfirmedCryptoDeposit(admin, depositId);
     revalidatePath("/dashboard/billing");
     return { ok: true, status: "confirmed", planName: deposit.plan_name };
   }
@@ -317,6 +303,7 @@ export async function verifyCryptoDeposit(depositId: string): Promise<VerifyDepo
           .eq("user_id", user.id);
 
         if (mapped === "confirmed") {
+          await grantConfirmedCryptoDeposit(admin, depositId);
           revalidatePath("/dashboard/billing");
           return { ok: true, status: "confirmed", planName: deposit.plan_name };
         }
@@ -377,6 +364,8 @@ export async function simulateCryptoDeposit(
     logDepositDbError("simulate", error);
     return { ok: false, error: "Simulation failed" };
   }
+
+  await grantConfirmedCryptoDeposit(admin, depositId);
 
   revalidatePath("/dashboard/billing");
   return { ok: true, status: "confirmed", planName: planMeta.planName };

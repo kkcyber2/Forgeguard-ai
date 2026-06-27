@@ -149,6 +149,98 @@ async function runRobots(domain: string): Promise<Record<string, unknown>> {
   return { domain, path: "/robots.txt", http_status: status, content: body };
 }
 
+// ─── Certificate Transparency (crt.sh) ───────────────────────────────────────
+
+interface CrtShRow {
+  issuer_ca_id?: number;
+  common_name?: string;
+  name_value?: string;
+  serial_number?: string;
+  not_before?: string;
+  not_after?: string;
+}
+
+async function fetchCrtSh(domain: string): Promise<CrtShRow[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    // %25 = URL-encoded '%'; crt.sh substring match on the domain.
+    const url = `https://crt.sh/?q=%25.${encodeURIComponent(domain)}&output=json`;
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "ForgeGuard-IntelVault/1.0 (+legal-osint)",
+      },
+    });
+    if (!res.ok) return [];
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as CrtShRow[];
+    } catch {
+      return [];
+    }
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function extractSubdomains(nameValue: string | undefined, root: string): string[] {
+  if (!nameValue) return [];
+  const out = new Set<string>();
+  for (let line of nameValue.split(/\n|,/)) {
+    line = line.trim().toLowerCase().replace(/^\*+\./, "");
+    if (!line) continue;
+    // Keep only names within the queried root (crt.sh may include SANs of
+    // unrelated issuers); exact match or subdomain of root.
+    if (line === root || line.endsWith(`.${root}`)) {
+      out.add(line);
+    }
+  }
+  return [...out].sort();
+}
+
+async function runCtLogs(domain: string): Promise<Record<string, unknown>> {
+  const rows = await fetchCrtSh(domain);
+  const subdomains = new Set<string>();
+  let valid = 0;
+  for (const r of rows) {
+    if (r.not_after && new Date(r.not_after) >= new Date()) valid += 1;
+    for (const s of extractSubdomains(r.name_value, domain)) subdomains.add(s);
+  }
+  return {
+    domain,
+    source: "crt.sh",
+    total_certificates: rows.length,
+    currently_valid: valid,
+    unique_subdomains: subdomains.size,
+    subdomains: [...subdomains].slice(0, 200),
+    sample: rows.slice(0, 20).map((r) => ({
+      common_name: r.common_name,
+      not_before: r.not_before,
+      not_after: r.not_after,
+      serial_number: r.serial_number,
+    })),
+  };
+}
+
+async function runSubdomains(domain: string): Promise<Record<string, unknown>> {
+  const rows = await fetchCrtSh(domain);
+  const subdomains = new Set<string>();
+  for (const r of rows) {
+    for (const s of extractSubdomains(r.name_value, domain)) subdomains.add(s);
+  }
+  const list = [...subdomains].sort();
+  return {
+    domain,
+    source: "crt.sh (CT logs)",
+    count: list.length,
+    subdomains: list.slice(0, 500),
+  };
+}
+
 async function runSecurityTxt(domain: string): Promise<Record<string, unknown>> {
   const { status, body } = await fetchPublic("/.well-known/security.txt", domain);
   return { domain, path: "/.well-known/security.txt", http_status: status, content: body };
@@ -187,6 +279,10 @@ export async function executeOsintQuery(
       return runWhois(domain);
     case "certs":
       return runCerts(domain);
+    case "ct_logs":
+      return runCtLogs(domain);
+    case "subdomains":
+      return runSubdomains(domain);
     case "robots":
       return runRobots(domain);
     case "security_txt":

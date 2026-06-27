@@ -128,7 +128,12 @@ export function AlmanacCatalog({
                 </p>
                 <p className="mt-3 font-mono text-[9px] text-white/30">
                   Last seen {new Date(e.last_seen_at).toLocaleDateString()}
-                  {e.source_type === "cve" ? " · External CVE" : ""}
+                  {e.source_type === "cve" || e.source_type === "nvd"
+                    ? " · External CVE"
+                    : ""}
+                  {e.epss_percentile != null
+                    ? ` · EPSS ${(e.epss_percentile * 100).toFixed(0)}%`
+                    : ""}
                 </p>
               </Link>
             </li>

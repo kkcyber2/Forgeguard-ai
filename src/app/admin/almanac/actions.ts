@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminProfile } from "@/lib/supabase/server";
 import { ingestCveAlmanacEntries } from "@/lib/almanac/cve-ingest";
+import { ingestNvdAlmanacEntries } from "@/lib/almanac/nvd-ingest";
+import { enrichAlmanacWithEpss } from "@/lib/almanac/epss-enrich";
 import type { AlmanacEntry } from "@/lib/almanac/types";
 
 export type AlmanacAdminStats = {
@@ -11,6 +13,8 @@ export type AlmanacAdminStats = {
   published: number;
   draft: number;
   cve: number;
+  nvd: number;
+  epss_scored: number;
 };
 
 export async function fetchAlmanacAdminStats(): Promise<AlmanacAdminStats> {
@@ -35,9 +39,28 @@ export async function fetchAlmanacAdminStats(): Promise<AlmanacAdminStats> {
     .eq("source_type", "cve")
     .is("merged_into_id", null);
 
+  const { count: nvd } = await admin
+    .from("vulnerability_almanac_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("source_type", "nvd")
+    .is("merged_into_id", null);
+
+  const { count: epssScored } = await admin
+    .from("vulnerability_almanac_entries")
+    .select("id", { count: "exact", head: true })
+    .not("epss_percentile", "is", null)
+    .is("merged_into_id", null);
+
   const t = total ?? 0;
   const p = published ?? 0;
-  return { total: t, published: p, draft: t - p, cve: cve ?? 0 };
+  return {
+    total: t,
+    published: p,
+    draft: t - p,
+    cve: cve ?? 0,
+    nvd: nvd ?? 0,
+    epss_scored: epssScored ?? 0,
+  };
 }
 
 export async function fetchAlmanacAdminEntries(): Promise<AlmanacEntry[]> {
@@ -47,7 +70,7 @@ export async function fetchAlmanacAdminEntries(): Promise<AlmanacEntry[]> {
   const { data, error } = await admin
     .from("vulnerability_almanac_entries")
     .select(
-      "id, slug, title, family, owasp_id, severity, summary_md, poc_redacted, attack_hash, first_seen_at, last_seen_at, source_scan_id, published, source_type, cve_id, merged_into_id",
+      "id, slug, title, family, owasp_id, severity, summary_md, poc_redacted, attack_hash, first_seen_at, last_seen_at, source_scan_id, published, source_type, cve_id, merged_into_id, epss_score, epss_percentile, cvss_v3_score, cvss_severity, nvd_published",
     )
     .is("merged_into_id", null)
     .order("last_seen_at", { ascending: false })
@@ -124,6 +147,39 @@ export async function runCveAlmanacIngest(): Promise<
     return { ok: true, ...result };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "CVE ingest failed";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function runNvdAlmanacIngest(): Promise<
+  | { ok: true; scanned: number; inserted: number; updated: number; errors: number }
+  | { ok: false; error: string }
+> {
+  await requireAdminProfile();
+  try {
+    const admin = createAdminSupabase();
+    const result = await ingestNvdAlmanacEntries(admin);
+    revalidatePath("/admin/almanac");
+    return { ok: true, ...result };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "NVD ingest failed";
+    return { ok: false, error: msg };
+  }
+}
+
+export async function runEpssEnrich(): Promise<
+  | { ok: true; scanned: number; enriched: number; skipped: number; errors: number }
+  | { ok: false; error: string }
+> {
+  await requireAdminProfile();
+  try {
+    const admin = createAdminSupabase();
+    const result = await enrichAlmanacWithEpss(admin);
+    revalidatePath("/admin/almanac");
+    revalidatePath("/resources/almanac");
+    return { ok: true, ...result };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "EPSS enrich failed";
     return { ok: false, error: msg };
   }
 }

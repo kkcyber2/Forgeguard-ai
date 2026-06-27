@@ -5,7 +5,7 @@ export type AlmanacSeverity =
   | "low"
   | "info";
 
-export type AlmanacSourceType = "scan" | "cve";
+export type AlmanacSourceType = "scan" | "cve" | "nvd";
 
 export interface AlmanacEntry {
   id: string;
@@ -24,6 +24,11 @@ export interface AlmanacEntry {
   source_type: AlmanacSourceType;
   cve_id: string | null;
   merged_into_id: string | null;
+  epss_score: number | null;
+  epss_percentile: number | null;
+  cvss_v3_score: number | null;
+  cvss_severity: string | null;
+  nvd_published: string | null;
 }
 
 export const OWASP_LLM_IDS = [

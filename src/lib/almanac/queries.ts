@@ -18,7 +18,7 @@ export async function fetchPublishedAlmanacEntries(
   let query = (supabase as any)
     .from("vulnerability_almanac_entries")
     .select(
-      "id, slug, title, family, owasp_id, severity, summary_md, poc_redacted, attack_hash, first_seen_at, last_seen_at, source_scan_id, published, source_type, cve_id, merged_into_id",
+      "id, slug, title, family, owasp_id, severity, summary_md, poc_redacted, attack_hash, first_seen_at, last_seen_at, source_scan_id, published, source_type, cve_id, merged_into_id, epss_score, epss_percentile, cvss_v3_score, cvss_severity, nvd_published",
     )
     .eq("published", true)
     .is("merged_into_id", null)
@@ -60,7 +60,7 @@ export async function fetchPublishedAlmanacBySlug(
   const { data, error } = await (supabase as any)
     .from("vulnerability_almanac_entries")
     .select(
-      "id, slug, title, family, owasp_id, severity, summary_md, poc_redacted, attack_hash, first_seen_at, last_seen_at, source_scan_id, published, source_type, cve_id, merged_into_id",
+      "id, slug, title, family, owasp_id, severity, summary_md, poc_redacted, attack_hash, first_seen_at, last_seen_at, source_scan_id, published, source_type, cve_id, merged_into_id, epss_score, epss_percentile, cvss_v3_score, cvss_severity, nvd_published",
     )
     .eq("slug", slug)
     .eq("published", true)

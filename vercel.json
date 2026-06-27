@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/almanac-cve",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/intel-sync",
+      "schedule": "30 6 * * *"
     }
   ]
 }

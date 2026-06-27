@@ -52,14 +52,37 @@ export default async function AlmanacEntryPage({ params }: Props) {
           <span className="rounded border border-white/15 px-2 py-0.5 text-white/55">
             {entry.severity}
           </span>
+          {entry.cvss_v3_score != null ? (
+            <span className="rounded border border-amber-400/30 px-2 py-0.5 text-amber-300/80">
+              CVSS {entry.cvss_v3_score.toFixed(1)}
+              {entry.cvss_severity ? ` · ${entry.cvss_severity}` : ""}
+            </span>
+          ) : null}
+          {entry.epss_percentile != null ? (
+            <span
+              className={
+                "rounded border px-2 py-0.5 " +
+                (entry.epss_percentile >= 0.8
+                  ? "border-red-400/30 text-red-300/80"
+                  : entry.epss_percentile >= 0.4
+                    ? "border-amber-400/30 text-amber-300/80"
+                    : "border-white/15 text-white/55")
+              }
+              title="EPSS exploit-likelihood percentile (higher = more likely exploited in the wild)"
+            >
+              EPSS {(entry.epss_percentile * 100).toFixed(1)}%
+            </span>
+          ) : null}
           {entry.owasp_id ? (
             <span className="rounded border border-[#D1FF00]/25 px-2 py-0.5 text-[#D1FF00]/80">
               {entry.owasp_id}
             </span>
           ) : null}
           <span className="text-white/35">{entry.family}</span>
-          {entry.source_type === "cve" ? (
-            <span className="text-violet-300/80">External CVE · not scan telemetry</span>
+          {entry.source_type === "cve" || entry.source_type === "nvd" ? (
+            <span className="text-violet-300/80">
+              External CVE · not scan telemetry
+            </span>
           ) : null}
         </div>
 

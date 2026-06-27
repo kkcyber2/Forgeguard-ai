@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   mergeAlmanacEntries,
   runCveAlmanacIngest,
+  runEpssEnrich,
+  runNvdAlmanacIngest,
   setAlmanacPublished,
 } from "@/app/admin/almanac/actions";
 import type { AlmanacEntry } from "@/lib/almanac/types";
@@ -69,6 +71,32 @@ export function AlmanacAdminPanel({ entries }: { entries: AlmanacEntry[] }) {
     );
   }
 
+  async function ingestNvd() {
+    setBusy("nvd");
+    const r = await runNvdAlmanacIngest();
+    setBusy(null);
+    if (!r.ok) {
+      setMessage(r.error ?? "NVD ingest failed");
+      return;
+    }
+    setMessage(
+      `NVD ingest: scanned ${r.scanned}, inserted ${r.inserted}, updated ${r.updated}, errors ${r.errors}. Refresh to see rows.`,
+    );
+  }
+
+  async function enrichEpss() {
+    setBusy("epss");
+    const r = await runEpssEnrich();
+    setBusy(null);
+    if (!r.ok) {
+      setMessage(r.error ?? "EPSS enrich failed");
+      return;
+    }
+    setMessage(
+      `EPSS: scanned ${r.scanned}, enriched ${r.enriched}, skipped ${r.skipped}, errors ${r.errors}.`,
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -78,7 +106,25 @@ export function AlmanacAdminPanel({ entries }: { entries: AlmanacEntry[] }) {
           onClick={() => void ingestCve()}
           className="rounded border border-violet-400/30 bg-violet-400/10 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-violet-300 disabled:opacity-50"
         >
-          Ingest CISA KEV (LLM keywords)
+          {busy === "cve" ? "Ingesting KEV…" : "Ingest CISA KEV (LLM)"}
+        </button>
+        <button
+          type="button"
+          disabled={busy === "nvd"}
+          onClick={() => void ingestNvd()}
+          className="rounded border border-sky-400/30 bg-sky-400/10 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-sky-300 disabled:opacity-50"
+          title="Fetches NVD CVEs matching AI/LLM keywords (no API key, ~6.5s throttle)"
+        >
+          {busy === "nvd" ? "Ingesting NVD…" : "Ingest NVD (AI/LLM)"}
+        </button>
+        <button
+          type="button"
+          disabled={busy === "epss"}
+          onClick={() => void enrichEpss()}
+          className="rounded border border-[#D1FF00]/30 bg-[#D1FF00]/10 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-[#D1FF00] disabled:opacity-50"
+          title="Fill EPSS exploit-likelihood scores on CVE entries"
+        >
+          {busy === "epss" ? "Scoring EPSS…" : "Enrich EPSS"}
         </button>
         <button
           type="button"
@@ -103,6 +149,8 @@ export function AlmanacAdminPanel({ entries }: { entries: AlmanacEntry[] }) {
               <th className="px-3 py-2">Family</th>
               <th className="px-3 py-2">OWASP</th>
               <th className="px-3 py-2">Sev</th>
+              <th className="px-3 py-2">CVSS</th>
+              <th className="px-3 py-2">EPSS</th>
               <th className="px-3 py-2">Source</th>
               <th className="px-3 py-2">Last seen</th>
               <th className="px-3 py-2">Actions</th>
@@ -127,6 +175,16 @@ export function AlmanacAdminPanel({ entries }: { entries: AlmanacEntry[] }) {
                   {e.owasp_id ?? "—"}
                 </td>
                 <td className="px-3 py-2 uppercase text-white/55">{e.severity}</td>
+                <td className="px-3 py-2 font-mono text-white/55">
+                  {e.cvss_v3_score != null
+                    ? `${e.cvss_v3_score.toFixed(1)}${e.cvss_severity ? ` ${e.cvss_severity.slice(0, 4)}` : ""}`
+                    : "—"}
+                </td>
+                <td className="px-3 py-2 font-mono text-white/55">
+                  {e.epss_percentile != null
+                    ? `${(e.epss_percentile * 100).toFixed(1)}%`
+                    : "—"}
+                </td>
                 <td className="px-3 py-2 font-mono text-white/45">
                   {e.source_type}
                   {e.cve_id ? ` · ${e.cve_id}` : ""}

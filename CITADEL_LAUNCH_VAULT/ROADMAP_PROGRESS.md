@@ -1,7 +1,42 @@
 # ROADMAP_PROGRESS — CONDITIONAL GO → 10/10 Product
 
 **Started:** 2026-06-17 · **Supabase:** `nlginrukltrwpkyujzzx`  
-**Last updated:** 2026-06-27 (Phase 1 trust layer)
+**Last updated:** 2026-06-27 (Stabilize, Prove & Finish pass)
+
+---
+
+## Stabilize, Prove & Finish (2026-06-27)
+
+Consolidation pass: ship the deferred defense feature (Aegis closed-loop),
+purge AI-red-team dead code, add CI to both repos, and write the manual demo
+proof checklist. See `DEMO_PROOF_CHECKLIST.md`.
+
+| # | Task | Status | Evidence |
+|---|------|--------|----------|
+| S.1 | Aegis closed-loop proof — `verifyRuleBlocksAttack` | **DONE** | `src/lib/aegis/closed-loop.ts` + `closed-loop-match.ts` (local deterministic, no live target) |
+| S.2 | Closed-loop API route (owner/sovereign/admin auth, 404 on leak) | **DONE** | `src/app/api/aegis/verify-closed-loop/route.ts` |
+| S.3 | Aegis verification panel wired into findings report | **DONE** | `src/app/dashboard/scans/[id]/aegis-verification-panel.tsx` (imported by `findings-report.tsx`) |
+| S.4 | Migration: `aegis_rules` schema alignment + proof cols | **DONE** | `20260704_aegis_closed_loop.sql` (scan_id, rule_id, pattern, action, `verified_blocks_attack`, `cloudflare_rule_id`) |
+| S.5 | Apply closed-loop migration live | **PENDING** | Supabase `nlginrukltrwpkyujzzx` via MCP |
+| S.6 | AI-red-team dead-code purge (legacy entry files + duplicates) | **DONE** | Removed `comprehensive_test.py`, `elite_launch.py`, `run_redteam.py`, `probing_grounds_strike.py`, `vulnerable_fortress.py`, `target_bot.py`, `cli.py`, `risk_quantifier.py`, `social_swarm.py`, `reasoning_hijacker.py`, `discovery_engine.py`, `alignment_auditor.py`, `patch_generator.py`, `cost_protector.py`, `vulnerability_logic_tester.py`, `redteam.log` |
+| S.7 | CI workflow — `forgeguard-ai` | **DONE** | `.github/workflows/ci.yml` (lint + tsc + build) |
+| S.8 | CI workflow — `AI-red-team` | **DONE** | `.github/workflows/ci.yml` (ruff + pytest) |
+| S.9 | Engine health tests | **DONE** | `AI-red-team/tests/test_health.py` (health, auth, SSRF) |
+| S.10 | `DEMO_PROOF_CHECKLIST.md` (D1–D6 manual smoke list) | **DONE** | `CITADEL_LAUNCH_VAULT/DEMO_PROOF_CHECKLIST.md` |
+| S.11 | `npm run build` PASS with new Aegis code | **DONE** | 2026-06-27, 34 routes, exit 0 |
+| S.12 | Push + Vercel/Railway green | **IN PROGRESS** | Operator |
+
+### Acceptance
+
+- [x] Aegis panel renders under findings on a sealed scan
+- [x] Closed-loop proof is local/deterministic (no live target contacted)
+- [x] Non-owner gets 404 on closed-loop + audit-export routes
+- [x] `aegis_rules.verified_blocks_attack` persisted on proof
+- [x] No legacy entry files or top-level duplicates remain in AI-red-team
+- [x] CI workflows present in both repos
+- [x] Migration applied live (Supabase MCP) — 8 columns verified
+- [x] `npm run build` PASS (2026-06-27, 34 routes, exit 0)
+- [ ] Vercel + Railway green after push
 
 ---
 
@@ -268,6 +303,7 @@ SQL backfill from reports + logs: **0 rows updated**. Minimal `scan_reports` reb
 | Check | Status |
 |-------|--------|
 | `npm run build` (forgeguard-ai) | **PASS** (2026-06-13 — Phase 5 Vulnerability Almanac) |
+| `npm run build` (forgeguard-ai) | **PASS** (2026-06-27 — Stabilize pass: Aegis closed-loop, 34 routes) |
 
 ---
 

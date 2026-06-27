@@ -133,6 +133,12 @@ export async function POST(req: NextRequest) {
     p_amount: authorPayout,
   });
 
+  // Phase 4 — author reputation: +5 per bazaar sale.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (admin as any)
+    .rpc("increment_reputation", { p_user_id: script.author_id, p_delta: 5 })
+    .catch((e: unknown) => console.error("[bazaar] rep award:", e));
+
   // Escrow record (already released — instant commerce)
   await supabase.from("bounty_escrow").insert({
     submission_id: script_id,  // soft ref to script

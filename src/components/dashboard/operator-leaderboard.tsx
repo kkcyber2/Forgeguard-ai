@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import Link from "next/link";
 import { HackerProfile } from "@/components/dashboard/hacker-profile";
 import { normalizeHackerRankLabel } from "@/lib/access/ranks";
 import {
@@ -60,7 +61,10 @@ export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
             <span className="w-5 shrink-0 font-mono text-[10px] tabular-nums text-zinc-600">
               {String(i + 1).padStart(2, "0")}
             </span>
-            <div className="min-w-0 flex-1">
+            <Link
+              href={`/operators/${op.id}`}
+              className="min-w-0 flex-1 rounded-sm transition-colors hover:bg-white/[0.03]"
+            >
               <HackerProfile
                 fullName={op.full_name}
                 email={op.email}
@@ -73,7 +77,7 @@ export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
                 clearanceTier={op.clearance_tier ?? undefined}
                 compact
               />
-            </div>
+            </Link>
           </li>
           );
         })}

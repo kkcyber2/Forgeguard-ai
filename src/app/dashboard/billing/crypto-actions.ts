@@ -18,6 +18,30 @@ import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";
 
 const PAYMENTS_UNAVAILABLE = "Payments temporarily unavailable";
+const CHECKOUT_CONFIG_ERROR = "Checkout configuration error — contact support";
+
+/** Map NOWPayments API errors to user-facing checkout messages. */
+function mapCheckoutError(err: unknown): string {
+  if (err instanceof NowPaymentsRateLimitError) {
+    return "Payment service busy, retry in 60s";
+  }
+  if (!(err instanceof Error)) {
+    return PAYMENTS_UNAVAILABLE;
+  }
+  if (err.message.includes("429")) {
+    return "Payment service busy, retry in 60s";
+  }
+  if (err.message.includes("NOWPAYMENTS_API_KEY is not configured")) {
+    return PAYMENTS_UNAVAILABLE;
+  }
+  if (err.message.includes("NOWPayments invoice failed (400)")) {
+    return CHECKOUT_CONFIG_ERROR;
+  }
+  if (err.message.includes("NOWPayments invoice failed (401)")) {
+    return PAYMENTS_UNAVAILABLE;
+  }
+  return PAYMENTS_UNAVAILABLE;
+}
 
 type CryptoDepositInsert = {
   id: string;
@@ -110,7 +134,7 @@ export async function createCheckoutInvoice(params: {
     params.depositKind === "credit_pack"
       ? `${appUrl}/dashboard/bazaar?credits=1`
       : `${appUrl}/dashboard/billing?upgraded=1`;
-  const cancelledUrl = `${appUrl}/dashboard/billing?cancelled=1`;
+  const cancelUrl = `${appUrl}/dashboard/billing?cancelled=1`;
 
   let invoice;
   try {
@@ -120,17 +144,11 @@ export async function createCheckoutInvoice(params: {
       orderDescription: `ForgeGuard ${planName} — ${user.email ?? user.id}`,
       ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
       successUrl,
-      cancelledUrl,
+      cancelUrl,
     });
   } catch (err) {
     console.error("[crypto/createCheckoutInvoice]", err);
-    if (
-      err instanceof NowPaymentsRateLimitError ||
-      (err instanceof Error && err.message.includes("429"))
-    ) {
-      return { ok: false, error: "Payment service busy, retry in 60s" };
-    }
-    return { ok: false, error: PAYMENTS_UNAVAILABLE };
+    return { ok: false, error: mapCheckoutError(err) };
   }
 
   const admin = createAdminSupabase();

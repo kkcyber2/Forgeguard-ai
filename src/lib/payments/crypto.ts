@@ -302,7 +302,7 @@ export async function createNowPaymentsInvoice(params: {
   orderDescription: string;
   ipnCallbackUrl: string;
   successUrl: string;
-  cancelledUrl: string;
+  cancelUrl: string;
   payCurrency?: CryptoPayCurrency;
 }): Promise<NowPaymentsInvoiceResult> {
   const apiKey = getNowPaymentsApiKey();
@@ -317,7 +317,7 @@ export async function createNowPaymentsInvoice(params: {
     order_description: params.orderDescription,
     ipn_callback_url: params.ipnCallbackUrl,
     success_url: params.successUrl,
-    cancelled_url: params.cancelledUrl,
+    cancel_url: params.cancelUrl,
     is_fixed_rate: false,
   };
   if (params.payCurrency) {

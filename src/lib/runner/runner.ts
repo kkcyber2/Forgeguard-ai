@@ -61,7 +61,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   const { data: scan, error: scanErr } = (await admin
     .from("scans")
     .select(
-      "id, user_id, target_model, target_url, target_credential_encrypted, intensity, surface_kind, asset_value_usd",
+      "id, user_id, target_model, target_url, target_credential_encrypted, intensity, surface_kind, asset_value_usd, scope_host, scope_verified_at",
     )
     .eq("id", scanId)
     .maybeSingle()) as {
@@ -74,6 +74,8 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       intensity: string | null;
       surface_kind: string | null;
       asset_value_usd: number | null;
+      scope_host: string | null;
+      scope_verified_at: string | null;
     } | null;
     error: { message: string } | null;
   };
@@ -159,6 +161,22 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   // 6. POST to /scan/start — no provider inference -------------------------
   const scanStartUrl = joinEnginePath(orchestratorUrl, "/scan/start");
   try {
+    // Load the linked legal consent row (if any) for the compliance audit trail.
+    // Cast through `any` — generated types are stale vs the v2 consent columns.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: consentRow } = (await (admin as any)
+      .from("legal_authorizations")
+      .select("signature_hash, policy_version, full_name, target_host")
+      .eq("scan_id", scan.id)
+      .maybeSingle()) as {
+      data: {
+        signature_hash: string | null;
+        policy_version: string | null;
+        full_name: string | null;
+        target_host: string | null;
+      } | null;
+    };
+
     const dispatchBody = {
       scan_id: scan.id,
       user_id: scan.user_id,
@@ -175,6 +193,12 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
           : 50000,
       ownership_verified: sovereign,
       is_ghost_active: isGhostActive,
+      consent_signature_hash: consentRow?.signature_hash ?? null,
+      policy_version_accepted: consentRow?.policy_version ?? null,
+      signer_name: consentRow?.full_name ?? null,
+      consent_target_host: consentRow?.target_host ?? null,
+      scope_host: scan.scope_host ?? null,
+      scope_verified: Boolean(scan.scope_verified_at) || sovereign,
     };
     const resp = await fetch(scanStartUrl, {
       method: "POST",

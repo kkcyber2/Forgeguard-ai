@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Copy, Loader2, Terminal, Wallet, X, Zap } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Terminal, Wallet, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanMeta } from "@/lib/plans";
 import { formatCryptoPayAmount, isUsdtStableCoin } from "@/lib/payments/crypto-format";
@@ -39,11 +39,15 @@ export function SovereignVaultModal({
   const [paymentId, setPaymentId] = React.useState<string | null>(null);
   const [depositStatus, setDepositStatus] = React.useState<"pending" | "confirming" | "confirmed">("pending");
   const [depositAddress, setDepositAddress] = React.useState<string | null>(null);
+  const [plainQrCode, setPlainQrCode] = React.useState<string | null>(null);
   const [walletQrCode, setWalletQrCode] = React.useState<string | null>(null);
+  const [qrMode, setQrMode] = React.useState<"plain" | "wallet">("plain");
   const [amountUsdt, setAmountUsdt] = React.useState<number>(plan.price);
   const [payCurrency, setPayCurrency] = React.useState("USDT");
   const [payAmount, setPayAmount] = React.useState<number>(plan.price);
   const [paymentUri, setPaymentUri] = React.useState<string | null>(null);
+  const [invoiceUrl, setInvoiceUrl] = React.useState<string | null>(null);
+  const [showHostedPage, setShowHostedPage] = React.useState(false);
   const [verifyMsg, setVerifyMsg] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [addressPrefix, setAddressPrefix] = React.useState("");
@@ -70,8 +74,12 @@ export function SovereignVaultModal({
     setDepositStatus("pending");
     setAutoPolling(false);
     setDepositAddress(null);
+    setPlainQrCode(null);
     setWalletQrCode(null);
+    setQrMode("plain");
     setPaymentUri(null);
+    setInvoiceUrl(null);
+    setShowHostedPage(false);
     setAmountUsdt(plan.price);
     setAddressPrefix("");
     setAddressSuffix("");
@@ -89,11 +97,13 @@ export function SovereignVaultModal({
       setDepositId(result.depositId);
       setPaymentId(result.paymentId);
       setDepositAddress(result.depositAddress);
+      setPlainQrCode(result.plainQrCode);
       setWalletQrCode(result.walletQrCode);
       setAmountUsdt(result.amountUsdt);
       setPayAmount(result.payAmount);
       setPayCurrency(String(result.payCurrency ?? "USDT").toUpperCase());
       setPaymentUri(result.paymentUri);
+      setInvoiceUrl(result.invoiceUrl ?? null);
     });
 
     return () => {
@@ -158,7 +168,7 @@ export function SovereignVaultModal({
     }
     const timer = window.setInterval(() => {
       void pollDeposit(true);
-    }, 15_000);
+    }, 10_000);
     return () => window.clearInterval(timer);
   }, [open, revenueSimulation, depositId, depositStatus, pollDeposit]);
 
@@ -172,6 +182,8 @@ export function SovereignVaultModal({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  const activeQr = qrMode === "wallet" && walletQrCode ? walletQrCode : plainQrCode;
 
   if (!open) return null;
 
@@ -247,7 +259,7 @@ export function SovereignVaultModal({
               <div className="rounded-sm border border-lime-500/15 bg-[#0a0a0a] p-4">
                 <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-600">Amount</p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-lime-400">
-                  {formatCryptoPayAmount(payAmount, payCurrency)}{" "}
+                  {payAmount.toFixed(6).replace(/\.?0+$/, "")}{" "}
                   <span className="text-sm font-normal text-zinc-500">USDT</span>
                 </p>
                 {!isUsdtStableCoin(payCurrency) && (
@@ -263,35 +275,63 @@ export function SovereignVaultModal({
                 )}
               </div>
 
-              {!revenueSimulation && walletQrCode && (
+              {!revenueSimulation && activeQr && (
                 <div className="space-y-4">
+                  {isTrc20 && (
+                    <div className="rounded-sm border border-amber-400/40 bg-amber-400/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
+                      <strong className="text-amber-100">Bybit / Binance:</strong> Withdraw → USDT →
+                      Network <span className="text-amber-100">TRC20</span> → paste the address below
+                      manually. <span className="text-amber-100">Do not scan the tron: QR</span> —
+                      exchanges don't read deep links.
+                    </div>
+                  )}
+
+                  <div className="flex gap-1 rounded-sm border border-lime-500/15 bg-[#0a0a0a] p-1">
+                    <button
+                      type="button"
+                      onClick={() => setQrMode("plain")}
+                      className={cn(
+                        "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-2 text-[9px] uppercase tracking-[0.14em] transition-colors",
+                        qrMode === "plain"
+                          ? "bg-lime-500/15 text-lime-400"
+                          : "text-zinc-500 hover:text-zinc-300",
+                      )}
+                    >
+                      <Copy size={11} />
+                      Address (exchanges)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrMode("wallet")}
+                      className={cn(
+                        "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-2 text-[9px] uppercase tracking-[0.14em] transition-colors",
+                        qrMode === "wallet"
+                          ? "bg-lime-500/15 text-lime-400"
+                          : "text-zinc-500 hover:text-zinc-300",
+                      )}
+                    >
+                      <Wallet size={11} />
+                      Wallet app (tron:)
+                    </button>
+                  </div>
+
                   <div className="rounded-sm border border-lime-500/10 bg-lime-500/5 px-3 py-2.5 text-[10px] leading-relaxed text-zinc-400">
                     Send exactly{" "}
                     <span className="text-lime-400">
                       {formatCryptoPayAmount(payAmount, payCurrency)} USDT
                     </span>{" "}
-                    on <span className="text-lime-400/90">TRON (TRC20)</span> to the address below.
-                    Scan the QR in TronLink or Trust Wallet, or copy the address manually.
+                    on <span className="text-lime-400/90">TRON (TRC20)</span>.
+                    {qrMode === "plain"
+                      ? " Copy the address below into your exchange withdrawal form."
+                      : " Scan in TronLink or Trust Wallet to pre-fill the send."}
                   </div>
-
-                  {isTrc20 && (
-                    <div className="rounded-sm border border-zinc-700/50 bg-zinc-900/40 px-3 py-2.5 text-[10px] leading-relaxed text-zinc-400">
-                      <strong className="text-zinc-300">Bybit:</strong> Assets → Withdraw → USDT →
-                      Network <span className="text-lime-400/90">TRC20</span> → paste address below →
-                      amount{" "}
-                      <span className="text-lime-400">
-                        {formatCryptoPayAmount(payAmount, payCurrency)} USDT
-                      </span>
-                      . Exchanges cannot scan tron: QR — copy the address manually.
-                    </div>
-                  )}
 
                   <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
                     <div className="shrink-0 overflow-hidden rounded-sm border border-white/15 bg-white p-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={walletQrCode}
-                        alt="USDT TRC20 send QR code"
+                        src={activeQr}
+                        alt={qrMode === "wallet" ? "Wallet tron: QR code" : "Plain address QR code"}
                         width={160}
                         height={160}
                         className="block"
@@ -312,19 +352,41 @@ export function SovereignVaultModal({
                         <Copy size={10} />
                         {copied ? "Copied" : "Copy address"}
                       </button>
-                      {paymentUri && isTrc20 && (
-                        <div className="mt-3 flex flex-col gap-1.5">
-                          <a
-                            href={paymentUri}
-                            className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-lime-400/90 underline-offset-2 hover:underline"
-                          >
-                            <Wallet size={10} />
-                            Open in wallet
-                          </a>
-                        </div>
+                      {paymentUri && isTrc20 && qrMode === "wallet" && (
+                        <a
+                          href={paymentUri}
+                          className="mt-3 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-lime-400/90 underline-offset-2 hover:underline"
+                        >
+                          <Wallet size={10} />
+                          Open in wallet
+                        </a>
                       )}
                     </div>
                   </div>
+
+                  {invoiceUrl && (
+                    <div className="border-t border-white/[0.04] pt-3">
+                      {showHostedPage ? (
+                        <a
+                          href={invoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-lime-400/90 underline-offset-2 hover:underline"
+                        >
+                          <ExternalLink size={11} />
+                          Open NOWPayments hosted page
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowHostedPage(true)}
+                          className="text-[10px] text-zinc-600 underline-offset-2 hover:text-zinc-400 hover:underline"
+                        >
+                          Prefer the hosted checkout page?
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -385,7 +447,7 @@ export function SovereignVaultModal({
                 <div className="rounded-sm border border-lime-500/20 bg-lime-500/5 px-3 py-2 text-[10px] text-lime-400/80">
                   {verifyMsg}
                   {autoPolling && (
-                    <span className="mt-1 block text-zinc-500">Auto-checking every 15s…</span>
+                    <span className="mt-1 block text-zinc-500">Auto-checking every 10s…</span>
                   )}
                 </div>
               )}

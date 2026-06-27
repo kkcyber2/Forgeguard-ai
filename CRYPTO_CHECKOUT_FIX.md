@@ -1,76 +1,75 @@
-# Crypto Checkout Fix — White-label USDT TRC20 (no redirect)
+# Crypto Checkout v3 — Dual QR White-label USDT TRC20
 
-## Problem
+Sovereign Vault checkout is **white-label**: users send USDT TRC20 directly to
+the NOWPayments-generated deposit address. Two QR codes cover both exchange and
+wallet-app flows; a hosted NOWPayments page is offered only as an optional
+collapsed link — never the default QR.
 
-Sovereign Vault previously encoded NOWPayments `pay_url` / `invoice_url` in QR codes and offered a checkout redirect tab. Product requirement: **white-label only** — users send USDT TRC20 directly to the NOWPayments-generated deposit address with no hosted checkout page.
+## Dual-QR matrix
 
-## White-label QR format
+| Mode | QR payload | Best for |
+|------|------------|----------|
+| **Address (primary)** | raw `pay_address` (e.g. `TXyz…`) | Bybit, Binance, exchanges — paste into Withdraw form. Exchanges don't read `tron:` deep links. |
+| **Wallet app** | `tron:{pay_address}?amount={pay_amount}` | TronLink, Trust Wallet — scan to pre-fill the send |
 
-Every USDT TRC20 QR and "Open in wallet" link encodes exactly:
+Both QRs are black-on-white via `api.qrserver.com` (`color=000000`, `bgcolor=ffffff`).
 
-```
-tron:{pay_address}?amount={pay_amount}
-```
+**Banner:** "Bybit / Binance: Withdraw → USDT → TRC20 → paste the address below
+manually. Do not scan the tron: QR — exchanges don't read deep links."
 
-- `pay_address` — from NOWPayments `POST /v1/payment` response (`data.pay_address`)
-- `pay_amount` — from `data.pay_amount`, fallback `resolveCatalogPayAmount`
-- **No** `token=`, **no** `contractAddress=`, **no** `invoice_url` or `pay_url`
-
-Example: `tron:TXyz…?amount=10`
+**Optional collapsed link:** "Prefer the hosted checkout page?" → reveals
+"Open NOWPayments hosted page" using `invoice_url` from the API (only if
+returned). Not the default, not in any QR.
 
 ## Implementation
 
 | Component | Change |
 |-----------|--------|
-| `src/lib/payments/crypto.ts` | `buildTronUsdtTrc20Uri()` → `tron:{addr}?amount={amount}`; `buildCryptoQrCodeUrl()` never encodes redirect URLs; `NowPaymentsRateLimitError` on HTTP 429; `isCryptoCheckoutConfigured()` = `NOWPAYMENTS_API_KEY` only |
-| `src/app/dashboard/billing/crypto-actions.ts` | Single `qrCode` / `walletQrCode` (same tron URI); no `invoiceUrl`/`payUrl` in result; 429 → "Payment service busy, retry in 60s" |
-| `src/app/dashboard/billing/sovereign-vault-modal.tsx` | Single wallet QR; Amount / Network TRC20 / Address; Bybit withdraw instructions; 15s auto-poll; operator `payment_id` footer |
+| `src/lib/payments/crypto.ts` | `buildPlainAddressQrCodeUrl()`; `is_fixed_rate: false` in `POST /v1/payment`; always prefer `data.pay_amount`; surface optional `invoiceUrl` |
+| `src/app/dashboard/billing/crypto-actions.ts` | `GenerateDepositResult` exposes `plainQrCode` + `walletQrCode` (+ `qrCode` = plain); optional `invoiceUrl` |
+| `src/app/dashboard/billing/sovereign-vault-modal.tsx` | Dual-QR toggle, Bybit banner, 10s poll, exact amount display, optional hosted-page link |
 | `src/app/api/webhooks/nowpayments/route.ts` | Unchanged — IPN → `grantConfirmedCryptoDeposit` on confirmed |
 
-### QR styling
+## pay_amount
 
-Black-on-white via `api.qrserver.com` (`color=000000`, `bgcolor=ffffff`) for scanner contrast.
+- QR amount always uses NOWPayments `data.pay_amount` when present (fallback
+  `resolveCatalogPayAmount`).
+- Modal displays the exact amount (up to 6 decimals, e.g. `10.012345 USDT`).
 
-### Fresh payment per modal open
+## Polling + activation
 
-Each Sovereign Vault open calls `createNowPayment()` → new `payment_id` row in `crypto_deposits`.
+- Auto-poll every **10s** while the modal is open (`verifyCryptoDeposit`).
+- Manual **"I Have Sent Payment"** polls NOWPayments API.
+- IPN webhook → `crypto_deposits.status = confirmed` → `grantConfirmedCryptoDeposit`.
+- All three paths converge on `subscriptions.status = active` (or wallet credits
+  for packs). `grantConfirmedCryptoDeposit` is idempotent via `credits_granted`.
 
-### Error handling
+## Error handling
 
 | Condition | User message |
 |-----------|--------------|
-| HTTP 429 from NOWPayments | Payment service busy, retry in 60s |
+| HTTP 429 | Payment service busy, retry in 60s |
 | Network / API failure | Payments temporarily unavailable |
 | Missing API key | Payments temporarily unavailable |
 
-Never falls back to static `SOVEREIGN_CRYPTO_WALLET` without a `payment_id`.
+Never falls back to a static `SOVEREIGN_CRYPTO_WALLET` without a `payment_id`.
 
-### Exchange instructions (Bybit)
+## Environment (never embedded in code)
 
-1. Assets → **Withdraw**
-2. Coin: **USDT**
-3. Network: **TRC20** (not ERC20/BEP20)
-4. Paste deposit address from modal
-5. Amount: exact `pay_amount` shown (e.g. `10`, `49`, `199`)
+`NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`, `NEXT_PUBLIC_APP_URL`
 
-Exchanges **cannot** scan `tron:` QR — copy the address manually.
+## Fresh payment per modal open
 
-### Payment activation flow
+Each Sovereign Vault open calls `createNowPayment()` → new `payment_id` row in
+`crypto_deposits`.
 
-1. User opens Sovereign Vault → `createNowPayment()` → row in `crypto_deposits` with `payment_id`
-2. User sends USDT TRC20 to deposit address (wallet scan or manual paste)
-3. Confirmation paths:
-   - IPN webhook → `crypto_deposits.status = confirmed` → `grantConfirmedCryptoDeposit`
-   - Manual **"I Have Sent Payment"** → `verifyCryptoDeposit()` polls NOWPayments API
-   - **Auto-poll** every 15s while modal open
-4. `grantConfirmedCryptoDeposit()` → `subscriptions.status = active` (or wallet credits for packs)
-
-## Acceptance checklist
+## Acceptance
 
 | # | Criterion |
 |---|-----------|
-| 1 | QR decodes to `tron:T…?amount=10` (exact format, no extra params) |
-| 2 | No NOWPayments redirect links in modal |
-| 3 | Each modal open creates new `payment_id` in DB |
-| 4 | Test payment → `crypto_deposits` confirmed → subscriptions active |
-| 5 | `npm run build` PASS |
+| 1 | Plain QR decodes to raw `T…` address (for exchange copy) |
+| 2 | Wallet QR decodes to `tron:T…?amount=10` (for TronLink) |
+| 3 | No redirect links as default QR; hosted page only as collapsed option |
+| 4 | Each modal open creates new `payment_id` in DB |
+| 5 | IPN + poll both activate subscription |
+| 6 | `npm run build` PASS |

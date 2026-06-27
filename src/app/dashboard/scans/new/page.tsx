@@ -49,7 +49,12 @@ export default async function NewScanPage() {
         description="Paste the endpoint you want hardened and the API key ForgeGuard should use while probing. Credentials are sealed with AES-256-GCM before they touch the database."
       />
       <div className="mx-auto max-w-2xl">
-        <NewScanForm isSovereign={isSovereign} quota={quota} probeSuggestion={probeSuggestion} />
+        <NewScanForm
+          isSovereign={isSovereign}
+          quota={quota}
+          probeSuggestion={probeSuggestion}
+          userId={user.id}
+        />
       </div>
     </>
   );

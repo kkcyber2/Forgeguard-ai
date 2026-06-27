@@ -1,7 +1,43 @@
 # ROADMAP_PROGRESS — CONDITIONAL GO → 10/10 Product
 
 **Started:** 2026-06-17 · **Supabase:** `nlginrukltrwpkyujzzx`  
-**Last updated:** 2026-06-25 (UX polish + responsive nav)
+**Last updated:** 2026-06-27 (Phase 1 trust layer)
+
+---
+
+## Phase 1 — Trust layer (2026-06-27)
+
+Scope enforcement + immutable audit chain + compliance export for enterprise
+buyers. See `SCOPE_ENFORCEMENT_SPEC.md` and `AUDIT_CHAIN_SPEC.md`.
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | `src/lib/scans/scope.ts` — `normalizeHost` + `isWithinScope` (+ tests) | **DONE** |
+| 2 | `createScan` scope gate (target host within verified host) | **DONE** |
+| 3 | `verifyScanOwnership` returns `verifiedHost` | **DONE** |
+| 4 | Migration `20260704_scan_scope_host.sql` (scans.scope_host, scope_verified_at) | **Applied** |
+| 5 | Engine `StartScanRequest.scope_host` / `scope_verified` + WARNING log | **DONE** |
+| 6 | `runner.ts` forwards scope fields to Railway | **DONE** |
+| 7 | Migration `20260704_scan_audit_events.sql` (hash-chained audit table) | **Applied** |
+| 8 | `src/lib/compliance/audit-chain.ts` — append + verify chain | **DONE** |
+| 9 | Webhook hooks: scope_verified / scan_started / first_finding / scan_sealed | **DONE** |
+| 10 | `src/lib/compliance/owasp-llm.ts` — family → OWASP LLM01..LLM10 | **DONE** |
+| 11 | `/api/scans/[id]/audit-export` signed evidence pack | **DONE** |
+| 12 | `/admin/audit` read-only chain verification view | **DONE** |
+| 13 | `npm run build` PASS + Vercel deploy | **DONE** |
+
+### Acceptance
+
+- [x] `scope.ts` exists with `normalizeHost` + `isWithinScope`
+- [x] Supabase: `scans.scope_host` column; `scan_audit_events` table exists
+- [x] Verified `example.com` cannot scan `victim.com` (scope mismatch)
+- [x] Verified `example.com` can scan `api.example.com` (subdomain allowed)
+- [x] Sovereign operator bypasses scope gate
+- [x] `legal_authorizations` still immutable (UPDATE/DELETE denied to authenticated)
+- [x] `verifyAuditChain` returns `valid=true` for a clean chain
+- [x] `/api/scans/[id]/audit-export` returns signed pack for owner; 404 for non-owner
+- [x] Domain verifier UI unchanged
+- [x] `npm run build` PASS + Vercel deploy green
 
 ---
 

@@ -7,6 +7,7 @@ import { resolveAppUrl } from "@/lib/app-url";
 import {
   buildCryptoPaymentUri,
   buildCryptoQrCodeUrl,
+  buildPlainAddressQrCodeUrl,
   createNowPayment,
   fetchNowPaymentStatus,
   getNowPaymentsApiKey,
@@ -70,14 +71,19 @@ export type GenerateDepositResult =
       depositId: string;
       depositAddress: string;
       paymentId: string;
-      /** White-label tron URI QR — never a NOWPayments redirect URL. */
+      /** Primary QR — plain address (exchanges: Bybit/Binance). */
       qrCode: string;
+      /** Plain-address QR (raw T… address, no tron: scheme). */
+      plainQrCode: string;
+      /** Wallet-app QR — tron:{address}?amount={pay_amount}. */
       walletQrCode: string;
       paymentUri: string;
       amountUsdt: number;
       payAmount: number;
       planName: string;
       payCurrency: string;
+      /** Optional NOWPayments hosted page — collapsed link only, never the QR. */
+      invoiceUrl?: string;
     }
   | { ok: false; error: string };
 
@@ -86,10 +92,12 @@ function buildDepositQrPayloads(
   payAmount: number,
   payCurrency: string,
 ) {
+  const plainQrCode = buildPlainAddressQrCodeUrl(depositAddress);
   const walletQrCode = buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency);
   return {
+    plainQrCode,
     walletQrCode,
-    qrCode: walletQrCode,
+    qrCode: plainQrCode,
   };
 }
 
@@ -168,6 +176,7 @@ async function createNowPaymentsDeposit(params: {
     payAmount,
     planName: params.depositRow.plan_name,
     payCurrency,
+    invoiceUrl: payment.invoiceUrl,
   };
 }
 

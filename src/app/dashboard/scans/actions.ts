@@ -11,6 +11,10 @@ import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { ENGINE_HANDSHAKE_TIMEOUT_MS } from "@/lib/agathon-config";
 import { verifyScanOwnership } from "./ownership-actions";
 import { normalizeSurfaceKind, SURFACE_KINDS } from "@/lib/scans/surface-kind";
+import { verifyConsentRecord } from "@/lib/legal/consent-server";
+import { scanIntensityToLegalIntensity, LEGAL_POLICY_VERSION } from "@/lib/legal/consent";
+import { normalizeHost, isWithinScope } from "@/lib/scans/scope";
+import { appendAuditEvent } from "@/lib/compliance/audit-chain";
 
 async function markScanDispatchFailed(
   scanId: string,
@@ -133,23 +137,65 @@ export async function createScan(
       return { ok: false, error: "Legal authorization required for High/Nuclear scans." };
     }
     const admin = createAdminSupabase();
-    const { data: legalRow } = await admin
+    // Cast through `any` — the generated Supabase types are stale relative to
+    // the v2 consent columns added in 20260703_legal_consent_crypto.sql.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: legalRow } = (await (admin as any)
       .from("legal_authorizations")
-      .select("id, user_id, intensity, consented")
+      .select(
+        "id, user_id, intensity, consented, full_name, policy_version, target_host, signature_hash, signed_at, scan_id",
+      )
       .eq("id", legalAuthId)
       .eq("user_id", user.id)
-      .maybeSingle();
+      .maybeSingle()) as {
+      data: {
+        consented: boolean | null;
+        scan_id: string | null;
+        intensity: string | null;
+        full_name: string | null;
+        policy_version: string | null;
+        target_host: string | null;
+        signature_hash: string | null;
+        signed_at: string | null;
+      } | null;
+    };
+
     if (!legalRow?.consented) {
       return { ok: false, error: "Invalid or expired legal authorization." };
+    }
+    // Single-use: a consent record already bound to a scan cannot be reused.
+    if (legalRow.scan_id) {
+      return { ok: false, error: "Legal authorization already used by another scan." };
+    }
+    // Intensity must match the scan being launched.
+    const expectedLegal = scanIntensityToLegalIntensity(intensity);
+    if (expectedLegal && legalRow.intensity !== expectedLegal) {
+      return { ok: false, error: "Legal authorization intensity does not match this scan." };
+    }
+    // Re-verify the cryptographic consent signature server-side.
+    const verified = verifyConsentRecord({
+      userId: user.id,
+      scanTargetUrl: parsed.data.target_url,
+      signerName: legalRow.full_name,
+      policyVersion: legalRow.policy_version ?? null,
+      signedAt: legalRow.signed_at,
+      signatureHash: legalRow.signature_hash,
+      consentedTargetHost: legalRow.target_host ?? null,
+    });
+    if (!verified.ok) {
+      console.warn("[scans] consent verification failed:", verified.reason, {
+        legal_auth_id: legalAuthId,
+      });
+      return { ok: false, error: verified.reason };
     }
   }
 
   const ownershipToken = String(formData.get("ownership_token") ?? "").trim();
-  if (
-    !sovereign &&
-    intensity !== "standard" &&
-    intensity !== "recon"
-  ) {
+  // Scope enforcement — applied at the same tier gate as ownership
+  // (intensity > standard). Sovereign operators bypass.
+  let scopeHost: string | null = null;
+  let scopeVerifiedAt: string | null = null;
+  if (!sovereign && intensity !== "standard" && intensity !== "recon") {
     if (!ownershipToken) {
       return {
         ok: false,
@@ -160,6 +206,20 @@ export async function createScan(
     if (!ownership.verified) {
       return { ok: false, error: ownership.detail };
     }
+    const targetHost = normalizeHost(parsed.data.target_url);
+    const verifiedHost = ownership.verifiedHost;
+    if (!verifiedHost || !targetHost || !isWithinScope(targetHost, verifiedHost)) {
+      return {
+        ok: false,
+        error: "Target is outside your verified scope. Verify this domain first.",
+      };
+    }
+    scopeHost = verifiedHost;
+    scopeVerifiedAt = new Date().toISOString();
+  } else if (sovereign) {
+    // Sovereign bypass: record the scanned host for audit, self-attested.
+    scopeHost = normalizeHost(parsed.data.target_url);
+    scopeVerifiedAt = new Date().toISOString();
   }
 
   let sealed: string;
@@ -195,6 +255,8 @@ export async function createScan(
         parsed.data.asset_value_usd != null && parsed.data.asset_value_usd > 0
           ? parsed.data.asset_value_usd
           : null,
+      scope_host: scopeHost,
+      scope_verified_at: scopeVerifiedAt,
     })
     .select("id")
     .single()) as {
@@ -214,6 +276,19 @@ export async function createScan(
       .update({ scan_id: scan.id })
       .eq("id", legalAuthId)
       .eq("user_id", user.id);
+  }
+
+  // Tamper-evident audit chain — record scope state at creation time.
+  try {
+    const admin = createAdminSupabase();
+    await appendAuditEvent(admin, {
+      scanId: scan.id,
+      userId: user.id,
+      event: "scope_verified",
+      policyVersion: LEGAL_POLICY_VERSION,
+    });
+  } catch (err) {
+    console.warn("[scans] audit chain append failed:", err);
   }
 
   // Kick the runner. We MUST await this — Vercel Server Actions terminate

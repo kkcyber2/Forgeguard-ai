@@ -35,6 +35,20 @@ Align with `src/middleware.ts` + `src/lib/perimeter/*`:
 - **Turnstile** on `/auth/signup` if abuse spikes (not required for P0 demo)
 - **Upstash Redis** (`UPSTASH_REDIS_*`) for distributed rate limits at edge + middleware
 
+## Phase 1 trust layer (2026-06-27) — no Cloudflare change
+
+Scope enforcement + immutable audit chain + compliance export ship entirely
+in the Next.js app + Supabase + Railway engine. **No Cloudflare config,
+Workers, or WAF rule changes** are required:
+
+- `/api/scans/[id]/audit-export` is a standard Node runtime route — it rides
+  the existing `60 req/min per IP` `/api/*` rate limit and Vercel origin.
+- Audit events are append-only in Postgres (RLS + revoked UPDATE/DELETE);
+  tamper-evidence is enforced at the DB + hash-chain layer, not the edge.
+- If `pack_signature` verification is later needed at the edge, expose
+  `SCAN_CREDENTIAL_SECRET` only to a dedicated Worker — do not place it in
+  a Cloudflare page rule or public binding.
+
 ## Verification
 
 ```bash

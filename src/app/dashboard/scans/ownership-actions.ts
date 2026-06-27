@@ -44,16 +44,21 @@ export async function issueScanOwnershipToken(
 export async function verifyScanOwnership(
   targetUrl: string,
   token: string,
-): Promise<{ verified: boolean; detail: string }> {
+): Promise<{ verified: boolean; detail: string; verifiedHost: string | null }> {
   const user = await getSessionUser();
-  if (!user) return { verified: false, detail: "Not authenticated." };
+  if (!user) return { verified: false, detail: "Not authenticated.", verifiedHost: null };
 
   if (isSovereignOperator(user.email)) {
-    return { verified: true, detail: "Sovereign operator — ownership bypassed." };
+    const host = extractTargetHost(targetUrl);
+    return {
+      verified: true,
+      detail: "Sovereign operator — ownership bypassed.",
+      verifiedHost: host,
+    };
   }
 
   const result = await probeOwnershipFile(targetUrl, token);
-  if (!result.verified) return result;
+  if (!result.verified) return { ...result, verifiedHost: null };
 
   const host = extractTargetHost(targetUrl);
   if (host) {
@@ -65,5 +70,5 @@ export async function verifyScanOwnership(
       .eq("target_domain", host);
   }
 
-  return result;
+  return { ...result, verifiedHost: host };
 }

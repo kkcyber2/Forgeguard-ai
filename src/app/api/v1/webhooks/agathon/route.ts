@@ -18,6 +18,11 @@ import {
   verifyWebhookToken,
 } from "@/services/fortress-perimeter.service";
 import { logBlacklistedEntity } from "@/services/scraper-defense.service";
+import {
+  appendAuditEvent,
+  appendAuditEventOnce,
+} from "@/lib/compliance/audit-chain";
+import { LEGAL_POLICY_VERSION } from "@/lib/legal/consent";
 
 /**
  * POST /api/v1/webhooks/agathon
@@ -334,6 +339,18 @@ export async function POST(request: NextRequest) {
       }
 
       persistOk = true;
+      if (ownerId) {
+        try {
+          await appendAuditEventOnce(admin, {
+            scanId: event.scanId,
+            userId: ownerId,
+            event: "scan_sealed",
+            policyVersion: LEGAL_POLICY_VERSION,
+          });
+        } catch (err) {
+          console.warn("[webhook:agathon] audit append scan_sealed failed:", err);
+        }
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any).from("scan_logs").insert({
         scan_id: event.scanId,
@@ -413,6 +430,18 @@ export async function POST(request: NextRequest) {
           .eq("id", event.scanId)
           .maybeSingle();
         revalidateScansCache(scanOwner?.user_id as string | undefined);
+        if (scanOwner?.user_id) {
+          try {
+            await appendAuditEventOnce(admin, {
+              scanId: event.scanId,
+              userId: scanOwner.user_id as string,
+              event: "scan_started",
+              policyVersion: LEGAL_POLICY_VERSION,
+            });
+          } catch (err) {
+            console.warn("[webhook:agathon] audit append scan_started failed:", err);
+          }
+        }
         persistOk = true;
       }
     } catch (err) {
@@ -517,6 +546,23 @@ export async function POST(request: NextRequest) {
       }
 
       persistOk = true;
+      const { data: breachOwner } = await (admin as any)
+        .from("scans")
+        .select("user_id")
+        .eq("id", event.scanId)
+        .maybeSingle();
+      if (breachOwner?.user_id) {
+        try {
+          await appendAuditEventOnce(admin, {
+            scanId: event.scanId,
+            userId: breachOwner.user_id as string,
+            event: "first_finding",
+            policyVersion: LEGAL_POLICY_VERSION,
+          });
+        } catch (err) {
+          console.warn("[webhook:agathon] audit append first_finding failed:", err);
+        }
+      }
     } catch (err) {
       persistOk = false;
       persistError =

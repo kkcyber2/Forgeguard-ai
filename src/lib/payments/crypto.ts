@@ -28,6 +28,8 @@ export interface NowPaymentResult {
   payAmount: number;
   payCurrency: CryptoPayCurrency;
   status: string;
+  /** Optional NOWPayments hosted invoice URL — secondary link only, never the QR. */
+  invoiceUrl?: string;
 }
 
 /** Map display plan name → plan id + USDT amount (subscription checkout). */
@@ -153,6 +155,14 @@ export function buildCryptoQrCodeUrl(
   return buildQrServerUrl(payload);
 }
 
+/**
+ * Plain-address QR (no `tron:` scheme) — for exchanges (Bybit/Binance) whose
+ * scanners reject deep links. Encodes the raw deposit address only.
+ */
+export function buildPlainAddressQrCodeUrl(depositAddress: string): string {
+  return buildQrServerUrl(depositAddress.trim());
+}
+
 function readEnv(...keys: string[]): string | undefined {
   for (const key of keys) {
     const val = process.env[key]?.trim();
@@ -203,6 +213,8 @@ export async function createNowPayment(params: {
       order_id: params.orderId,
       order_description: params.orderDescription,
       ipn_callback_url: params.ipnCallbackUrl,
+      // Let NOWPayments recompute pay_amount at confirmation; we display data.pay_amount verbatim.
+      is_fixed_rate: false,
     }),
     cache: "no-store",
   });
@@ -222,6 +234,7 @@ export async function createNowPayment(params: {
     pay_amount?: number;
     pay_currency?: string;
     payment_status?: string;
+    invoice_url?: string;
   };
 
   const paymentId = data.payment_id != null ? String(data.payment_id) : "";
@@ -231,16 +244,15 @@ export async function createNowPayment(params: {
     throw new Error("NOWPayments returned an incomplete payment payload");
   }
 
-  const catalogPay = resolveCatalogPayAmount(params.amountUsdt, payCurrency);
+  // B3: always prefer the API's pay_amount for the QR amount when present.
   const apiPayAmount = data.pay_amount != null ? Number(data.pay_amount) : NaN;
+  const catalogPay = resolveCatalogPayAmount(params.amountUsdt, payCurrency);
   const payAmount =
-    isTronCurrency(payCurrency) && Number.isFinite(apiPayAmount) && apiPayAmount > 0
+    Number.isFinite(apiPayAmount) && apiPayAmount > 0
       ? apiPayAmount
       : stableUsdt
         ? catalogPay
-        : Number.isFinite(apiPayAmount) && apiPayAmount > 0
-          ? apiPayAmount
-          : params.amountUsdt;
+        : params.amountUsdt;
 
   return {
     paymentId,
@@ -248,6 +260,7 @@ export async function createNowPayment(params: {
     payAmount,
     payCurrency: (data.pay_currency as CryptoPayCurrency) ?? payCurrency,
     status: data.payment_status ?? "waiting",
+    invoiceUrl: data.invoice_url?.trim() || undefined,
   };
 }
 

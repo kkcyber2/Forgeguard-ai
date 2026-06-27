@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef } from "react";
-import { AlertTriangle, ShieldCheck, X, Radiation, Zap } from "lucide-react";
+import { AlertTriangle, X, Radiation, Zap, KeyRound } from "lucide-react";
 import { submitLegalAuthorization, type LegalIntensity } from "@/app/dashboard/scans/legal-actions";
+import { buildLegalConsentSignature } from "@/lib/legal/consent-client";
 
 /* ── Types ────────────────────────────────────────────────────────── */
 interface LegalVerificationModalProps {
   intensity: LegalIntensity;
+  /** Authenticated user id — included in the signed consent payload. */
+  userId: string;
+  /** Scan target URL — normalized to a hostname and bound into the signature. */
+  targetUrl: string;
   onAuthorized: (authId: string) => void;
   onCancel: () => void;
 }
@@ -54,6 +59,8 @@ const LEGAL_CHECKBOXES: { id: string; text: string }[] = [
 /* ── Component ────────────────────────────────────────────────────── */
 export function LegalVerificationModal({
   intensity,
+  userId,
+  targetUrl,
   onAuthorized,
   onCancel,
 }: LegalVerificationModalProps) {
@@ -87,11 +94,25 @@ export function LegalVerificationModal({
     if (!canSubmit) return;
     setError(null);
     startTransition(async () => {
-      const result = await submitLegalAuthorization(fullName.trim(), intensity);
-      if (result.ok && result.authId) {
-        onAuthorized(result.authId);
-      } else {
-        setError(result.error ?? "Authorization failed. Please retry.");
+      try {
+        const consent = await buildLegalConsentSignature({
+          userId,
+          targetUrl,
+          signerName: fullName.trim(),
+        });
+        const result = await submitLegalAuthorization(fullName.trim(), intensity, {
+          target_host: consent.targetHost,
+          policy_version: consent.policyVersion,
+          signature_hash: consent.signatureHash,
+          signed_at: consent.signedAtIso,
+        });
+        if (result.ok && result.authId) {
+          onAuthorized(result.authId);
+        } else {
+          setError(result.error ?? "Authorization failed. Please retry.");
+        }
+      } catch {
+        setError("Could not generate consent signature. Please retry.");
       }
     });
   }
@@ -272,12 +293,12 @@ export function LegalVerificationModal({
             {isPending ? (
               <>
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Logging authorization…
+                Signing authorization…
               </>
             ) : (
               <>
-                <ShieldCheck size={14} strokeWidth={1.75} />
-                Authorize &amp; Continue
+                <KeyRound size={14} strokeWidth={1.75} />
+                Cryptographically Sign &amp; Proceed
               </>
             )}
           </button>

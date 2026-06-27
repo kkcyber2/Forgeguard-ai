@@ -145,10 +145,12 @@ export function NewScanForm({
   isSovereign = false,
   quota = null,
   probeSuggestion = null,
+  userId = "",
 }: {
   isSovereign?: boolean;
   quota?: ScanQuotaSnapshot | null;
   probeSuggestion?: ProbeSuggestion | null;
+  userId?: string;
 }) {
   const [state, formAction, pending] = useActionState(createScan, initial);
   const [showKey,    setShowKey]    = React.useState(false);
@@ -178,6 +180,8 @@ export function NewScanForm({
     setOwnershipVerified(false);
     setOwnershipToken(null);
     setOwnershipMsg(null);
+    // Consent signature is bound to the target host — invalidate prior auth on URL/intensity change.
+    setAuthId(null);
   }, [targetUrl, intensity, isSovereign]);
 
   const selectedTarget = TARGET_TYPES.find((t) => t.value === surfaceKind)!;
@@ -239,6 +243,8 @@ export function NewScanForm({
     {showLegal && !isSovereign && intensity !== "standard" && (
       <LegalVerificationModal
         intensity={intensity as LegalIntensity}
+        userId={userId}
+        targetUrl={targetUrl}
         onAuthorized={handleAuthorized}
         onCancel={() => setShowLegal(false)}
       />

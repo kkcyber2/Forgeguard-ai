@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { redactSecrets } from "@/lib/security/redact-secrets";
 import { TacticalTargetError } from "./tactical-target-error";
+import { AegisVerificationPanel } from "./aegis-verification-panel";
 import {
   type Finding,
   type OWASPBucket,
@@ -1629,6 +1630,10 @@ export function FindingsReport({
         snippet={report.remediation_code_snippet}
         scanId={scanId}
       />
+
+      {scanId !== "unknown" && (
+        <AegisVerificationPanel scanId={scanId} />
+      )}
 
       {findings.length > 0 && (
         <div className="rounded-sm border border-white/[0.06] bg-surface p-5">

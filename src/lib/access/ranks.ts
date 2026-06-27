@@ -20,6 +20,8 @@ export interface NavAccessItem {
 
 export const DASHBOARD_NAV: NavAccessItem[] = [
   { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold", minRank: 1 },
+  { href: "/dashboard/hacker-home", label: "Hacker Home", icon: "swords", section: "Stronghold", minRank: 1, userTypes: ["hacker", "developer"] },
+  { href: "/dashboard/ctf", label: "CTF Labs", icon: "crosshair", section: "Stronghold", minRank: 1, userTypes: ["hacker", "developer"] },
   { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "Operations", minRank: 1 },
   { href: "/dashboard/integrations", label: "Integrations", icon: "cpu", section: "Operations", minRank: 1 },
   { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations", minRank: 2 },
@@ -100,9 +102,11 @@ export function buildDashboardNav(
   if (userType === "hacker" || userType === "developer") {
     const order = [
       "/dashboard",
+      "/dashboard/hacker-home",
       "/dashboard/scans",
       "/dashboard/missions",
       "/dashboard/forge",
+      "/dashboard/ctf",
       "/dashboard/bazaar",
       "/dashboard/intel",
     ];

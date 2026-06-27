@@ -280,6 +280,94 @@ export async function fetchNowPaymentStatus(paymentId: string): Promise<string |
   return data.payment_status ?? null;
 }
 
+export interface NowPaymentsInvoiceResult {
+  invoiceId: string;
+  invoiceUrl: string;
+  orderId: string;
+  status: string;
+  payAmount?: number;
+  payCurrency?: CryptoPayCurrency;
+}
+
+/**
+ * Create a NOWPayments hosted invoice (POST /v1/invoice) and return the
+ * invoice_url the customer is redirected to. The user picks their crypto
+ * on NOWPayments' hosted page, so pay_currency is intentionally omitted
+ * by default. is_fixed_rate is false so the invoice doesn't expire in
+ * ~10 minutes. Confirmation is handled by the IPN webhook (HMAC verified).
+ */
+export async function createNowPaymentsInvoice(params: {
+  amountUsd: number;
+  orderId: string;
+  orderDescription: string;
+  ipnCallbackUrl: string;
+  successUrl: string;
+  cancelledUrl: string;
+  payCurrency?: CryptoPayCurrency;
+}): Promise<NowPaymentsInvoiceResult> {
+  const apiKey = getNowPaymentsApiKey();
+  if (!apiKey) {
+    throw new Error("NOWPAYMENTS_API_KEY is not configured");
+  }
+
+  const body: Record<string, unknown> = {
+    price_amount: params.amountUsd,
+    price_currency: "usd",
+    order_id: params.orderId,
+    order_description: params.orderDescription,
+    ipn_callback_url: params.ipnCallbackUrl,
+    success_url: params.successUrl,
+    cancelled_url: params.cancelledUrl,
+    is_fixed_rate: false,
+  };
+  if (params.payCurrency) {
+    body.pay_currency = params.payCurrency;
+  }
+
+  const res = await fetch(`${NOWPAYMENTS_API}/invoice`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  if (res.status === 429) {
+    throw new NowPaymentsRateLimitError();
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`NOWPayments invoice failed (${res.status}): ${text.slice(0, 240)}`);
+  }
+
+  const data = (await res.json()) as {
+    id?: string | number;
+    invoice_url?: string;
+    status?: string;
+    pay_amount?: number;
+    pay_currency?: string;
+  };
+
+  const invoiceId = data.id != null ? String(data.id) : "";
+  const invoiceUrl = data.invoice_url?.trim() ?? "";
+
+  if (!invoiceId || !invoiceUrl) {
+    throw new Error("NOWPayments invoice returned an incomplete payload");
+  }
+
+  return {
+    invoiceId,
+    invoiceUrl,
+    orderId: params.orderId,
+    status: data.status ?? "new",
+    payAmount: data.pay_amount != null ? Number(data.pay_amount) : undefined,
+    payCurrency: data.pay_currency as CryptoPayCurrency | undefined,
+  };
+}
+
 function sortIpnPayload(value: unknown): unknown {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return value;

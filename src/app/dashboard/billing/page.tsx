@@ -45,13 +45,13 @@ async function getWalletBalance(userId: string): Promise<number> {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ upgraded?: string; gate?: string }>;
+  searchParams: Promise<{ upgraded?: string; gate?: string; cancelled?: string }>;
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/auth/login?next=/dashboard/billing");
 
   const isSovereign = isSovereignOperator(user.email);
-  const { upgraded, gate } = await searchParams;
+  const { upgraded, gate, cancelled } = await searchParams;
   const sub = await getSubscription(user.id);
   const walletBalance = await getWalletBalance(user.id);
   const creditPack = CREDIT_PACKS[0];
@@ -108,6 +108,15 @@ export default async function BillingPage({
           <CheckCircle2 size={14} className="shrink-0 text-acid" />
           <p className="text-sm text-acid">
             Plan upgraded successfully — your new quota is active.
+          </p>
+        </div>
+      )}
+
+      {cancelled && (
+        <div className="mb-4 flex items-center gap-2.5 rounded-sm border border-amber-400/30 bg-amber-400/5 px-4 py-3">
+          <Lock size={14} className="shrink-0 text-amber-300" />
+          <p className="text-sm text-amber-300">
+            Checkout was cancelled — no payment was taken. You can retry any time.
           </p>
         </div>
       )}

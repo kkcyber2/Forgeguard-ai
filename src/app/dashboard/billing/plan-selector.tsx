@@ -1,29 +1,30 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence } from "framer-motion";
-import { CheckCircle2, ShieldCheck, Zap } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanId, PlanMeta } from "@/lib/plans";
-import { simulateCryptoDeposit } from "./crypto-actions";
-import { SovereignVaultModal } from "./sovereign-vault-modal";
+import { createCheckoutInvoice, simulateCryptoDeposit } from "./crypto-actions";
 
 function PlanCardClient({
   plan,
   current,
-  onOpenVault,
-  vaultPending,
+  onBuy,
+  pending,
+  pendingPlanId,
 }: {
   plan: PlanMeta;
   current: boolean;
-  onOpenVault: () => void;
-  vaultPending: boolean;
+  onBuy: () => void;
+  pending: boolean;
+  pendingPlanId: PlanId | null;
 }) {
+  const disabled = pending || (plan.price > 0 && !current);
   return (
     <button
       type="button"
-      onClick={plan.price > 0 && !current ? onOpenVault : undefined}
-      disabled={vaultPending && plan.price > 0 && !current}
+      onClick={plan.price > 0 && !current ? onBuy : undefined}
+      disabled={disabled}
       className={cn(
         "relative flex w-full flex-col rounded-sm border p-5 text-left transition-all",
         current
@@ -55,7 +56,7 @@ function PlanCardClient({
         ) : (
           <>
             <span className="text-2xl font-bold text-foreground">${plan.price}</span>
-            <span className="text-xs text-zinc-500">/month · USDT</span>
+            <span className="text-xs text-zinc-500">/month · crypto</span>
           </>
         )}
       </div>
@@ -80,8 +81,14 @@ function PlanCardClient({
           Active
         </div>
       ) : plan.price > 0 ? (
-        <div className="rounded-sm border border-lime-500/25 bg-lime-500/[0.04] px-3 py-2 text-center font-mono text-[11px] text-lime-400/90">
-          Open Sovereign Vault →
+        <div className="flex items-center justify-center gap-2 rounded-sm border border-lime-500/25 bg-lime-500/[0.04] px-3 py-2 text-center font-mono text-[11px] text-lime-400/90">
+          {pending && pendingPlanId === plan.id ? (
+            <>
+              <Loader2 size={12} className="animate-spin" /> Opening checkout…
+            </>
+          ) : (
+            "Buy with Sovereign Vault →"
+          )}
         </div>
       ) : null}
     </button>
@@ -92,7 +99,6 @@ export function PlanSelector({
   plans,
   currentPlan,
   revenueSimulation = false,
-  showOperatorDebug = false,
 }: {
   plans: PlanMeta[];
   currentPlan: PlanId;
@@ -101,28 +107,38 @@ export function PlanSelector({
   revenueSimulation?: boolean;
   showOperatorDebug?: boolean;
 }) {
-  const [vaultPlan, setVaultPlan] = React.useState<PlanMeta | null>(null);
-  const [vaultPending, setVaultPending] = React.useState(false);
+  const [pendingPlanId, setPendingPlanId] = React.useState<PlanId | null>(null);
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
 
-  function openVault(plan: PlanMeta) {
+  async function buyPlan(plan: PlanMeta) {
     if (plan.price === 0 || plan.id === currentPlan) return;
+    if (pendingPlanId) return;
     setCheckoutError(null);
-    setVaultPlan(plan);
-  }
+    setPendingPlanId(plan.id);
 
-  async function handleSimulate(plan: PlanMeta) {
-    if (plan.id !== "startup" && plan.id !== "enterprise") return;
-    setVaultPending(true);
     try {
-      const result = await simulateCryptoDeposit(plan.id);
+      if (revenueSimulation && (plan.id === "startup" || plan.id === "enterprise")) {
+        const result = await simulateCryptoDeposit(plan.id);
+        if (!result.ok) {
+          setCheckoutError(result.error);
+          return;
+        }
+        window.location.href = "/dashboard/billing?upgraded=1";
+        return;
+      }
+
+      const result = await createCheckoutInvoice({
+        planName: plan.name,
+        depositKind: "subscription",
+      });
       if (!result.ok) {
         setCheckoutError(result.error);
         return;
       }
-      window.location.href = "/dashboard/billing?upgraded=1";
+      // Redirect directly to the NOWPayments hosted invoice page.
+      window.location.href = result.invoiceUrl;
     } finally {
-      setVaultPending(false);
+      setPendingPlanId(null);
     }
   }
 
@@ -140,28 +156,12 @@ export function PlanSelector({
             key={plan.id}
             plan={plan}
             current={plan.id === currentPlan}
-            vaultPending={vaultPending}
-            onOpenVault={() => openVault(plan)}
+            pending={Boolean(pendingPlanId)}
+            pendingPlanId={pendingPlanId}
+            onBuy={() => buyPlan(plan)}
           />
         ))}
       </div>
-
-      <AnimatePresence>
-        {vaultPlan && (
-          <SovereignVaultModal
-            open={Boolean(vaultPlan)}
-            plan={vaultPlan}
-            revenueSimulation={revenueSimulation}
-            showOperatorDebug={showOperatorDebug}
-            onClose={() => setVaultPlan(null)}
-            onConfirmed={() => {
-              setVaultPlan(null);
-              window.location.href = "/dashboard/billing?upgraded=1";
-            }}
-            onSimulate={() => handleSimulate(vaultPlan)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

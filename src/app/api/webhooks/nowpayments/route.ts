@@ -19,6 +19,8 @@ interface NowPaymentsIpnPayload {
 /**
  * POST /api/webhooks/nowpayments
  * NOWPayments IPN — HMAC-SHA512 verified; grants subscription OR wallet by deposit_type.
+ * Invoice-flow IPNs carry our order_id, so we match by order_id first
+ * (fallback to payment_id for legacy white-label deposits).
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const rawBody = await req.text();
@@ -37,20 +39,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const paymentId = payload.payment_id != null ? String(payload.payment_id) : "";
+  const orderId = payload.order_id?.trim() ?? "";
   const rawStatus = payload.payment_status ?? "";
 
-  if (!paymentId || !rawStatus) {
-    return NextResponse.json({ error: "Missing payment_id or payment_status" }, { status: 400 });
+  if ((!paymentId && !orderId) || !rawStatus) {
+    return NextResponse.json({ error: "Missing payment_id/order_id or payment_status" }, { status: 400 });
   }
 
   const status = mapNowPaymentStatus(rawStatus);
   const admin = createAdminSupabase();
 
-  const { data: deposit, error: fetchErr } = await admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let depositQuery: any = (admin as any)
     .from("crypto_deposits")
-    .select("id, status, deposit_type")
-    .eq("payment_id", paymentId)
-    .maybeSingle();
+    .select("id, status, deposit_type");
+
+  let deposit: { id: string; status: string; deposit_type: string | null } | null = null;
+  let fetchErr: { message: string } | null = null;
+
+  if (orderId) {
+    const res = await depositQuery.eq("order_id", orderId).maybeSingle();
+    fetchErr = res.error;
+    deposit = res.data;
+  }
+
+  if (!deposit && paymentId) {
+    const res = await (admin as any)
+      .from("crypto_deposits")
+      .select("id, status, deposit_type")
+      .eq("payment_id", paymentId)
+      .maybeSingle();
+    fetchErr = res.error;
+    deposit = res.data;
+  }
 
   if (fetchErr) {
     console.error("[nowpayments/webhook] fetch", fetchErr.message);
@@ -58,7 +79,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   if (!deposit) {
-    console.warn("[nowpayments/webhook] unknown payment_id", paymentId);
+    console.warn("[nowpayments/webhook] unknown order_id/payment_id", { orderId, paymentId });
     return NextResponse.json({ ok: true, skipped: true });
   }
 

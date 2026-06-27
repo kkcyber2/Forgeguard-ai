@@ -2,22 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/supabase/server";
 import { resolveAppUrl } from "@/lib/app-url";
 import {
-  buildCryptoPaymentUri,
-  buildCryptoQrCodeUrl,
-  buildPlainAddressQrCodeUrl,
-  createNowPayment,
-  fetchNowPaymentStatus,
+  createNowPaymentsInvoice,
   getNowPaymentsApiKey,
-  getSovereignCryptoWallet,
   grantConfirmedCryptoDeposit,
   isCryptoCheckoutConfigured,
-  mapNowPaymentStatus,
   NowPaymentsRateLimitError,
-  resolveCryptoPlan,
   resolveCreditPack,
+  resolveCryptoPlan,
+  getSovereignCryptoWallet,
 } from "@/lib/payments/crypto";
 import { isRevenueSimulationMode } from "@/lib/payments/lemon-squeezy";
 import type { PlanId } from "@/lib/plans";
@@ -31,12 +26,13 @@ type CryptoDepositInsert = {
   plan_id: string;
   deposit_type: "subscription" | "credit_pack";
   amount_usdt: number;
-  pay_amount?: number;
   deposit_address: string;
   pay_currency: string;
   payment_id: string | null;
-  status: string;
+  order_id?: string;
+  invoice_url?: string;
   credit_amount?: number;
+  status: string;
 };
 
 /** Live DB retains legacy NOT NULL columns address_generated + amount_usd — mirror canonical fields. */
@@ -65,68 +61,69 @@ async function insertCryptoDeposit(
   return (admin as any).from("crypto_deposits").insert(buildCryptoDepositRow(row));
 }
 
-export type GenerateDepositResult =
-  | {
-      ok: true;
-      depositId: string;
-      depositAddress: string;
-      paymentId: string;
-      /** Primary QR — plain address (exchanges: Bybit/Binance). */
-      qrCode: string;
-      /** Plain-address QR (raw T… address, no tron: scheme). */
-      plainQrCode: string;
-      /** Wallet-app QR — tron:{address}?amount={pay_amount}. */
-      walletQrCode: string;
-      paymentUri: string;
-      amountUsdt: number;
-      payAmount: number;
-      planName: string;
-      payCurrency: string;
-      /** Optional NOWPayments hosted page — collapsed link only, never the QR. */
-      invoiceUrl?: string;
-    }
+export type CreateInvoiceResult =
+  | { ok: true; invoiceUrl: string; depositId: string }
   | { ok: false; error: string };
 
-function buildDepositQrPayloads(
-  depositAddress: string,
-  payAmount: number,
-  payCurrency: string,
-) {
-  const plainQrCode = buildPlainAddressQrCodeUrl(depositAddress);
-  const walletQrCode = buildCryptoQrCodeUrl(depositAddress, payAmount, payCurrency);
-  return {
-    plainQrCode,
-    walletQrCode,
-    qrCode: plainQrCode,
-  };
-}
+/**
+ * Create a NOWPayments hosted invoice for a subscription or credit-pack
+ * purchase and return the invoice_url the user is redirected to. The
+ * actual access grant happens via the verified IPN webhook when the
+ * payment status reaches `finished` / `confirmed`.
+ */
+export async function createCheckoutInvoice(params: {
+  planName: string;
+  depositKind: "subscription" | "credit_pack";
+}): Promise<CreateInvoiceResult> {
+  const user = await getSessionUser();
+  if (!user) {
+    return { ok: false, error: "Not authenticated" };
+  }
 
-async function createNowPaymentsDeposit(params: {
-  catalogAmount: number;
-  orderId: string;
-  orderDescription: string;
-  depositRow: Omit<
-    CryptoDepositInsert,
-    "deposit_address" | "pay_currency" | "payment_id" | "pay_amount" | "status" | "amount_usdt"
-  >;
-}): Promise<GenerateDepositResult> {
-  if (!getNowPaymentsApiKey()) {
+  if (!isCryptoCheckoutConfigured() && !isRevenueSimulationMode()) {
     return { ok: false, error: PAYMENTS_UNAVAILABLE };
   }
 
-  const admin = createAdminSupabase();
-  let payment;
+  const depositId = crypto.randomUUID();
+  const orderId = `fg-${params.depositKind === "credit_pack" ? "credits" : "sub"}-${user.id.slice(0, 8)}-${depositId.slice(0, 8)}`;
+  const appUrl = resolveAppUrl();
 
+  let catalogAmount: number;
+  let planId: string;
+  let planName: string;
+  let creditAmount: number | undefined;
+
+  if (params.depositKind === "credit_pack") {
+    const pack = resolveCreditPack(params.planName);
+    catalogAmount = pack.amountUsdt;
+    planId = "credit_pack";
+    planName = pack.packName;
+    creditAmount = pack.creditAmount;
+  } else {
+    const plan = resolveCryptoPlan(params.planName);
+    catalogAmount = plan.amountUsdt;
+    planId = plan.planId;
+    planName = plan.planName;
+  }
+
+  const successUrl =
+    params.depositKind === "credit_pack"
+      ? `${appUrl}/dashboard/bazaar?credits=1`
+      : `${appUrl}/dashboard/billing?upgraded=1`;
+  const cancelledUrl = `${appUrl}/dashboard/billing?cancelled=1`;
+
+  let invoice;
   try {
-    const appUrl = resolveAppUrl();
-    payment = await createNowPayment({
-      amountUsdt: params.catalogAmount,
-      orderId: params.orderId,
-      orderDescription: params.orderDescription,
+    invoice = await createNowPaymentsInvoice({
+      amountUsd: catalogAmount,
+      orderId,
+      orderDescription: `ForgeGuard ${planName} — ${user.email ?? user.id}`,
       ipnCallbackUrl: `${appUrl}/api/webhooks/nowpayments`,
+      successUrl,
+      cancelledUrl,
     });
   } catch (err) {
-    console.error("[crypto/createNowPaymentsDeposit]", err);
+    console.error("[crypto/createCheckoutInvoice]", err);
     if (
       err instanceof NowPaymentsRateLimitError ||
       (err instanceof Error && err.message.includes("429"))
@@ -136,200 +133,39 @@ async function createNowPaymentsDeposit(params: {
     return { ok: false, error: PAYMENTS_UNAVAILABLE };
   }
 
-  if (!payment.paymentId) {
-    return { ok: false, error: PAYMENTS_UNAVAILABLE };
-  }
-
-  const payCurrency = payment.payCurrency;
-  const payAmount = payment.payAmount;
-
+  const admin = createAdminSupabase();
   const { error } = await insertCryptoDeposit(admin, {
-    ...params.depositRow,
-    amount_usdt: params.catalogAmount,
-    pay_amount: payAmount,
-    deposit_address: payment.depositAddress,
-    pay_currency: payCurrency,
-    payment_id: payment.paymentId,
+    id: depositId,
+    user_id: user.id,
+    plan_name: planName,
+    plan_id: planId,
+    deposit_type: params.depositKind,
+    amount_usdt: catalogAmount,
+    deposit_address: invoice.invoiceId,
+    pay_currency: invoice.payCurrency ?? "usdttrc20",
+    payment_id: invoice.invoiceId,
+    order_id: orderId,
+    invoice_url: invoice.invoiceUrl,
+    credit_amount: creditAmount,
     status: "pending",
   });
 
   if (error) {
-    logDepositDbError("createNowPaymentsDeposit", error);
-    return { ok: false, error: "Failed to record deposit" };
+    logDepositDbError("createCheckoutInvoice", error);
+    // The invoice exists at NOWPayments; the IPN will still match by order_id.
   }
 
-  const paymentUri = buildCryptoPaymentUri(payCurrency, payment.depositAddress, payAmount);
-  const qrPayloads = buildDepositQrPayloads(
-    payment.depositAddress,
-    payAmount,
-    payCurrency,
-  );
-
-  return {
-    ok: true,
-    depositId: params.depositRow.id,
-    depositAddress: payment.depositAddress,
-    paymentId: payment.paymentId,
-    ...qrPayloads,
-    paymentUri,
-    amountUsdt: params.catalogAmount,
-    payAmount,
-    planName: params.depositRow.plan_name,
-    payCurrency,
-    invoiceUrl: payment.invoiceUrl,
-  };
+  return { ok: true, invoiceUrl: invoice.invoiceUrl, depositId };
 }
 
-export type VerifyDepositResult =
+export type SimulateDepositResult =
   | { ok: true; status: "confirmed"; planName: string }
-  | { ok: true; status: "pending" | "confirming"; message: string }
   | { ok: false; error: string };
-
-/**
- * Generate a dynamic crypto deposit address for Startup / Sovereign plans.
- */
-export async function generateDepositAddress(planName: string): Promise<GenerateDepositResult> {
-  const user = await getSessionUser();
-  if (!user) {
-    return { ok: false, error: "Not authenticated" };
-  }
-
-  if (!isCryptoCheckoutConfigured() && !isRevenueSimulationMode()) {
-    return { ok: false, error: PAYMENTS_UNAVAILABLE };
-  }
-
-  let planMeta: ReturnType<typeof resolveCryptoPlan>;
-  try {
-    planMeta = resolveCryptoPlan(planName);
-  } catch {
-    return { ok: false, error: `Unknown plan: ${planName}` };
-  }
-
-  const depositId = crypto.randomUUID();
-  const orderId = `fg-${user.id.slice(0, 8)}-${depositId.slice(0, 8)}`;
-
-  return createNowPaymentsDeposit({
-    catalogAmount: planMeta.amountUsdt,
-    orderId,
-    orderDescription: `ForgeGuard ${planMeta.planName} — ${user.email ?? user.id}`,
-    depositRow: {
-      id: depositId,
-      user_id: user.id,
-      plan_name: planMeta.planName,
-      plan_id: planMeta.planId,
-      deposit_type: "subscription",
-    },
-  });
-}
-
-/** Generate a credit-pack deposit ($10 → 100 Bazaar credits). */
-export async function generateCreditPackDeposit(
-  packName = "Starter Pack",
-): Promise<GenerateDepositResult> {
-  const user = await getSessionUser();
-  if (!user) {
-    return { ok: false, error: "Not authenticated" };
-  }
-
-  if (!isCryptoCheckoutConfigured() && !isRevenueSimulationMode()) {
-    return { ok: false, error: PAYMENTS_UNAVAILABLE };
-  }
-
-  let packMeta: ReturnType<typeof resolveCreditPack>;
-  try {
-    packMeta = resolveCreditPack(packName);
-  } catch {
-    return { ok: false, error: `Unknown credit pack: ${packName}` };
-  }
-
-  const depositId = crypto.randomUUID();
-  const orderId = `fg-credits-${user.id.slice(0, 8)}-${depositId.slice(0, 8)}`;
-
-  return createNowPaymentsDeposit({
-    catalogAmount: packMeta.amountUsdt,
-    orderId,
-    orderDescription: `ForgeGuard ${packMeta.packName} (${packMeta.creditAmount} credits)`,
-    depositRow: {
-      id: depositId,
-      user_id: user.id,
-      plan_name: packMeta.packName,
-      plan_id: "credit_pack",
-      deposit_type: "credit_pack",
-      credit_amount: packMeta.creditAmount,
-    },
-  });
-}
-
-/** Poll crypto_deposits (and NOWPayments when available) for payment confirmation. */
-export async function verifyCryptoDeposit(depositId: string): Promise<VerifyDepositResult> {
-  const user = await getSessionUser();
-  if (!user) {
-    return { ok: false, error: "Not authenticated" };
-  }
-
-  const supabase = await createServerSupabase();
-  const { data: deposit, error } = await supabase
-    .from("crypto_deposits")
-    .select("id, status, plan_name, payment_id, user_id")
-    .eq("id", depositId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error || !deposit) {
-    return { ok: false, error: "Deposit not found" };
-  }
-
-  if (deposit.status === "confirmed") {
-    const admin = createAdminSupabase();
-    await grantConfirmedCryptoDeposit(admin, depositId);
-    revalidatePath("/dashboard/billing");
-    return { ok: true, status: "confirmed", planName: deposit.plan_name };
-  }
-
-  if (deposit.payment_id) {
-    const remoteStatus = await fetchNowPaymentStatus(deposit.payment_id);
-    if (remoteStatus) {
-      const mapped = mapNowPaymentStatus(remoteStatus);
-      if (mapped !== deposit.status) {
-        const admin = createAdminSupabase();
-        await admin
-          .from("crypto_deposits")
-          .update({ status: mapped })
-          .eq("id", depositId)
-          .eq("user_id", user.id);
-
-        if (mapped === "confirmed") {
-          await grantConfirmedCryptoDeposit(admin, depositId);
-          revalidatePath("/dashboard/billing");
-          return { ok: true, status: "confirmed", planName: deposit.plan_name };
-        }
-
-        return {
-          ok: true,
-          status: mapped === "confirming" ? "confirming" : "pending",
-          message:
-            mapped === "confirming"
-              ? "Transaction detected — awaiting confirmations"
-              : "Payment not yet detected on-chain",
-        };
-      }
-    }
-  }
-
-  return {
-    ok: true,
-    status: deposit.status === "confirming" ? "confirming" : "pending",
-    message:
-      deposit.status === "confirming"
-        ? "Transaction detected — awaiting confirmations"
-        : "Payment not yet detected — keep this window open or retry in a moment",
-  };
-}
 
 /** REVENUE_SIMULATION_MODE — instant crypto deposit confirmation without on-chain payment. */
 export async function simulateCryptoDeposit(
   planId: Extract<PlanId, "startup" | "enterprise">,
-): Promise<VerifyDepositResult> {
+): Promise<SimulateDepositResult> {
   if (!isRevenueSimulationMode()) {
     return { ok: false, error: "Revenue simulation is disabled" };
   }

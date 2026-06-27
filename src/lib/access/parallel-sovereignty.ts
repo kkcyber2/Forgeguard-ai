@@ -106,8 +106,10 @@ export function buildSovereignMasterNav(): {
     { href: "/admin/threats", label: "Global Threats", icon: "shield-alert", section: "SYSTEM" },
   ];
   const hacker: NavItem[] = [
+    { href: "/dashboard/hacker-home", label: "Hacker Home", icon: "swords", section: "HACKER" },
     { href: "/dashboard/missions", label: "Mission Feed", icon: "crosshair", section: "HACKER" },
     { href: "/dashboard/forge", label: "The Forge", icon: "flask-conical", section: "HACKER" },
+    { href: "/dashboard/ctf", label: "CTF Labs", icon: "crosshair", section: "HACKER" },
     { href: "/dashboard/bazaar", label: "Bazaar", icon: "store", section: "HACKER" },
     { href: "/dashboard/intel", label: "Leaderboard", icon: "zap", section: "HACKER" },
   ];
@@ -171,9 +173,11 @@ export function buildSovereignNav(
         ]
       : [
           { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold" },
+          { href: "/dashboard/hacker-home", label: "Hacker Home", icon: "swords", section: "Stronghold" },
           { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations" },
           { href: "/dashboard/missions", label: "Mission Feed", icon: "crosshair", section: "Stronghold" },
           { href: "/dashboard/forge", label: "The Forge", icon: "flask-conical", section: "Stronghold" },
+          { href: "/dashboard/ctf", label: "CTF Labs", icon: "crosshair", section: "Stronghold" },
           { href: "/dashboard/bazaar", label: "Bazaar", icon: "store", section: "Operations" },
         ];
 

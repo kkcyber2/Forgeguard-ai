@@ -19,7 +19,7 @@ function PlanCardClient({
   pending: boolean;
   pendingPlanId: PlanId | null;
 }) {
-  const disabled = pending || (plan.price > 0 && !current);
+  const disabled = pending || current;
   return (
     <button
       type="button"

@@ -22,9 +22,9 @@ export const CREDIT_PACKS: CreditPackMeta[] = [
   {
     id: "starter",
     name: "Starter Pack",
-    priceUsd: Number(process.env.CREDIT_PACK_USD ?? 10) || 10,
-    credits: Number(process.env.CREDIT_PACK_AMOUNT ?? 100) || 100,
-    description: `${Number(process.env.CREDIT_PACK_AMOUNT ?? 100) || 100} Bazaar credits for script purchases and mission escrow.`,
+    priceUsd: Number(process.env.CREDIT_PACK_USD ?? 20) || 20,
+    credits: Number(process.env.CREDIT_PACK_AMOUNT ?? 20) || 20,
+    description: `${Number(process.env.CREDIT_PACK_AMOUNT ?? 20) || 20} Bazaar credits for script purchases and mission escrow.`,
   },
 ];
 

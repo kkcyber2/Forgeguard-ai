@@ -30,6 +30,7 @@ import {
   type ScanReport,
   attackStringForFinding,
   isSuccessfulBreach,
+  remediationStepsFor,
 } from "./findings-report-types";
 
 export type { Finding, OWASPBucket, PoC, ScanReport } from "./findings-report-types";
@@ -155,7 +156,7 @@ export function RemediationSection({
   roadmapMd?: string;
   findings: Finding[];
 }) {
-  const withRemediation = findings.filter((f) => f.remediation?.trim());
+  const withRemediation = findings.filter((f) => remediationStepsFor(f).length > 0);
   if (!roadmapMd && withRemediation.length === 0) return null;
 
   return (
@@ -164,16 +165,21 @@ export function RemediationSection({
       {roadmapMd && <RemediationRoadmap md={roadmapMd} />}
       {withRemediation.length > 0 && (
         <ul className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
-          {withRemediation.map((f) => (
-            <li key={f.id}>
-              <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
-                {f.attack}
-              </p>
-              <p className="mt-1 font-mono text-[11px] leading-relaxed text-foreground-muted">
-                {f.remediation}
-              </p>
-            </li>
-          ))}
+          {withRemediation.map((f) => {
+            const steps = remediationStepsFor(f);
+            return (
+              <li key={f.id}>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-foreground-subtle">
+                  {f.attack}
+                </p>
+                <ol className="mt-1.5 list-decimal space-y-1 pl-4 font-mono text-[11px] leading-relaxed text-foreground-muted marker:text-acid/60">
+                  {steps.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ol>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -1055,18 +1061,31 @@ function FindingCard({
           )}
 
           {/* Remediation */}
-          {finding.remediation && (
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-foreground-subtle">
-                Remediation
-              </span>
-              <div className="mt-1.5 rounded border border-acid/20 bg-acid/5 p-3">
-                <p className="text-xs leading-relaxed text-acid/90">
-                  {finding.remediation}
-                </p>
+          {(() => {
+            const steps = remediationStepsFor(finding);
+            if (steps.length === 0 && !finding.aegis_rule) return null;
+            return (
+              <div>
+                <span className="text-[10px] uppercase tracking-widest text-foreground-subtle">
+                  Remediation
+                </span>
+                <div className="mt-1.5 rounded border border-acid/20 bg-acid/5 p-3">
+                  {steps.length > 0 ? (
+                    <ol className="list-decimal space-y-1 pl-4 text-xs leading-relaxed text-acid/90 marker:text-acid/50">
+                      {steps.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ol>
+                  ) : null}
+                  {finding.aegis_rule ? (
+                    <pre className="mt-2 overflow-x-auto rounded-sm bg-obsidian-900/80 p-2 font-mono text-[10px] leading-relaxed text-foreground-muted whitespace-pre-wrap break-all">
+                      {finding.aegis_rule}
+                    </pre>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Proof of Concept */}
           {poc && (poc.curl || poc.python) && (
@@ -1295,7 +1314,7 @@ function buildReportHTML(
         </div>
       </div>
       ${f.evidence ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Evidence</div><pre style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:10px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace;margin:0">${escapeHTML(redactSecrets(f.evidence))}</pre></div>` : ""}
-      ${f.remediation ? `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Remediation</div><div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:10px;border-radius:4px;font-size:11px">${escapeHTML(redactSecrets(f.remediation))}</div></div>` : ""}
+      ${(() => { const _steps = remediationStepsFor(f); const _rule = f.aegis_rule; if (_steps.length === 0 && !_rule) return ""; const _list = _steps.length > 0 ? `<ol style="margin:0;padding-left:18px;font-size:11px;line-height:1.5">${_steps.map((s) => `<li style="margin-bottom:3px">${escapeHTML(redactSecrets(s))}</li>`).join("")}</ol>` : ""; const _code = _rule ? `<pre style="margin-top:8px;background:#0b1220;border:1px solid #1f2937;color:#d1d5db;padding:8px;border-radius:4px;font-size:10px;white-space:pre-wrap;word-break:break-word;font-family:monospace">${escapeHTML(redactSecrets(_rule))}</pre>` : ""; return `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;margin-bottom:5px">Remediation</div><div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:10px;border-radius:4px">${_list}${_code}</div></div>`; })()}
       <div style="font-size:10px;font-weight:600;display:inline-block;padding:2px 8px;border-radius:3px;background:${f.verdict ? "#fef2f2" : "#f0fdf4"};color:${f.verdict ? "#dc2626" : "#15803d"}">${f.verdict ? "EXPLOITED" : "MITIGATED"}</div>
     </div>`,
     )

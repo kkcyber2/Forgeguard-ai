@@ -21,6 +21,8 @@ export interface Finding {
   verdict?: boolean;
   cwe_references?: string[];
   remediation?: string;
+  remediation_suggestions?: string[];
+  aegis_rule?: string | null;
   proof_of_concept?: PoC;
   remediation_snippet_key?: string;
   observed_at?: string;
@@ -73,4 +75,18 @@ export function attackStringForFinding(finding: Finding): string {
     finding.summary?.trim() ||
     ""
   );
+}
+
+/**
+ * Effective 1–3 remediation steps for a finding: prefer the structured
+ * `remediation_suggestions` array emitted by the engine; fall back to the
+ * single `remediation` string; empty if neither is present.
+ */
+export function remediationStepsFor(finding: Finding): string[] {
+  const suggestions = (finding.remediation_suggestions ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (suggestions.length > 0) return suggestions.slice(0, 3);
+  const single = finding.remediation?.trim();
+  return single ? [single] : [];
 }

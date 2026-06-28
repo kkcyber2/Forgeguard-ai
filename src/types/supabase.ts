@@ -3074,6 +3074,84 @@ export type Database = {
         }
         Relationships: []
       }
+      attack_lessons: {
+        Row: {
+          id: string
+          provider: string
+          model: string
+          family: string
+          lesson_text: string
+          breach_count: number
+          fail_count: number
+          last_seen_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          provider: string
+          model: string
+          family: string
+          lesson_text: string
+          breach_count?: number
+          fail_count?: number
+          last_seen_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          provider?: string
+          model?: string
+          family?: string
+          lesson_text?: string
+          breach_count?: number
+          fail_count?: number
+          last_seen_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      custom_attack_tools: {
+        Row: {
+          id: string
+          author_id: string
+          name: string
+          family: string
+          intensity_min: string
+          code: string
+          status: string
+          audit_result: string | null
+          network_allowed: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          author_id: string
+          name: string
+          family?: string
+          intensity_min?: string
+          code: string
+          status?: string
+          audit_result?: string | null
+          network_allowed?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          author_id?: string
+          name?: string
+          family?: string
+          intensity_min?: string
+          code?: string
+          status?: string
+          audit_result?: string | null
+          network_allowed?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       intel_messages_with_profile: {

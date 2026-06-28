@@ -28,15 +28,7 @@ export default async function EvolutionAdminPage() {
 
   const [stats, approvedToolsResp] = await Promise.all([
     fetchEvolveStats(),
-    // custom_attack_tools is added by 20260628_custom_attack_tools.sql; cast to
-    // any until src/types/supabase.ts is regenerated after the migration applies.
-    (supabase as unknown as {
-      from: (t: string) => {
-        select: (c: string, opts: { count: "exact"; head: boolean }) => {
-          eq: (col: string, val: string) => { count: number | null };
-        };
-      };
-    })
+    supabase
       .from("custom_attack_tools")
       .select("id", { count: "exact", head: true })
       .eq("status", "approved"),

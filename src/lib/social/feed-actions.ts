@@ -125,12 +125,14 @@ export async function createPost(input: {
   content: string;
   teamId?: string | null;
   visibility?: "public" | "team";
+  mediaPath?: string | null;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const user = await getSessionUser();
   if (!user) return { ok: false, error: "Not authenticated" };
 
   const content = input.content.trim();
-  if (!content || content.length > 2000) {
+  const mediaPath = (input.mediaPath ?? null)?.trim() || null;
+  if ((!content || content.length > 2000) && !mediaPath) {
     return { ok: false, error: "Invalid content length" };
   }
 
@@ -144,6 +146,7 @@ export async function createPost(input: {
       user_id: user.id,
       team_id: input.teamId ?? null,
       content,
+      media_path: mediaPath,
       visibility,
     })
     .select("id")

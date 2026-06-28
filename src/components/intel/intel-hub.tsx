@@ -9,6 +9,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   Globe,
   Heart,
+  ImageIcon,
   MessageSquare,
   Send,
   Shield,
@@ -206,6 +207,9 @@ function FeedPanel() {
   const [posts, setPosts] = React.useState<FeedPost[]>([]);
   const [content, setContent] = React.useState("");
   const [loading, setLoading] = React.useState(true);
+  const [mediaUrl, setMediaUrl] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -218,11 +222,48 @@ function FeedPanel() {
     void refresh();
   }, [refresh]);
 
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Only images are supported.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) throw new Error("Not authenticated");
+      const ext = file.name.split(".").pop()?.slice(0, 4) || "img";
+      const path = `${uid}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("social-posts")
+        .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      setMediaUrl(supabase.storage.from("social-posts").getPublicUrl(path).data.publicUrl);
+    } catch (err) {
+      console.error("[feed] media upload failed:", err);
+      alert("Upload failed.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   async function submit() {
-    const r = await createPost({ content });
+    if (uploading) return;
+    const r = await createPost({ content, mediaPath: mediaUrl });
     if (r.ok) {
       setContent("");
+      setMediaUrl(null);
       void refresh();
+    } else {
+      alert(r.error);
     }
   }
 
@@ -237,13 +278,48 @@ function FeedPanel() {
           className="w-full resize-none bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
           maxLength={2000}
         />
-        <button
-          type="button"
-          onClick={() => void submit()}
-          className="mt-2 inline-flex min-h-[44px] items-center rounded-sm border border-acid/30 bg-acid/10 px-4 text-xs uppercase tracking-wider text-acid"
-        >
-          Publish
-        </button>
+        {mediaUrl ? (
+          <div className="relative mt-2 inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={mediaUrl}
+              alt="attachment preview"
+              className="max-h-48 rounded-sm border border-white/10 object-cover"
+            />
+            <button
+              type="button"
+              onClick={() => setMediaUrl(null)}
+              className="absolute right-1 top-1 rounded-sm bg-black/70 px-2 py-0.5 text-[10px] uppercase text-threat"
+            >
+              Remove
+            </button>
+          </div>
+        ) : null}
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => void onFileChange(e)}
+            className="hidden"
+            id="feed-media-input"
+          />
+          <label
+            htmlFor="feed-media-input"
+            className="inline-flex min-h-[44px] cursor-pointer items-center rounded-sm border border-white/10 px-3 text-xs uppercase tracking-wider text-foreground-subtle hover:text-foreground"
+          >
+            <ImageIcon size={14} className="mr-1.5" />
+            {uploading ? "Uploading…" : "Image"}
+          </label>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={uploading}
+            className="inline-flex min-h-[44px] items-center rounded-sm border border-acid/30 bg-acid/10 px-4 text-xs uppercase tracking-wider text-acid disabled:opacity-40"
+          >
+            Publish
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -272,6 +348,14 @@ function FeedPanel() {
                 </time>
               </div>
               <p className="text-sm leading-relaxed text-foreground-muted">{p.content}</p>
+              {p.media_path ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={p.media_path}
+                  alt="post attachment"
+                  className="mt-3 max-h-96 w-full rounded-sm border border-white/10 object-cover"
+                />
+              ) : null}
               <button
                 type="button"
                 onClick={() => void likePost(p.id).then(() => refresh())}

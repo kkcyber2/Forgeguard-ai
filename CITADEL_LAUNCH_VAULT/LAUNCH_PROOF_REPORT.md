@@ -4,9 +4,10 @@ Automated verification from Launch Proof Sprint + Real Developer System +
 Build/Fix/Test/Push sprint. Operator-only steps remain where noted.
 
 **Supabase:** `nlginrukltrwpkyujzzx`  
-**Local forgeguard-ai HEAD:** `2d60e68` (Real Developer System + launch docs)  
-**Local AI-red-team HEAD:** `bd118f4` (test-probe, Brain catalog, operator telemetry)  
-**Engine:** `https://engine.forgeguard-ai.com/health` → healthy (confirm SHA post-push)
+**Local forgeguard-ai HEAD:** `9f4c196` (Real Developer System + launch docs + test:unit)  
+**Vercel prod deploy:** `dpl_FS974LiZQj35C13BtmmvtyrSUDaF` READY @ `forgeguard-ai.com` (CLI deploy 2026-06-28)  
+**AI-red-team origin/main:** `6007474` (includes `bd118f4` developer system)  
+**Engine:** `https://engine.forgeguard-ai.com/health` → healthy, registry 174
 
 ---
 

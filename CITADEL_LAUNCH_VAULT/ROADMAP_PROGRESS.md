@@ -24,7 +24,7 @@ proof checklist. See `DEMO_PROOF_CHECKLIST.md`.
 | S.9 | Engine health tests | **DONE** | `AI-red-team/tests/test_health.py` (health, auth, SSRF) |
 | S.10 | `DEMO_PROOF_CHECKLIST.md` (D1–D6 manual smoke list) | **DONE** | `CITADEL_LAUNCH_VAULT/DEMO_PROOF_CHECKLIST.md` |
 | S.11 | `npm run build` PASS with new Aegis code | **DONE** | 2026-06-27, 34 routes, exit 0 |
-| S.12 | Push + Vercel/Railway green | **IN PROGRESS** | Local @ `2d60e68` / `bd118f4`; push this sprint |
+| S.12 | Push + Vercel/Railway green | **DONE** | `8b341a5` on GitHub; Vercel CLI prod READY |
 
 ### Acceptance
 
@@ -228,7 +228,7 @@ buyers. See `SCOPE_ENFORCEMENT_SPEC.md` and `AUDIT_CHAIN_SPEC.md`.
 | 4.3 | `runIntelVaultQuery()` + rate limits + audit log | **DONE** | `vault-actions.ts`, `osint-runners.ts` |
 | 4.4 | Intel Hub **Intel Vault** tab (domain, query types, results) | **DONE** | `intel-vault-panel.tsx`, `intel-hub.tsx` |
 | 4.5 | Scan detail **Recon context** linkage | **DONE** | `scan-recon-context.tsx` on `/dashboard/scans/[id]` |
-| 4.6 | Push + Vercel deploy | **IN PROGRESS** | `2d60e68` includes Real Developer System |
+| 4.6 | Push + Vercel deploy | **DONE** | `8b341a5` + Vercel prod |
 
 **Phase 4: DONE** (code complete — no live scan or OpenRouter required).
 

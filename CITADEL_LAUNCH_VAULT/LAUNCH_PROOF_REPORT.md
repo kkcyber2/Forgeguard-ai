@@ -15,10 +15,10 @@ Build/Fix/Test/Push sprint. Operator-only steps remain where noted.
 
 | Check | Result | Evidence |
 |-------|--------|----------|
-| Git push `forgeguard-ai` main | **PENDING** | Local @ `2d60e68`; origin was `da2e36d` |
-| Vercel prod deploy | **PENDING** | Auto-deploy on push |
-| AI-red-team push | **PENDING** | Local 3 commits ahead of `6577c2c` |
-| Railway redeploy | **OPERATOR** | Confirm engine SHA matches `bd118f4` after push |
+| Git push `forgeguard-ai` main | **PASS** | `origin/main` @ `8b341a5` |
+| Vercel prod deploy | **PASS** | CLI deploy `dpl_FS974LiZQj35C13BtmmvtyrSUDaF` → `forgeguard-ai.com` |
+| AI-red-team push | **PASS** | `origin/main` @ `6007474` |
+| Railway redeploy | **OPERATOR** | Confirm engine matches `6007474` / developer endpoints live |
 
 ---
 

@@ -125,6 +125,7 @@ export function buildDashboardNav(
   if (rank >= 5) {
     nav.push({ href: "/admin", label: "Admin", icon: "shield-alert", section: "Legend" });
     nav.push({ href: "/admin/threats", label: "Global Map", icon: "globe", section: "Legend" });
+    nav.push({ href: "/admin/evolution", label: "Evolution", icon: "cpu", section: "Legend" });
   }
 
   return nav;

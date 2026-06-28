@@ -25,7 +25,8 @@ import type { Database } from "@/types/supabase";
  *
  * Flow:
  *   1. Load the scan row with the service-role client (bypasses RLS).
- *   2. Decrypt the target API key with our AES-GCM secret.
+ *   2. Unseal the target API key (AES-256-GCM when SCAN_CREDENTIAL_ENCRYPT is
+ *      enabled, else base64 obfuscation) via openCredential().
  *   3. POST to ${AGATHON_ORCHESTRATOR_URL}/scan/start with bearer auth.
  *      target_url and api_key are sent exactly as stored on the scan row
  *      (no URL normalization or provider inference on the dispatcher).

@@ -45,7 +45,8 @@ async function markScanDispatchFailed(
  * Scan Server Actions.
  * --------------------
  * - createScan: called from /dashboard/scans/new. Validates, writes the
- *   scan row (RLS-scoped to auth.uid()), seals the API key with AES-GCM,
+ *   scan row (RLS-scoped to auth.uid()), seals the API key (AES-256-GCM when
+ *   SCAN_CREDENTIAL_ENCRYPT=true, else base64 obfuscation),
  *   fires /api/scan/start to kick the runner, then redirects to the
  *   detail page. If the runner isn't reachable the scan stays in
  *   `queued` and can be retried.

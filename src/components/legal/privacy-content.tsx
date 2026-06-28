@@ -66,7 +66,8 @@ export function PrivacyContent() {
         <p>
           All Platform data is stored in Supabase, hosted on AWS
           infrastructure with SOC 2 Type II certification. Security measures
-          include Row-Level Security (RLS), AES-256 at rest for scan payloads,
+          include Row-Level Security (RLS), AES-256 disk encryption at rest,
+          server-side credential sealing (AES-256-GCM where configured),
           TLS 1.3 in transit, and server-only service role keys.
         </p>
       </LegalSection>

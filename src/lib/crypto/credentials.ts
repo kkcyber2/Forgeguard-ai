@@ -1,96 +1,124 @@
 import "server-only";
+import { createHash, createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 /**
  * Target API key storage layer.
  * ------------------------------
  *
- * MVP STRATEGY: store credentials in obfuscated-but-not-encrypted form.
+ * Two storage modes, selected at seal time by environment:
  *
- * Why we removed AES-GCM:
- *   The previous implementation derived a key via scrypt from
- *   `SCAN_CREDENTIAL_SECRET` and sealed each credential with AES-256-GCM.
- *   In Vercel's serverless runtime, Server Actions and API Route handlers
- *   sometimes execute in different lambda function bundles whose
- *   `process.env` snapshots can drift across deploys, causing the seal
- *   step to use a different secret than the unseal step. The result was
- *   "Unsupported state or unable to authenticate" on every decrypt —
- *   even with the env var set identically across all environments.
+ *   1. AES-256-GCM (opt-in)   — when SCAN_CREDENTIAL_ENCRYPT="true" AND
+ *       SCAN_CREDENTIAL_SECRET is set. Each credential is sealed with a
+ *       fresh 96-bit IV + 128-bit auth tag. Marker: `fg2:`.
+ *   2. Base64 obfuscation (default) — marker `fg1:`. Not encryption; a
+ *       shoulder-surfing defence. Supabase AES-256 disk encryption + RLS
+ *       still protect the column at rest.
  *
- * Why this is OK for now:
- *   1. Postgres-at-rest encryption — Supabase encrypts disks (AES-256).
- *   2. RLS — only the scan owner OR service role can read this column.
- *   3. Service role key is server-only and rotates independently.
- *   4. Credentials live in the DB for ~5 minutes per scan, then the run
- *      completes and the row's value is no longer functionally needed.
- *   5. Industry standard — most production SaaS (Vercel itself, Stripe,
- *      Render, Railway) store user-supplied API keys this way.
+ * Why AES-GCM is opt-in and not the default:
+ *   The previous always-on AES-GCM implementation derived its key from
+ *   `SCAN_CREDENTIAL_SECRET` and broke across Vercel serverless bundles
+ *   whose `process.env` snapshots drifted, producing unrecoverable
+ *   "unable to authenticate" decrypts. Making it opt-in means an operator
+ *   who has confirmed the secret is stable across every bundle gets real
+ *   encryption, while the default deployment never regresses.
  *
- * What we still do:
- *   - Reverse the string with a simple obfuscation marker so a casual
- *     `SELECT *` from the DB doesn't show readable plaintext keys. This
- *     is *not* security; it's defence against shoulder-surfing.
- *   - Strip whitespace/quotes the user might have pasted around the key.
+ * The key is sha-256(secret) — deterministic and drift-free as long as the
+ * secret string is identical in every runtime (no scrypt salt to mismatch).
  *
- * When to re-add real encryption:
- *   - Once the product is past MVP and you have paying customers,
- *     migrate this layer to AWS KMS or HashiCorp Vault. Both maintain
- *     a single canonical key in a managed service so the
- *     "different-process-different-env-var" failure mode is impossible.
- *   - The function signatures (`sealCredential`/`openCredential`) are
- *     deliberately preserved so callers don't change.
+ * `openCredential` auto-detects the format by marker, so mixed-mode rows
+ * (some sealed before the flag was flipped) all open correctly.
  */
 
-const MARKER = "fg1:";
+const MARKER_OBFUSCATE = "fg1:";
+const MARKER_AES = "fg2:";
+const IV_LEN = 12;
+const TAG_LEN = 16;
+
+function isEncryptionEnabled(): boolean {
+  return process.env.SCAN_CREDENTIAL_ENCRYPT === "true" && !!process.env.SCAN_CREDENTIAL_SECRET;
+}
+
+function deriveKey(): Buffer {
+  const secret = process.env.SCAN_CREDENTIAL_SECRET;
+  if (!secret) throw new Error("openCredential/sealCredential: SCAN_CREDENTIAL_SECRET not set");
+  return createHash("sha256").update(secret).digest(); // 32 bytes → AES-256
+}
+
+export type CredentialEncryptionMode = "aes-gcm" | "obfuscation";
+
+/** Reports the active at-rest mode for truthful UI copy. Server-only. */
+export function getCredentialEncryptionMode(): CredentialEncryptionMode {
+  return isEncryptionEnabled() ? "aes-gcm" : "obfuscation";
+}
 
 export function sealCredential(plaintext: string): string {
   if (!plaintext) throw new Error("sealCredential: plaintext required");
   const cleaned = plaintext
     .trim()
-    // Strip wrapping quotes the user may have pasted accidentally.
     .replace(/^["']|["']$/g, "");
   if (!cleaned) throw new Error("sealCredential: plaintext was empty after trim");
-  // Marker + base64 — simple, robust, idempotent, and survives every
-  // Vercel/Supabase boundary unchanged.
+
+  if (isEncryptionEnabled()) {
+    const key = deriveKey();
+    const iv = randomBytes(IV_LEN);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const ct = Buffer.concat([cipher.update(cleaned, "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    const blob = Buffer.concat([iv, ct, tag]).toString("base64");
+    return `${MARKER_AES}${blob}`;
+  }
+
   const obfuscated = Buffer.from(cleaned, "utf8").toString("base64");
-  return `${MARKER}${obfuscated}`;
+  return `${MARKER_OBFUSCATE}${obfuscated}`;
 }
 
 export function openCredential(blob: string): string {
   if (!blob) throw new Error("openCredential: empty blob");
 
-  // The `target_credential_encrypted` column is `bytea` in Postgres, and
-  // Supabase's PostgREST returns bytea values as hex strings prefixed with
-  // `\x`. Detect and decode that wrapper FIRST so all subsequent logic
-  // operates on the original UTF-8 string we wrote.
+  // bytea columns come back from PostgREST as `\x`-prefixed hex. Unwrap first.
   let cleaned = blob;
   if (cleaned.startsWith("\\x")) {
     try {
       cleaned = Buffer.from(cleaned.slice(2), "hex").toString("utf8");
     } catch (e) {
-      throw new Error(
-        `openCredential: failed to decode bytea hex wrapper: ${
-          (e as Error).message
-        }`,
-      );
+      throw new Error(`openCredential: failed to decode bytea hex wrapper: ${(e as Error).message}`);
     }
   }
 
-  // New format: marker + base64.
-  if (cleaned.startsWith(MARKER)) {
-    const b64 = cleaned.slice(MARKER.length);
+  // AES-256-GCM mode.
+  if (cleaned.startsWith(MARKER_AES)) {
+    const secret = process.env.SCAN_CREDENTIAL_SECRET;
+    if (!secret) {
+      throw new Error(
+        "openCredential: blob is AES-GCM sealed but SCAN_CREDENTIAL_SECRET is not set in this runtime. " +
+          "Set the secret (and SCAN_CREDENTIAL_ENCRYPT=true) consistently across every bundle.",
+      );
+    }
     try {
-      return Buffer.from(b64, "base64").toString("utf8");
+      const buf = Buffer.from(cleaned.slice(MARKER_AES.length), "base64");
+      const iv = buf.subarray(0, IV_LEN);
+      const tag = buf.subarray(buf.length - TAG_LEN);
+      const ct = buf.subarray(IV_LEN, buf.length - TAG_LEN);
+      const key = deriveKey();
+      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(tag);
+      const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
+      return pt.toString("utf8");
     } catch (e) {
-      throw new Error(
-        `openCredential: failed to decode obfuscated blob: ${(e as Error).message}`,
-      );
+      throw new Error(`openCredential: AES-GCM decrypt failed: ${(e as Error).message}`);
     }
   }
 
-  // Legacy format support: if the blob looks like a stale AES-GCM blob
-  // from before we removed encryption, fail fast with a clear message
-  // so the operator knows to delete the old scan and create a new one.
-  // (Old blobs were base64 with no marker prefix, ~128 chars long.)
+  // Obfuscation mode.
+  if (cleaned.startsWith(MARKER_OBFUSCATE)) {
+    try {
+      return Buffer.from(cleaned.slice(MARKER_OBFUSCATE.length), "base64").toString("utf8");
+    } catch (e) {
+      throw new Error(`openCredential: failed to decode obfuscated blob: ${(e as Error).message}`);
+    }
+  }
+
+  // Legacy stale AES-GCM blob from the removed always-on scheme (no marker).
   if (/^[A-Za-z0-9+/=]+$/.test(cleaned) && cleaned.length >= 64) {
     throw new Error(
       "openCredential: this scan was created under the old AES-GCM scheme. " +
@@ -98,7 +126,6 @@ export function openCredential(blob: string): string {
     );
   }
 
-  // Anything else — assume the caller passed plaintext by mistake.
   throw new Error("openCredential: blob format not recognised");
 }
 

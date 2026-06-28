@@ -25,7 +25,7 @@ const PILLARS = [
   {
     icon: Lock,
     title: "Security-First Architecture",
-    body: "Our platform proxies all AI calls through a hardened Node.js layer. Your API keys never touch client code. All scan payloads are encrypted at rest, isolated per tenant.",
+    body: "Our platform proxies all AI calls through a hardened Node.js layer. Your API keys never touch client code. Scan payloads and credentials are protected at rest (Supabase AES-256 disk encryption + Row-Level Security), sealed server-side, and isolated per tenant.",
   },
   {
     icon: Zap,

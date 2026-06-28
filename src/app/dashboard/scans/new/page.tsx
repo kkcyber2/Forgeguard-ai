@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/dashboard/shell";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { createServerSupabase, getSessionUser } from "@/lib/supabase/server";
 import { getPlanMeta, type PlanId } from "@/lib/plans";
+import { getCredentialEncryptionMode } from "@/lib/crypto/credentials";
 import { NewScanForm } from "./form";
 import { suggestNextProbeFromCorpus } from "@/lib/training/corpus-suggest";
 
@@ -46,7 +47,7 @@ export default async function NewScanPage() {
       <PageHeader
         eyebrow="Launch probe"
         title="New red-team scan"
-        description="Paste the endpoint you want hardened and the API key ForgeGuard should use while probing. Credentials are sealed with AES-256-GCM before they touch the database."
+        description="Paste the endpoint you want hardened and the API key ForgeGuard should use while probing. Credentials are sealed server-side before they touch the database."
       />
       <div className="mx-auto max-w-2xl">
         <NewScanForm
@@ -54,6 +55,7 @@ export default async function NewScanPage() {
           quota={quota}
           probeSuggestion={probeSuggestion}
           userId={user.id}
+          credentialEncryption={getCredentialEncryptionMode()}
         />
       </div>
     </>

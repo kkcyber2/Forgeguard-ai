@@ -146,11 +146,13 @@ export function NewScanForm({
   quota = null,
   probeSuggestion = null,
   userId = "",
+  credentialEncryption = "obfuscation",
 }: {
   isSovereign?: boolean;
   quota?: ScanQuotaSnapshot | null;
   probeSuggestion?: ProbeSuggestion | null;
   userId?: string;
+  credentialEncryption?: "aes-gcm" | "obfuscation";
 }) {
   const [state, formAction, pending] = useActionState(createScan, initial);
   const [showKey,    setShowKey]    = React.useState(false);
@@ -490,8 +492,9 @@ export function NewScanForm({
               strokeWidth={1.75}
               className="mt-[2px] text-acid/80"
             />
-            Sealed with AES-256-GCM + per-row salt before insert. The
-            plaintext never leaves the request boundary.
+            {credentialEncryption === "aes-gcm"
+              ? "Sealed with AES-256-GCM (per-credential IV + auth tag) before it touches the database. The plaintext never leaves the request boundary."
+              : "Sealed server-side and stored behind Row-Level Security on Supabase (AES-256 disk encryption at rest). The plaintext never leaves the request boundary."}
           </p>
         </div>
 

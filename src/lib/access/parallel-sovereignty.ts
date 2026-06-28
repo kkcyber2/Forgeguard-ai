@@ -78,6 +78,7 @@ export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
     { href: "/admin/threat-console", label: "Threat Console", icon: "shield-alert", section: "Command" },
     { href: "/admin/users", label: "User Management", icon: "users", section: "Command" },
     { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "Command" },
+    { href: "/admin/developer-tools", label: "Developer Tools", icon: "cpu", section: "Command" },
   ];
   const secondary: NavItem[] = [
     { href: "/admin/verification", label: "Verification", icon: "shield-check", section: "Ops" },
@@ -123,6 +124,8 @@ export function buildSovereignMasterNav(): {
     { href: "/dashboard/recon", label: "Recon Map", icon: "globe", section: "OPS" },
     { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "OPS" },
     { href: "/admin/bazaar", label: "Bazaar Triage", icon: "store", section: "OPS" },
+    { href: "/admin/developer-tools", label: "Developer Tools", icon: "cpu", section: "OPS" },
+    { href: "/admin/evolution", label: "Evolution", icon: "cpu", section: "OPS" },
     { href: "/admin/verification", label: "Verification", icon: "shield-check", section: "OPS" },
     { href: "/admin/ledger", label: "Ledger", icon: "landmark", section: "OPS" },
     { href: "/admin/system", label: "System", icon: "activity", section: "OPS" },

@@ -29,6 +29,7 @@ export const DASHBOARD_NAV: NavAccessItem[] = [
   { href: "/dashboard/aegis", label: "Aegis", icon: "shield-check", section: "Operations", minRank: 1, userTypes: ["client", "developer"] },
   { href: "/dashboard/bounties", label: "Bounties", icon: "shield-alert", section: "Operations", minRank: 1, userTypes: ["client", "developer"] },
   { href: "/dashboard/forge", label: "Forge", icon: "flask-conical", section: "Stronghold", minRank: 3, userTypes: ["hacker", "developer"] },
+  { href: "/dashboard/developer", label: "Developer", icon: "cpu", section: "Stronghold", minRank: 3, userTypes: ["hacker", "developer"] },
   { href: "/dashboard/bazaar", label: "Bazaar", icon: "store", section: "Operations", minRank: 3 },
   { href: "/dashboard/bazaar/verified", label: "Verified", icon: "shield-check", section: "Operations", minRank: 3 },
   { href: "/dashboard/intel", label: "Intel", icon: "zap", section: "Operations", minRank: 3 },
@@ -45,6 +46,7 @@ const RANK_2_PREFIXES = ["/dashboard/analytics"];
 /** Paths that require rank ≥ 3 */
 const RANK_3_PREFIXES = [
   "/dashboard/forge",
+  "/dashboard/developer",
   "/dashboard/bazaar",
   "/dashboard/missions",
   "/dashboard/intel",
@@ -106,6 +108,7 @@ export function buildDashboardNav(
       "/dashboard/scans",
       "/dashboard/missions",
       "/dashboard/forge",
+      "/dashboard/developer",
       "/dashboard/ctf",
       "/dashboard/bazaar",
       "/dashboard/intel",
@@ -126,6 +129,7 @@ export function buildDashboardNav(
     nav.push({ href: "/admin", label: "Admin", icon: "shield-alert", section: "Legend" });
     nav.push({ href: "/admin/threats", label: "Global Map", icon: "globe", section: "Legend" });
     nav.push({ href: "/admin/evolution", label: "Evolution", icon: "cpu", section: "Legend" });
+    nav.push({ href: "/admin/developer-tools", label: "Dev Tools", icon: "cpu", section: "Legend" });
   }
 
   return nav;

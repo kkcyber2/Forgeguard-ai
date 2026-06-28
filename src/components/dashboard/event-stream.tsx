@@ -3,16 +3,14 @@
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 /**
- * EventStream — a bounded live-feed for the Overview dashboard.
- * Seed events come from the server; the client rotates in additional
- * mock entries on a throttled interval so the panel feels "live" without
- * spamming renders.
+ * EventStream — bounded live-feed for the Overview dashboard.
  *
- * When real telemetry is wired through Supabase Realtime, swap the
- * `useMockPump` hook for a real subscription — the component contract
- * stays the same.
+ * Seeds with a few static entries, then subscribes to Supabase Realtime
+ * `scan_logs` INSERTs (RLS-scoped to the current user) and prepends each new
+ * log as it lands. Falls back to the seed if Realtime can't connect.
  */
 
 export type StreamEvent = {
@@ -31,13 +29,38 @@ const seed: StreamEvent[] = [
   { id: "e5", at: Date.now() - 90_000, severity: "secure", title: "New endpoint enrolled", meta: "support-agent.prod" },
 ];
 
-const rotation: Omit<StreamEvent, "id" | "at">[] = [
-  { severity: "secure", title: "Probe blocked", meta: "PROBE-0414 · md_image_exfil" },
-  { severity: "info", title: "Classifier updated", meta: "pii.classifier v1.14" },
-  { severity: "secure", title: "Probe blocked", meta: "PROBE-0421 · tool_allowlist" },
-  { severity: "threat", title: "Elevated anomaly score", meta: "endpoint=billing-agent" },
-  { severity: "info", title: "Nightly ATLAS sweep complete", meta: "384/384 probes" },
-];
+interface ScanLogRow {
+  id?: string;
+  scan_id?: string;
+  type?: string;
+  severity?: string;
+  attack_name?: string;
+  payload?: { message?: string } | null;
+  created_at?: string;
+}
+
+function severityOf(type: string | undefined, sev: string | undefined): StreamEvent["severity"] {
+  const t = (type ?? "").toLowerCase();
+  const s = (sev ?? "").toLowerCase();
+  if (["breach", "strike", "finding"].includes(t) || ["critical", "high"].includes(s)) return "threat";
+  if (t === "info" || s === "info") return "info";
+  return "secure";
+}
+
+function rowToEvent(row: ScanLogRow): StreamEvent {
+  const payload = (row.payload ?? {}) as { message?: string };
+  const title = (row.attack_name || payload.message || "Scan event").slice(0, 80);
+  const scanTag = row.scan_id ? row.scan_id.slice(0, 8) : "—";
+  const meta = `${scanTag} · ${row.type ?? "log"}`;
+  const at = row.created_at ? new Date(row.created_at).getTime() : Date.now();
+  return {
+    id: row.id ?? Math.random().toString(36).slice(2),
+    at,
+    severity: severityOf(row.type, row.severity),
+    title,
+    meta,
+  };
+}
 
 export function EventStream() {
   const reduce = useReducedMotion();
@@ -45,16 +68,33 @@ export function EventStream() {
 
   React.useEffect(() => {
     if (reduce) return;
-    let idx = 0;
-    const tick = setInterval(() => {
-      const next = rotation[idx % rotation.length];
-      idx += 1;
-      setEvents((prev) => [
-        { id: Math.random().toString(36).slice(2), at: Date.now(), ...next },
-        ...prev,
-      ].slice(0, 8));
-    }, 6500);
-    return () => clearInterval(tick);
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel("dashboard:event-stream:scan_logs")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "scan_logs" },
+          (payload) => {
+            const row = payload.new as ScanLogRow;
+            setEvents((prev) => [rowToEvent(row), ...prev].slice(0, 12));
+          },
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn("[event-stream] Realtime subscribe failed, using seed:", err);
+    }
+    return () => {
+      if (channel) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (channel as any).unsubscribe?.();
+        } catch {
+          /* best-effort */
+        }
+      }
+    };
   }, [reduce]);
 
   return (

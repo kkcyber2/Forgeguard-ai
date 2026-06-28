@@ -1,13 +1,14 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
-import { KeyRound, ShieldAlert, User2, Globe, PenLine } from "lucide-react";
+import { KeyRound, ShieldAlert, User2, Globe, PenLine, Bell } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/shell";
 import { Badge } from "@/components/ui/badge";
-import { getCurrentProfile, getSessionUser } from "@/lib/supabase/server";
+import { getCurrentProfile, getSessionUser, createServerSupabase } from "@/lib/supabase/server";
 import { fetchSettingsPageData } from "@/lib/dashboard/fetch-settings";
 import { ProfileForm } from "./profile-form";
 import { PasswordForm } from "./password-form";
 import { ApiKeysSection } from "./api-keys-section";
+import { NotificationsForm, type NotifPrefsInitial } from "./notifications-form";
 import { SignaturePad } from "@/components/settings/signature-pad";
 import { DomainVerifier } from "@/components/settings/domain-verifier";
 import {
@@ -40,6 +41,15 @@ export default async function SettingsPage() {
 
   const data = await fetchSettingsPageData(user, profile);
   const sovereignBypass = isSovereignOperator(user.email);
+
+  const supabase = await createServerSupabase();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: notifPrefsRow } = await (supabase as any)
+    .from("notification_preferences")
+    .select("email_on_scan_complete, email_on_breach, webhook_url, webhook_secret")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const notifPrefs = (notifPrefsRow ?? null) as NotifPrefsInitial | null;
 
   return (
     <>
@@ -94,6 +104,15 @@ export default async function SettingsPage() {
             title="API Keys"
           >
             <ApiKeysSection initialKeys={data.apiKeys} />
+          </Section>
+
+          <Section
+            id="notifications"
+            icon={Bell}
+            eyebrow="Alerting"
+            title="Notifications"
+          >
+            <NotificationsForm initialPrefs={notifPrefs} />
           </Section>
 
           <Section

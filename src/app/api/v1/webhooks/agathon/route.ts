@@ -13,6 +13,7 @@ import { ingestScanCompletedCorpus } from "@/lib/training/corpus";
 import { ingestScanFindingsToAlmanac } from "@/lib/almanac/ingest";
 import { autoPersistAegisRulesForScan } from "@/lib/evolve/aegis-auto-export";
 import { syncCustomToolsFromScanLogs } from "@/lib/evolve/custom-tools-sync";
+import { dispatchScanAlert } from "@/lib/alerting/dispatch";
 import {
   applyFortressBlock,
   verifyWebhookToken,
@@ -350,6 +351,17 @@ export async function POST(request: NextRequest) {
         } catch (err) {
           console.warn("[webhook:agathon] audit append scan_sealed failed:", err);
         }
+        // Fan out scan-complete email + signed webhook per owner preferences.
+        dispatchScanAlert(admin, {
+          scanId: event.scanId,
+          ownerId,
+          riskLabel: String(prepared.risk_label ?? riskLabel),
+          findingCount: counts.finding_count,
+          highSeverityCount: counts.high_severity_count,
+          aleUsd: parsedAle ?? null,
+          executiveSummary: executiveMd,
+          breach: false,
+        }).catch((err) => console.warn("[webhook:agathon] scan-complete alert failed:", err));
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (admin as any).from("scan_logs").insert({
@@ -562,6 +574,18 @@ export async function POST(request: NextRequest) {
         } catch (err) {
           console.warn("[webhook:agathon] audit append first_finding failed:", err);
         }
+        // Real-time breach alert (email + webhook) per owner preferences.
+        dispatchScanAlert(admin, {
+          scanId: event.scanId,
+          ownerId: breachOwner.user_id as string,
+          riskLabel: sev,
+          findingCount: Number(scanRow?.finding_count ?? 0),
+          highSeverityCount: Number(scanRow?.high_severity_count ?? 0),
+          aleUsd: parsedAle ?? null,
+          executiveSummary: executiveMd,
+          breach: true,
+          breachAttack: (p.probe as string | undefined) ?? (p.attack_name as string | undefined) ?? null,
+        }).catch((err) => console.warn("[webhook:agathon] breach alert failed:", err));
       }
     } catch (err) {
       persistOk = false;

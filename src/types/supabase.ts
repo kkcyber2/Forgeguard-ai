@@ -53,57 +53,220 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_audit_logs: {
+        Row: {
+          action_taken: string | null
+          admin_id: string | null
+          created_at: string | null
+          id: string
+          reason: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          admin_id?: string | null
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          admin_id?: string | null
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
+      aegis_firewall_rules: {
+        Row: {
+          blocked_pattern: string
+          client_id: string | null
+          created_at: string | null
+          id: string
+          rule_description: string | null
+          scan_id: string | null
+        }
+        Insert: {
+          blocked_pattern: string
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          rule_description?: string | null
+          scan_id?: string | null
+        }
+        Update: {
+          blocked_pattern?: string
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          rule_description?: string | null
+          scan_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aegis_firewall_rules_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
         ]
       }
       aegis_rules: {
         Row: {
-          action: string
+          action: string | null
           app_id: string | null
-          created_at: string
-          description: string
+          cloudflare_rule_id: string | null
+          created_at: string | null
+          description: string | null
           enabled: boolean
           finding_id: string | null
           format: string
-          id: number
-          pattern: string
+          id: string
+          is_active: boolean | null
+          pattern: string | null
+          pattern_to_block: string | null
           rule_content: string | null
-          rule_id: string
-          scan_id: string
+          rule_id: string | null
+          rule_name: string | null
+          scan_id: string | null
           updated_at: string
+          user_id: string | null
+          verified_blocks_attack: boolean | null
         }
         Insert: {
-          action: string
+          action?: string | null
           app_id?: string | null
-          created_at?: string
-          description: string
+          cloudflare_rule_id?: string | null
+          created_at?: string | null
+          description?: string | null
           enabled?: boolean
           finding_id?: string | null
           format?: string
-          id?: number
-          pattern: string
+          id?: string
+          is_active?: boolean | null
+          pattern?: string | null
+          pattern_to_block?: string | null
           rule_content?: string | null
-          rule_id: string
-          scan_id: string
+          rule_id?: string | null
+          rule_name?: string | null
+          scan_id?: string | null
           updated_at?: string
+          user_id?: string | null
+          verified_blocks_attack?: boolean | null
         }
         Update: {
-          action?: string
+          action?: string | null
           app_id?: string | null
-          created_at?: string
-          description?: string
+          cloudflare_rule_id?: string | null
+          created_at?: string | null
+          description?: string | null
           enabled?: boolean
           finding_id?: string | null
           format?: string
-          id?: number
-          pattern?: string
+          id?: string
+          is_active?: boolean | null
+          pattern?: string | null
+          pattern_to_block?: string | null
           rule_content?: string | null
-          rule_id?: string
-          scan_id?: string
+          rule_id?: string | null
+          rule_name?: string | null
+          scan_id?: string | null
           updated_at?: string
+          user_id?: string | null
+          verified_blocks_attack?: boolean | null
         }
         Relationships: [
           {
             foreignKeyName: "aegis_rules_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aegis_shield_rules: {
+        Row: {
+          action: string
+          app_id: string
+          blocked_pattern: string
+          client_id: string | null
+          created_at: string | null
+          description: string
+          enabled: boolean
+          finding_id: string | null
+          id: string
+          is_active: boolean | null
+          pattern: string | null
+          pattern_type: string | null
+          rule_content: string | null
+          scan_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string
+          app_id?: string
+          blocked_pattern: string
+          client_id?: string | null
+          created_at?: string | null
+          description?: string
+          enabled?: boolean
+          finding_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          pattern?: string | null
+          pattern_type?: string | null
+          rule_content?: string | null
+          scan_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          app_id?: string
+          blocked_pattern?: string
+          client_id?: string | null
+          created_at?: string | null
+          description?: string
+          enabled?: boolean
+          finding_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          pattern?: string | null
+          pattern_type?: string | null
+          rule_content?: string | null
+          scan_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aegis_shield_rules_scan_id_fkey"
             columns: ["scan_id"]
             isOneToOne: false
             referencedRelation: "scans"
@@ -117,24 +280,42 @@ export type Database = {
           agent_role: string | null
           created_at: string | null
           id: string
+          model_id: string | null
           scan_id: string | null
+          step_index: number
+          thought: string | null
           thought_process: string | null
+          tool_call: Json | null
+          tool_result: Json | null
+          user_id: string | null
         }
         Insert: {
           action_taken?: string | null
           agent_role?: string | null
           created_at?: string | null
           id?: string
+          model_id?: string | null
           scan_id?: string | null
+          step_index?: number
+          thought?: string | null
           thought_process?: string | null
+          tool_call?: Json | null
+          tool_result?: Json | null
+          user_id?: string | null
         }
         Update: {
           action_taken?: string | null
           agent_role?: string | null
           created_at?: string | null
           id?: string
+          model_id?: string | null
           scan_id?: string | null
+          step_index?: number
+          thought?: string | null
           thought_process?: string | null
+          tool_call?: Json | null
+          tool_result?: Json | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -176,6 +357,84 @@ export type Database = {
         }
         Relationships: []
       }
+      attack_lessons: {
+        Row: {
+          breach_count: number
+          fail_count: number
+          family: string
+          id: string
+          last_seen_at: string
+          lesson_text: string
+          model: string
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          breach_count?: number
+          fail_count?: number
+          family: string
+          id?: string
+          last_seen_at?: string
+          lesson_text: string
+          model: string
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          breach_count?: number
+          fail_count?: number
+          family?: string
+          id?: string
+          last_seen_at?: string
+          lesson_text?: string
+          model?: string
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      attack_logs: {
+        Row: {
+          blocked_at: string
+          country_code: string | null
+          id: string
+          ip_address: string
+          latitude: number | null
+          longitude: number | null
+          metadata: Json | null
+          method: string | null
+          path: string | null
+          reason: string
+          user_agent: string | null
+        }
+        Insert: {
+          blocked_at?: string
+          country_code?: string | null
+          id?: string
+          ip_address: string
+          latitude?: number | null
+          longitude?: number | null
+          metadata?: Json | null
+          method?: string | null
+          path?: string | null
+          reason?: string
+          user_agent?: string | null
+        }
+        Update: {
+          blocked_at?: string
+          country_code?: string | null
+          id?: string
+          ip_address?: string
+          latitude?: number | null
+          longitude?: number | null
+          metadata?: Json | null
+          method?: string | null
+          path?: string | null
+          reason?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       bazaar_purchases: {
         Row: {
           amount_usd: number | null
@@ -214,92 +473,127 @@ export type Database = {
       bazaar_scripts: {
         Row: {
           audit_findings: Json | null
+          audit_notes_raw: string | null
           audit_reason: string | null
-          audit_risk_score: number
-          audit_verdict: string
+          audit_risk_score: number | null
+          audit_verdict: string | null
           audited_at: string | null
           author_id: string
-          code: string
+          code: string | null
           code_content: string | null
-          created_at: string
-          description: string
+          compliance_score: number | null
+          created_at: string | null
+          description: string | null
           id: string
-          is_free: boolean
-          is_published: boolean
+          is_archived: boolean
           is_certified: boolean
-          is_removed: boolean
-          language: string
-          name: string
-          metadata: Record<string, unknown> | null
-          price_usd: number
-          purchase_count: number
-          revenue_usd: number
+          is_free: boolean
+          is_published: boolean | null
+          is_removed: boolean | null
+          language: string | null
+          metadata: Json
+          name: string | null
+          price_usd: number | null
+          purchase_count: number | null
+          revenue_usd: number | null
+          safety_report: Json | null
           safety_score: number | null
           status: string | null
-          tags: string[]
-          title: string | null
-          updated_at: string
+          tags: string[] | null
+          title: string
+          updated_at: string | null
         }
         Insert: {
           audit_findings?: Json | null
+          audit_notes_raw?: string | null
           audit_reason?: string | null
-          audit_risk_score?: number
-          audit_verdict?: string
+          audit_risk_score?: number | null
+          audit_verdict?: string | null
           audited_at?: string | null
           author_id: string
-          code: string
+          code?: string | null
           code_content?: string | null
-          created_at?: string
-          description?: string
+          compliance_score?: number | null
+          created_at?: string | null
+          description?: string | null
           id?: string
-          is_published?: boolean
+          is_archived?: boolean
           is_certified?: boolean
-          is_removed?: boolean
-          language?: string
-          name: string
-          metadata?: Record<string, unknown> | null
-          price_usd?: number
-          purchase_count?: number
-          revenue_usd?: number
+          is_free?: boolean
+          is_published?: boolean | null
+          is_removed?: boolean | null
+          language?: string | null
+          metadata?: Json
+          name?: string | null
+          price_usd?: number | null
+          purchase_count?: number | null
+          revenue_usd?: number | null
+          safety_report?: Json | null
           safety_score?: number | null
           status?: string | null
-          tags?: string[]
-          title?: string | null
-          updated_at?: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
         }
         Update: {
           audit_findings?: Json | null
+          audit_notes_raw?: string | null
           audit_reason?: string | null
-          audit_risk_score?: number
-          audit_verdict?: string
+          audit_risk_score?: number | null
+          audit_verdict?: string | null
           audited_at?: string | null
           author_id?: string
-          code?: string
+          code?: string | null
           code_content?: string | null
-          created_at?: string
-          description?: string
+          compliance_score?: number | null
+          created_at?: string | null
+          description?: string | null
           id?: string
-          is_published?: boolean
+          is_archived?: boolean
           is_certified?: boolean
-          is_removed?: boolean
-          language?: string
-          name?: string
-          metadata?: Record<string, unknown> | null
-          price_usd?: number
-          purchase_count?: number
-          revenue_usd?: number
+          is_free?: boolean
+          is_published?: boolean | null
+          is_removed?: boolean | null
+          language?: string | null
+          metadata?: Json
+          name?: string | null
+          price_usd?: number | null
+          purchase_count?: number | null
+          revenue_usd?: number | null
+          safety_report?: Json | null
           safety_score?: number | null
           status?: string | null
-          tags?: string[]
-          title?: string | null
-          updated_at?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "bazaar_scripts_author_id_fkey"
+            foreignKeyName: "bazaar_scripts_author_profiles_fkey"
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bazaar_scripts_author_profiles_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bazaar_scripts_author_profiles_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bazaar_scripts_author_profiles_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -337,6 +631,66 @@ export type Database = {
           price_usd?: number | null
           status?: string | null
           title?: string
+        }
+        Relationships: []
+      }
+      "black-hole_telemetry": {
+        Row: {
+          created_at: string | null
+          data_delivered_gb: number | null
+          id: string
+          ip_address: string | null
+          ua_detected: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_delivered_gb?: number | null
+          id?: string
+          ip_address?: string | null
+          ua_detected?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_delivered_gb?: number | null
+          id?: string
+          ip_address?: string | null
+          ua_detected?: string | null
+        }
+        Relationships: []
+      }
+      blacklisted_entities: {
+        Row: {
+          cpu_trap_active: boolean | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          poisoned_at: string
+          reason: string
+          user_agent: string | null
+          violation_type: string | null
+        }
+        Insert: {
+          cpu_trap_active?: boolean | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          poisoned_at?: string
+          reason?: string
+          user_agent?: string | null
+          violation_type?: string | null
+        }
+        Update: {
+          cpu_trap_active?: boolean | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          poisoned_at?: string
+          reason?: string
+          user_agent?: string | null
+          violation_type?: string | null
         }
         Relationships: []
       }
@@ -401,6 +755,27 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -627,6 +1002,36 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_requests: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          message: string | null
+          status: string | null
+          subject: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          message?: string | null
+          status?: string | null
+          subject?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          message?: string | null
+          status?: string | null
+          subject?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       contact_submissions: {
         Row: {
           created_at: string | null
@@ -665,55 +1070,207 @@ export type Database = {
       }
       crypto_deposits: {
         Row: {
-          id: string
-          user_id: string
-          plan_name: string
-          plan_id: string
-          deposit_type: string
-          amount_usdt: number
-          credit_amount: number | null
-          deposit_address: string
-          pay_currency: string
-          payment_id: string | null
-          status: string
-          credits_granted: boolean
-          created_at: string
-          updated_at: string
+          address_generated: string
+          amount_usd: number
+          amount_usdt: number | null
           confirmed_at: string | null
+          created_at: string | null
+          credit_amount: number | null
+          credits_granted: boolean
+          currency_type: string | null
+          deposit_address: string | null
+          deposit_type: string | null
+          id: string
+          invoice_url: string | null
+          order_id: string | null
+          pay_amount: number | null
+          pay_currency: string | null
+          payment_id: string | null
+          plan_id: string | null
+          plan_name: string | null
+          status: string | null
+          tx_hash: string | null
+          updated_at: string
+          user_id: string | null
         }
         Insert: {
-          id?: string
-          user_id: string
-          plan_name: string
-          plan_id: string
-          deposit_type?: string
-          amount_usdt: number
-          credit_amount?: number | null
-          deposit_address: string
-          pay_currency?: string
-          payment_id?: string | null
-          status?: string
-          credits_granted?: boolean
-          created_at?: string
-          updated_at?: string
+          address_generated: string
+          amount_usd: number
+          amount_usdt?: number | null
           confirmed_at?: string | null
+          created_at?: string | null
+          credit_amount?: number | null
+          credits_granted?: boolean
+          currency_type?: string | null
+          deposit_address?: string | null
+          deposit_type?: string | null
+          id?: string
+          invoice_url?: string | null
+          order_id?: string | null
+          pay_amount?: number | null
+          pay_currency?: string | null
+          payment_id?: string | null
+          plan_id?: string | null
+          plan_name?: string | null
+          status?: string | null
+          tx_hash?: string | null
+          updated_at?: string
+          user_id?: string | null
         }
         Update: {
-          id?: string
-          user_id?: string
-          plan_name?: string
-          plan_id?: string
-          deposit_type?: string
-          amount_usdt?: number
-          credit_amount?: number | null
-          deposit_address?: string
-          pay_currency?: string
-          payment_id?: string | null
-          status?: string
-          credits_granted?: boolean
-          created_at?: string
-          updated_at?: string
+          address_generated?: string
+          amount_usd?: number
+          amount_usdt?: number | null
           confirmed_at?: string | null
+          created_at?: string | null
+          credit_amount?: number | null
+          credits_granted?: boolean
+          currency_type?: string | null
+          deposit_address?: string | null
+          deposit_type?: string | null
+          id?: string
+          invoice_url?: string | null
+          order_id?: string | null
+          pay_amount?: number | null
+          pay_currency?: string | null
+          payment_id?: string | null
+          plan_id?: string | null
+          plan_name?: string | null
+          status?: string | null
+          tx_hash?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ctf_challenges: {
+        Row: {
+          category: string
+          created_at: string
+          description_md: string
+          difficulty: string
+          flag_hash: string
+          hint: string | null
+          id: string
+          is_published: boolean
+          points: number
+          prompt: string
+          slug: string
+          solves: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description_md?: string
+          difficulty?: string
+          flag_hash: string
+          hint?: string | null
+          id?: string
+          is_published?: boolean
+          points?: number
+          prompt?: string
+          slug: string
+          solves?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description_md?: string
+          difficulty?: string
+          flag_hash?: string
+          hint?: string | null
+          id?: string
+          is_published?: boolean
+          points?: number
+          prompt?: string
+          slug?: string
+          solves?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ctf_submissions: {
+        Row: {
+          awarded_points: number
+          challenge_id: string
+          created_at: string
+          id: string
+          is_correct: boolean
+          submitted_flag: string
+          user_id: string
+        }
+        Insert: {
+          awarded_points?: number
+          challenge_id: string
+          created_at?: string
+          id?: string
+          is_correct: boolean
+          submitted_flag?: string
+          user_id: string
+        }
+        Update: {
+          awarded_points?: number
+          challenge_id?: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          submitted_flag?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ctf_submissions_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "ctf_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_attack_tools: {
+        Row: {
+          audit_result: string | null
+          author_id: string
+          code: string
+          created_at: string
+          family: string
+          id: string
+          intensity_min: string
+          name: string
+          network_allowed: boolean
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          audit_result?: string | null
+          author_id: string
+          code: string
+          created_at?: string
+          family?: string
+          id?: string
+          intensity_min?: string
+          name: string
+          network_allowed?: boolean
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          audit_result?: string | null
+          author_id?: string
+          code?: string
+          created_at?: string
+          family?: string
+          id?: string
+          intensity_min?: string
+          name?: string
+          network_allowed?: boolean
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -770,65 +1327,6 @@ export type Database = {
           },
         ]
       }
-      hacker_repos: {
-        Row: {
-          code: string
-          commit_count: number
-          created_at: string
-          description: string
-          id: string
-          is_archived: boolean
-          is_public: boolean
-          language: string
-          name: string
-          owner_id: string
-          star_count: number
-          tags: string[]
-          updated_at: string
-          version: string
-        }
-        Insert: {
-          code?: string
-          commit_count?: number
-          created_at?: string
-          description?: string
-          id?: string
-          is_archived?: boolean
-          is_public?: boolean
-          language?: string
-          name: string
-          owner_id: string
-          star_count?: number
-          tags?: string[]
-          updated_at?: string
-          version?: string
-        }
-        Update: {
-          code?: string
-          commit_count?: number
-          created_at?: string
-          description?: string
-          id?: string
-          is_archived?: boolean
-          is_public?: boolean
-          language?: string
-          name?: string
-          owner_id?: string
-          star_count?: number
-          tags?: string[]
-          updated_at?: string
-          version?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hacker_repos_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       enterprise_api_keys: {
         Row: {
           api_key: string
@@ -868,6 +1366,90 @@ export type Database = {
         }
         Relationships: []
       }
+      hacker_repos: {
+        Row: {
+          code: string
+          code_content: string | null
+          commit_count: number
+          created_at: string | null
+          description: string | null
+          id: string
+          is_archived: boolean
+          is_private: boolean
+          is_public: boolean | null
+          language: string | null
+          name: string | null
+          owner_id: string | null
+          script_name: string
+          star_count: number
+          tags: string[]
+          updated_at: string | null
+          user_id: string | null
+          version: string
+        }
+        Insert: {
+          code?: string
+          code_content?: string | null
+          commit_count?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          is_private?: boolean
+          is_public?: boolean | null
+          language?: string | null
+          name?: string | null
+          owner_id?: string | null
+          script_name?: string
+          star_count?: number
+          tags?: string[]
+          updated_at?: string | null
+          user_id?: string | null
+          version?: string
+        }
+        Update: {
+          code?: string
+          code_content?: string | null
+          commit_count?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          is_private?: boolean
+          is_public?: boolean | null
+          language?: string | null
+          name?: string | null
+          owner_id?: string | null
+          script_name?: string
+          star_count?: number
+          tags?: string[]
+          updated_at?: string | null
+          user_id?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
+      hacker_wallets: {
+        Row: {
+          created_at: string
+          credits: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       intel_messages: {
         Row: {
           content: string
@@ -888,6 +1470,175 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      intel_vault_audit: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          meta: Json
+          query_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          query_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          query_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intel_vault_audit_query_id_fkey"
+            columns: ["query_id"]
+            isOneToOne: false
+            referencedRelation: "intel_vault_queries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intel_vault_items: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          legal_attestation: boolean
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_notes: string | null
+          moderation_status: string
+          source_url: string | null
+          summary_md: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          legal_attestation?: boolean
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_notes?: string | null
+          moderation_status?: string
+          source_url?: string | null
+          summary_md: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          legal_attestation?: boolean
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_notes?: string | null
+          moderation_status?: string
+          source_url?: string | null
+          summary_md?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      intel_vault_queries: {
+        Row: {
+          created_at: string
+          id: string
+          query_type: string
+          scan_id: string | null
+          status: string
+          target_domain: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          query_type: string
+          scan_id?: string | null
+          status?: string
+          target_domain: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          query_type?: string
+          scan_id?: string | null
+          status?: string
+          target_domain?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intel_vault_queries_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intel_vault_results: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          query_id: string
+          query_type: string
+          result: Json
+          scan_id: string | null
+          target_domain: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          query_id: string
+          query_type: string
+          result?: Json
+          scan_id?: string | null
+          target_domain: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          query_id?: string
+          query_type?: string
+          result?: Json
+          scan_id?: string | null
+          target_domain?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intel_vault_results_query_id_fkey"
+            columns: ["query_id"]
+            isOneToOne: false
+            referencedRelation: "intel_vault_queries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intel_vault_results_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
@@ -948,6 +1699,7 @@ export type Database = {
           id: string
           last_email_sent_at: string | null
           rank: string | null
+          source: string | null
           status: string | null
           vulnerability_summary: string | null
           website_url: string | null
@@ -962,6 +1714,7 @@ export type Database = {
           id?: string
           last_email_sent_at?: string | null
           rank?: string | null
+          source?: string | null
           status?: string | null
           vulnerability_summary?: string | null
           website_url?: string | null
@@ -976,6 +1729,7 @@ export type Database = {
           id?: string
           last_email_sent_at?: string | null
           rank?: string | null
+          source?: string | null
           status?: string | null
           vulnerability_summary?: string | null
           website_url?: string | null
@@ -1007,35 +1761,47 @@ export type Database = {
         Row: {
           consented: boolean
           created_at: string
-          full_name: string
+          full_name: string | null
           id: string
-          intensity: string
-          ip_address: string
+          intensity: string | null
+          ip_address: string | null
+          policy_version: string
           scan_id: string | null
+          signature_hash: string
+          signed_at: string | null
+          target_host: string | null
           user_agent: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           consented?: boolean
           created_at?: string
-          full_name: string
+          full_name?: string | null
           id?: string
-          intensity: string
-          ip_address: string
+          intensity?: string | null
+          ip_address?: string | null
+          policy_version?: string
           scan_id?: string | null
+          signature_hash?: string
+          signed_at?: string | null
+          target_host?: string | null
           user_agent?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           consented?: boolean
           created_at?: string
-          full_name?: string
+          full_name?: string | null
           id?: string
-          intensity?: string
-          ip_address?: string
+          intensity?: string | null
+          ip_address?: string | null
+          policy_version?: string
           scan_id?: string | null
+          signature_hash?: string
+          signed_at?: string | null
+          target_host?: string | null
           user_agent?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1169,10 +1935,52 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1327,6 +2135,7 @@ export type Database = {
           domain_verified: boolean | null
           id: string
           required_rank: string | null
+          rules_of_engagement_signed: boolean | null
           scope: string | null
           selected_hacker_id: string | null
           status: string | null
@@ -1342,6 +2151,7 @@ export type Database = {
           domain_verified?: boolean | null
           id?: string
           required_rank?: string | null
+          rules_of_engagement_signed?: boolean | null
           scope?: string | null
           selected_hacker_id?: string | null
           status?: string | null
@@ -1357,11 +2167,48 @@ export type Database = {
           domain_verified?: boolean | null
           id?: string
           required_rank?: string | null
+          rules_of_engagement_signed?: boolean | null
           scope?: string | null
           selected_hacker_id?: string | null
           status?: string | null
           title?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      otp_logs: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          phone: string | null
+          provider: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          phone?: string | null
+          provider?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          phone?: string | null
+          provider?: string | null
+          status?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1401,6 +2248,78 @@ export type Database = {
         }
         Relationships: []
       }
+      perimeter_events: {
+        Row: {
+          created_at: string
+          geo_country: string | null
+          geo_lat: number
+          geo_lng: number
+          id: string
+          ip_hash: string
+          path: string | null
+          reason: string | null
+          severity: string
+          source: string
+          threat_delta: number | null
+        }
+        Insert: {
+          created_at?: string
+          geo_country?: string | null
+          geo_lat: number
+          geo_lng: number
+          id?: string
+          ip_hash: string
+          path?: string | null
+          reason?: string | null
+          severity?: string
+          source?: string
+          threat_delta?: number | null
+        }
+        Update: {
+          created_at?: string
+          geo_country?: string | null
+          geo_lat?: number
+          geo_lng?: number
+          id?: string
+          ip_hash?: string
+          path?: string | null
+          reason?: string | null
+          severity?: string
+          source?: string
+          threat_delta?: number | null
+        }
+        Relationships: []
+      }
+      perimeter_ip_blocklist: {
+        Row: {
+          created_at: string
+          expires_at: string
+          geo_country: string | null
+          id: string
+          ip_hash: string
+          reason: string
+          threat_score: number
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          geo_country?: string | null
+          id?: string
+          ip_hash: string
+          reason: string
+          threat_score?: number
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          geo_country?: string | null
+          id?: string
+          ip_hash?: string
+          reason?: string
+          threat_score?: number
+        }
+        Relationships: []
+      }
       phishing_audits: {
         Row: {
           created_at: string | null
@@ -1428,6 +2347,24 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_flags: {
+        Row: {
+          key: string
+          updated_at: string
+          value: boolean
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: boolean
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: boolean
+        }
+        Relationships: []
+      }
       platform_transactions: {
         Row: {
           amount_credits: number | null
@@ -1435,9 +2372,11 @@ export type Database = {
           author_payout: number | null
           buyer_id: string | null
           created_at: string | null
+          fee_credits: number | null
           id: string
           platform_fee: number | null
           receiver_id: string | null
+          reference_id: string | null
           script_id: string | null
           seller_id: string | null
           sender_id: string | null
@@ -1450,9 +2389,11 @@ export type Database = {
           author_payout?: number | null
           buyer_id?: string | null
           created_at?: string | null
+          fee_credits?: number | null
           id?: string
           platform_fee?: number | null
           receiver_id?: string | null
+          reference_id?: string | null
           script_id?: string | null
           seller_id?: string | null
           sender_id?: string | null
@@ -1465,9 +2406,11 @@ export type Database = {
           author_payout?: number | null
           buyer_id?: string | null
           created_at?: string | null
+          fee_credits?: number | null
           id?: string
           platform_fee?: number | null
           receiver_id?: string | null
+          reference_id?: string | null
           script_id?: string | null
           seller_id?: string | null
           sender_id?: string | null
@@ -1487,174 +2430,216 @@ export type Database = {
       profiles: {
         Row: {
           access_level: number | null
-          active_view_mode: "client" | "hacker" | null
-          current_persona: "client" | "hacker" | "dev" | null
+          account_status: string
+          active_view_mode: string | null
           ai_audit_score: number | null
           avatar_url: string | null
+          banned_until: string | null
           bio: string | null
           clearance_tier: string | null
+          company_domain: string | null
           company_name: string | null
           company_tag: string | null
-          company_domain: string | null
           cookie_consent_at: string | null
           cookie_consent_version: string | null
           created_at: string | null
+          current_persona: string | null
           current_plan: string
+          data_processing_agreed: boolean | null
+          deleted_at: string | null
           deletion_requested_at: string | null
           domain_token: string | null
           domain_verified: boolean | null
+          domain_verify_token: string | null
           email: string
           entitlements: Json
+          face_liveness_at: string | null
+          face_liveness_pose_count: number
+          face_liveness_verified: boolean
           full_name: string | null
           hacker_rank: string | null
           id: string
           identity_audit_notes: string | null
           identity_audit_score: number | null
           identity_audit_status: string | null
-          identity_failure_reason: string | null
-          identity_raw_ocr_data: Json | null
           identity_document_path: string | null
+          identity_failure_reason: string | null
+          identity_proofed: boolean | null
+          identity_raw_ocr_data: Json | null
           identity_status: string | null
           identity_verified: boolean | null
-          identity_proofed: boolean | null
           is_admin: boolean | null
+          is_banned: boolean | null
+          is_ghost_active: boolean | null
           is_verified: boolean | null
           job_title: string | null
+          last_billing_sync_at: string | null
+          manual_verification_override: boolean | null
           period_resets_at: string | null
           phone: string | null
           phone_number: string | null
           phone_verified: boolean | null
-          face_liveness_verified: boolean | null
-          face_liveness_at: string | null
-          face_liveness_pose_count: number | null
           profile_completeness: number | null
           reputation: number | null
+          revenue_simulation_mode: boolean | null
           role: string | null
           scans_used_this_period: number
-          signature_data: string | null
           signature_at: string | null
+          signature_data: string | null
+          sovereign_manual_verify: boolean | null
           sovereign_pending: boolean | null
+          stripe_customer_id: string | null
           subscription_tier: string | null
-          is_ghost_active: boolean | null
           theme_preference: string | null
+          training_corpus_opt_out: boolean
+          trust_score: number | null
+          twilio_simulation_mode: boolean | null
           updated_at: string | null
-          user_type: "client" | "hacker" | "developer" | null
+          user_type: string | null
           verification_data: Json | null
-          work_email_verified: boolean | null
+          work_email_verified: boolean
         }
         Insert: {
           access_level?: number | null
-          active_view_mode?: "client" | "hacker" | null
-          current_persona?: "client" | "hacker" | "dev" | null
+          account_status?: string
+          active_view_mode?: string | null
           ai_audit_score?: number | null
           avatar_url?: string | null
+          banned_until?: string | null
           bio?: string | null
           clearance_tier?: string | null
+          company_domain?: string | null
           company_name?: string | null
           company_tag?: string | null
-          company_domain?: string | null
           cookie_consent_at?: string | null
           cookie_consent_version?: string | null
           created_at?: string | null
+          current_persona?: string | null
           current_plan?: string
+          data_processing_agreed?: boolean | null
+          deleted_at?: string | null
           deletion_requested_at?: string | null
           domain_token?: string | null
           domain_verified?: boolean | null
+          domain_verify_token?: string | null
           email: string
           entitlements?: Json
+          face_liveness_at?: string | null
+          face_liveness_pose_count?: number
+          face_liveness_verified?: boolean
           full_name?: string | null
           hacker_rank?: string | null
           id: string
           identity_audit_notes?: string | null
           identity_audit_score?: number | null
           identity_audit_status?: string | null
-          identity_failure_reason?: string | null
-          identity_raw_ocr_data?: Json | null
           identity_document_path?: string | null
+          identity_failure_reason?: string | null
+          identity_proofed?: boolean | null
+          identity_raw_ocr_data?: Json | null
           identity_status?: string | null
           identity_verified?: boolean | null
-          identity_proofed?: boolean | null
           is_admin?: boolean | null
+          is_banned?: boolean | null
+          is_ghost_active?: boolean | null
           is_verified?: boolean | null
           job_title?: string | null
+          last_billing_sync_at?: string | null
+          manual_verification_override?: boolean | null
           period_resets_at?: string | null
           phone?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
-          face_liveness_verified?: boolean | null
-          face_liveness_at?: string | null
-          face_liveness_pose_count?: number | null
           profile_completeness?: number | null
           reputation?: number | null
+          revenue_simulation_mode?: boolean | null
           role?: string | null
           scans_used_this_period?: number
-          signature_data?: string | null
           signature_at?: string | null
+          signature_data?: string | null
+          sovereign_manual_verify?: boolean | null
           sovereign_pending?: boolean | null
+          stripe_customer_id?: string | null
           subscription_tier?: string | null
-          is_ghost_active?: boolean | null
           theme_preference?: string | null
+          training_corpus_opt_out?: boolean
+          trust_score?: number | null
+          twilio_simulation_mode?: boolean | null
           updated_at?: string | null
-          user_type?: "client" | "hacker" | "developer" | null
+          user_type?: string | null
           verification_data?: Json | null
-          work_email_verified?: boolean | null
+          work_email_verified?: boolean
         }
         Update: {
           access_level?: number | null
-          active_view_mode?: "client" | "hacker" | null
-          current_persona?: "client" | "hacker" | "dev" | null
+          account_status?: string
+          active_view_mode?: string | null
           ai_audit_score?: number | null
           avatar_url?: string | null
+          banned_until?: string | null
           bio?: string | null
           clearance_tier?: string | null
+          company_domain?: string | null
           company_name?: string | null
           company_tag?: string | null
-          company_domain?: string | null
           cookie_consent_at?: string | null
           cookie_consent_version?: string | null
           created_at?: string | null
+          current_persona?: string | null
           current_plan?: string
+          data_processing_agreed?: boolean | null
+          deleted_at?: string | null
           deletion_requested_at?: string | null
           domain_token?: string | null
           domain_verified?: boolean | null
+          domain_verify_token?: string | null
           email?: string
           entitlements?: Json
+          face_liveness_at?: string | null
+          face_liveness_pose_count?: number
+          face_liveness_verified?: boolean
           full_name?: string | null
           hacker_rank?: string | null
           id?: string
           identity_audit_notes?: string | null
           identity_audit_score?: number | null
           identity_audit_status?: string | null
-          identity_failure_reason?: string | null
-          identity_raw_ocr_data?: Json | null
           identity_document_path?: string | null
+          identity_failure_reason?: string | null
+          identity_proofed?: boolean | null
+          identity_raw_ocr_data?: Json | null
           identity_status?: string | null
           identity_verified?: boolean | null
-          identity_proofed?: boolean | null
           is_admin?: boolean | null
+          is_banned?: boolean | null
+          is_ghost_active?: boolean | null
           is_verified?: boolean | null
           job_title?: string | null
+          last_billing_sync_at?: string | null
+          manual_verification_override?: boolean | null
           period_resets_at?: string | null
           phone?: string | null
           phone_number?: string | null
           phone_verified?: boolean | null
-          face_liveness_verified?: boolean | null
-          face_liveness_at?: string | null
-          face_liveness_pose_count?: number | null
           profile_completeness?: number | null
           reputation?: number | null
+          revenue_simulation_mode?: boolean | null
           role?: string | null
           scans_used_this_period?: number
-          signature_data?: string | null
           signature_at?: string | null
+          signature_data?: string | null
+          sovereign_manual_verify?: boolean | null
           sovereign_pending?: boolean | null
+          stripe_customer_id?: string | null
           subscription_tier?: string | null
-          is_ghost_active?: boolean | null
           theme_preference?: string | null
+          training_corpus_opt_out?: boolean
+          trust_score?: number | null
+          twilio_simulation_mode?: boolean | null
           updated_at?: string | null
-          user_type?: "client" | "hacker" | "developer" | null
+          user_type?: string | null
           verification_data?: Json | null
-          work_email_verified?: boolean | null
+          work_email_verified?: boolean
         }
         Relationships: []
       }
@@ -1710,6 +2695,27 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "project_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       project_submissions: {
@@ -1758,6 +2764,27 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_submissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1823,6 +2850,27 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1964,40 +3012,40 @@ export type Database = {
       }
       repo_files: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           mime_type: string
           name: string
           path: string
-          repo_id: string
+          repo_id: string | null
           size_bytes: number
           storage_key: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           mime_type?: string
-          name: string
+          name?: string
           path: string
-          repo_id: string
+          repo_id?: string | null
           size_bytes?: number
           storage_key: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           mime_type?: string
           name?: string
           path?: string
-          repo_id?: string
+          repo_id?: string | null
           size_bytes?: number
           storage_key?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -2034,6 +3082,47 @@ export type Database = {
             columns: ["repo_id"]
             isOneToOne: false
             referencedRelation: "hacker_repos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scan_audit_events: {
+        Row: {
+          created_at: string
+          event: string
+          event_hash: string
+          id: string
+          policy_version: string | null
+          prev_hash: string | null
+          scan_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          event_hash: string
+          id?: string
+          policy_version?: string | null
+          prev_hash?: string | null
+          scan_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          event_hash?: string
+          id?: string
+          policy_version?: string | null
+          prev_hash?: string | null
+          scan_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_audit_events_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
             referencedColumns: ["id"]
           },
         ]
@@ -2080,16 +3169,16 @@ export type Database = {
         Row: {
           aegis_zip_b64: string | null
           ale_usd: number | null
-          audit_report_md: string | null
-          attacks_run: number | null
           attack_path: Json
+          attacks_run: number | null
+          audit_report_md: string | null
           cvss_overall: number
+          data_record_value: number | null
           discovery_report: Json | null
-          executive_summary_md: string
           executive_summary: string | null
+          executive_summary_md: string
           financial_liability_usd: number | null
-          technical_proof_of_concept: string | null
-          remediation_code_snippet: string | null
+          financial_loss_projection: number | null
           findings: Json
           generated_at: string
           generation_cost_usd: number | null
@@ -2100,22 +3189,31 @@ export type Database = {
           optimization_suggestions_md: string | null
           owasp_coverage: Json | null
           pdf_storage_key: string | null
+          proof_of_work_status: string | null
+          real_world_impact: string | null
+          remediation_code_snippet: string | null
+          remediation_steps: string | null
           risk_label: string
           scan_id: string
           social_templates: Json | null
+          target_type: string | null
+          technical_proof_of_concept: string | null
+          total_exposed_records: number | null
+          total_vectors_tested: number | null
         }
         Insert: {
           aegis_zip_b64?: string | null
           ale_usd?: number | null
-          audit_report_md?: string | null
           attack_path?: Json
+          attacks_run?: number | null
+          audit_report_md?: string | null
           cvss_overall: number
+          data_record_value?: number | null
           discovery_report?: Json | null
-          executive_summary_md: string
           executive_summary?: string | null
+          executive_summary_md: string
           financial_liability_usd?: number | null
-          technical_proof_of_concept?: string | null
-          remediation_code_snippet?: string | null
+          financial_loss_projection?: number | null
           findings?: Json
           generated_at?: string
           generation_cost_usd?: number | null
@@ -2126,22 +3224,31 @@ export type Database = {
           optimization_suggestions_md?: string | null
           owasp_coverage?: Json | null
           pdf_storage_key?: string | null
+          proof_of_work_status?: string | null
+          real_world_impact?: string | null
+          remediation_code_snippet?: string | null
+          remediation_steps?: string | null
           risk_label: string
           scan_id: string
           social_templates?: Json | null
+          target_type?: string | null
+          technical_proof_of_concept?: string | null
+          total_exposed_records?: number | null
+          total_vectors_tested?: number | null
         }
         Update: {
           aegis_zip_b64?: string | null
           ale_usd?: number | null
           attack_path?: Json
+          attacks_run?: number | null
           audit_report_md?: string | null
           cvss_overall?: number
+          data_record_value?: number | null
           discovery_report?: Json | null
-          executive_summary_md?: string
           executive_summary?: string | null
+          executive_summary_md?: string
           financial_liability_usd?: number | null
-          technical_proof_of_concept?: string | null
-          remediation_code_snippet?: string | null
+          financial_loss_projection?: number | null
           findings?: Json
           generated_at?: string
           generation_cost_usd?: number | null
@@ -2152,9 +3259,17 @@ export type Database = {
           optimization_suggestions_md?: string | null
           owasp_coverage?: Json | null
           pdf_storage_key?: string | null
+          proof_of_work_status?: string | null
+          real_world_impact?: string | null
+          remediation_code_snippet?: string | null
+          remediation_steps?: string | null
           risk_label?: string
           scan_id?: string
           social_templates?: Json | null
+          target_type?: string | null
+          technical_proof_of_concept?: string | null
+          total_exposed_records?: number | null
+          total_vectors_tested?: number | null
         }
         Relationships: [
           {
@@ -2176,6 +3291,7 @@ export type Database = {
           compute_seconds_used: number
           created_at: string
           custom_tools_count: number
+          failure_reason: string | null
           finding_count: number
           high_severity_count: number
           id: string
@@ -2183,15 +3299,21 @@ export type Database = {
           notes: string | null
           progress_pct: number
           report_id: string | null
+          scope_host: string | null
+          scope_verified_at: string | null
           started_at: string | null
           status: string
           surface_kind: Database["public"]["Enums"]["scan_surface_kind"]
           target_credential_encrypted: string | null
+          target_diagnostic_logs: string | null
           target_model: string
+          target_type: string | null
           target_url: string
+          target_vector: string | null
           user_id: string
         }
         Insert: {
+          ale_usd?: number | null
           asset_value_usd?: number | null
           brain_input_tokens_used?: number
           brain_output_tokens_used?: number
@@ -2199,6 +3321,7 @@ export type Database = {
           compute_seconds_used?: number
           created_at?: string
           custom_tools_count?: number
+          failure_reason?: string | null
           finding_count?: number
           high_severity_count?: number
           id?: string
@@ -2206,15 +3329,21 @@ export type Database = {
           notes?: string | null
           progress_pct?: number
           report_id?: string | null
+          scope_host?: string | null
+          scope_verified_at?: string | null
           started_at?: string | null
           status?: string
           surface_kind?: Database["public"]["Enums"]["scan_surface_kind"]
           target_credential_encrypted?: string | null
+          target_diagnostic_logs?: string | null
           target_model: string
+          target_type?: string | null
           target_url: string
+          target_vector?: string | null
           user_id: string
         }
         Update: {
+          ale_usd?: number | null
           asset_value_usd?: number | null
           brain_input_tokens_used?: number
           brain_output_tokens_used?: number
@@ -2222,6 +3351,7 @@ export type Database = {
           compute_seconds_used?: number
           created_at?: string
           custom_tools_count?: number
+          failure_reason?: string | null
           finding_count?: number
           high_severity_count?: number
           id?: string
@@ -2229,12 +3359,17 @@ export type Database = {
           notes?: string | null
           progress_pct?: number
           report_id?: string | null
+          scope_host?: string | null
+          scope_verified_at?: string | null
           started_at?: string | null
           status?: string
           surface_kind?: Database["public"]["Enums"]["scan_surface_kind"]
           target_credential_encrypted?: string | null
+          target_diagnostic_logs?: string | null
           target_model?: string
+          target_type?: string | null
           target_url?: string
+          target_vector?: string | null
           user_id?: string
         }
         Relationships: [
@@ -2252,13 +3387,34 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "scans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_rank"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "visible_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       scheduled_scans: {
         Row: {
           active: boolean
           created_at: string
-          frequency: string
+          frequency: Database["public"]["Enums"]["scheduled_scan_frequency"]
           id: string
           last_run_at: string | null
           name: string
@@ -2271,7 +3427,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
-          frequency?: string
+          frequency?: Database["public"]["Enums"]["scheduled_scan_frequency"]
           id?: string
           last_run_at?: string | null
           name: string
@@ -2284,7 +3440,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
-          frequency?: string
+          frequency?: Database["public"]["Enums"]["scheduled_scan_frequency"]
           id?: string
           last_run_at?: string | null
           name?: string
@@ -2446,6 +3602,73 @@ export type Database = {
         }
         Relationships: []
       }
+      social_post_likes: {
+        Row: {
+          created_at: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_posts: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          like_count: number
+          media_path: string | null
+          team_id: string | null
+          user_id: string
+          visibility: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          like_count?: number
+          media_path?: string | null
+          team_id?: string | null
+          user_id: string
+          visibility?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          like_count?: number
+          media_path?: string | null
+          team_id?: string | null
+          user_id?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_posts_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -2455,7 +3678,7 @@ export type Database = {
           ls_subscription_id: string | null
           ls_variant_id: string | null
           period_ends_at: string | null
-          period_starts_at: string | null
+          period_starts_at: string
           plan: string
           scans_used_this_period: number
           status: string
@@ -2470,7 +3693,7 @@ export type Database = {
           ls_subscription_id?: string | null
           ls_variant_id?: string | null
           period_ends_at?: string | null
-          period_starts_at?: string | null
+          period_starts_at?: string
           plan?: string
           scans_used_this_period?: number
           status?: string
@@ -2485,7 +3708,7 @@ export type Database = {
           ls_subscription_id?: string | null
           ls_variant_id?: string | null
           period_ends_at?: string | null
-          period_starts_at?: string | null
+          period_starts_at?: string
           plan?: string
           scans_used_this_period?: number
           status?: string
@@ -2494,39 +3717,187 @@ export type Database = {
         }
         Relationships: []
       }
+      system_integrity_reports: {
+        Row: {
+          created_at: string | null
+          id: string
+          report_body: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          report_body?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          report_body?: string | null
+        }
+        Relationships: []
+      }
+      target_ownership_tokens: {
+        Row: {
+          created_at: string | null
+          id: string
+          target_url: string
+          token: string
+          user_id: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          target_url: string
+          token: string
+          user_id?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          target_url?: string
+          token?: string
+          user_id?: string | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
       target_verifications: {
         Row: {
-          created_at: string
+          created_at: string | null
           expires_at: string
           id: string
-          method: string
-          target_domain: string
-          token: string
-          user_id: string
+          is_verified: boolean | null
+          method: string | null
+          target_domain: string | null
+          target_url: string | null
+          token: string | null
+          user_id: string | null
+          verification_token: string | null
           verified: boolean
           verified_at: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           expires_at?: string
           id?: string
-          method: string
-          target_domain: string
-          token: string
-          user_id: string
+          is_verified?: boolean | null
+          method?: string | null
+          target_domain?: string | null
+          target_url?: string | null
+          token?: string | null
+          user_id?: string | null
+          verification_token?: string | null
           verified?: boolean
           verified_at?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           expires_at?: string
           id?: string
-          method?: string
-          target_domain?: string
-          token?: string
-          user_id?: string
+          is_verified?: boolean | null
+          method?: string | null
+          target_domain?: string | null
+          target_url?: string | null
+          token?: string | null
+          user_id?: string | null
+          verification_token?: string | null
           verified?: boolean
           verified_at?: string | null
+        }
+        Relationships: []
+      }
+      team_invites: {
+        Row: {
+          created_at: string
+          created_by: string
+          email: string
+          expires_at: string
+          id: string
+          team_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          email: string
+          expires_at?: string
+          id?: string
+          team_id: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          team_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invites_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          joined_at: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          role?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          slug: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          slug: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          slug?: string
         }
         Relationships: []
       }
@@ -2679,6 +4050,47 @@ export type Database = {
           },
         ]
       }
+      training_corpus_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          exportable: boolean
+          id: string
+          payload_json: Json
+          redacted: boolean
+          scan_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          exportable?: boolean
+          id?: string
+          payload_json?: Json
+          redacted?: boolean
+          scan_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          exportable?: boolean
+          id?: string
+          payload_json?: Json
+          redacted?: boolean
+          scan_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_corpus_events_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_events: {
         Row: {
           created_at: string
@@ -2719,298 +4131,195 @@ export type Database = {
       }
       user_api_keys: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           key_hash: string
           key_prefix: string
           last_used_at: string | null
           name: string
           revoked_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           key_hash: string
           key_prefix: string
           last_used_at?: string | null
           name: string
           revoked_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           key_hash?: string
           key_prefix?: string
           last_used_at?: string | null
           name?: string
           revoked_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
       user_wallets: {
         Row: {
           balance: number | null
-          balance_usd: number | null
+          balance_usd: number
+          bazaar_credits: number | null
           created_at: string | null
+          credits: number | null
           frozen_at: string | null
           frozen_reason: string | null
           id: string
           is_frozen: boolean
+          pending_bounties: number | null
+          pending_escrow: number | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           balance?: number | null
-          balance_usd?: number | null
+          balance_usd?: number
+          bazaar_credits?: number | null
           created_at?: string | null
+          credits?: number | null
           frozen_at?: string | null
           frozen_reason?: string | null
           id?: string
           is_frozen?: boolean
+          pending_bounties?: number | null
+          pending_escrow?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           balance?: number | null
-          balance_usd?: number | null
+          balance_usd?: number
+          bazaar_credits?: number | null
           created_at?: string | null
+          credits?: number | null
           frozen_at?: string | null
           frozen_reason?: string | null
           id?: string
           is_frozen?: boolean
+          pending_bounties?: number | null
+          pending_escrow?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
         Relationships: []
       }
-      hacker_wallets: {
+      verification_otps: {
         Row: {
-          user_id: string
-          credits: number
+          code_hash: string | null
+          consumed: boolean
           created_at: string
-          updated_at: string
-        }
-        Insert: {
-          user_id: string
-          credits?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          user_id?: string
-          credits?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      otp_logs: {
-        Row: {
+          expires_at: string | null
           id: string
+          phone: string | null
+          salt: string | null
           user_id: string | null
-          phone: string
-          status: string
-          provider: string | null
-          error_message: string | null
-          created_at: string
         }
         Insert: {
+          code_hash?: string | null
+          consumed?: boolean
+          created_at?: string
+          expires_at?: string | null
           id?: string
+          phone?: string | null
+          salt?: string | null
           user_id?: string | null
-          phone: string
-          status?: string
-          provider?: string | null
-          error_message?: string | null
-          created_at?: string
         }
         Update: {
+          code_hash?: string | null
+          consumed?: boolean
+          created_at?: string
+          expires_at?: string | null
           id?: string
+          phone?: string | null
+          salt?: string | null
           user_id?: string | null
-          phone?: string
-          status?: string
-          provider?: string | null
-          error_message?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      attack_logs: {
-        Row: {
-          id: string
-          ip_address: string
-          path: string | null
-          method: string | null
-          user_agent: string | null
-          reason: string
-          blocked_at: string
-          metadata: Record<string, unknown> | null
-        }
-        Insert: {
-          id?: string
-          ip_address: string
-          path?: string | null
-          method?: string | null
-          user_agent?: string | null
-          reason?: string
-          blocked_at?: string
-          metadata?: Record<string, unknown> | null
-        }
-        Update: {
-          id?: string
-          ip_address?: string
-          path?: string | null
-          method?: string | null
-          user_agent?: string | null
-          reason?: string
-          blocked_at?: string
-          metadata?: Record<string, unknown> | null
-        }
-        Relationships: []
-      }
-      perimeter_events: {
-        Row: {
-          id: string
-          ip_hash: string
-          path: string | null
-          severity: string
-          geo_lat: number
-          geo_lng: number
-          geo_country: string | null
-          threat_delta: number | null
-          reason: string | null
-          source: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          ip_hash: string
-          path?: string | null
-          severity?: string
-          geo_lat: number
-          geo_lng: number
-          geo_country?: string | null
-          threat_delta?: number | null
-          reason?: string | null
-          source?: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          ip_hash?: string
-          path?: string | null
-          severity?: string
-          geo_lat?: number
-          geo_lng?: number
-          geo_country?: string | null
-          threat_delta?: number | null
-          reason?: string | null
-          source?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      perimeter_ip_blocklist: {
-        Row: {
-          id: string
-          ip_hash: string
-          reason: string
-          threat_score: number
-          expires_at: string
-          geo_country: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          ip_hash: string
-          reason: string
-          threat_score?: number
-          expires_at: string
-          geo_country?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          ip_hash?: string
-          reason?: string
-          threat_score?: number
-          expires_at?: string
-          geo_country?: string | null
-          created_at?: string
         }
         Relationships: []
       }
       vulnerability_almanac_entries: {
         Row: {
-          id: string
-          slug: string
-          title: string
-          family: string
-          owasp_id: string | null
-          severity: string
-          summary_md: string
-          poc_redacted: string | null
           attack_hash: string
-          first_seen_at: string
-          last_seen_at: string
-          source_scan_id: string | null
-          published: boolean
-          source_type: string
-          cve_id: string | null
-          merged_into_id: string | null
           created_at: string
+          cve_id: string | null
+          cvss_severity: string | null
+          cvss_v3_score: number | null
+          epss_percentile: number | null
+          epss_score: number | null
+          family: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          merged_into_id: string | null
+          nvd_published: string | null
+          owasp_id: string | null
+          poc_redacted: string | null
+          published: boolean
+          severity: string
+          slug: string
+          source_scan_id: string | null
+          source_type: string
+          summary_md: string
+          title: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          slug: string
-          title: string
-          family: string
-          owasp_id?: string | null
-          severity?: string
-          summary_md?: string
-          poc_redacted?: string | null
           attack_hash: string
-          first_seen_at?: string
-          last_seen_at?: string
-          source_scan_id?: string | null
-          published?: boolean
-          source_type?: string
-          cve_id?: string | null
-          merged_into_id?: string | null
           created_at?: string
+          cve_id?: string | null
+          cvss_severity?: string | null
+          cvss_v3_score?: number | null
+          epss_percentile?: number | null
+          epss_score?: number | null
+          family: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          merged_into_id?: string | null
+          nvd_published?: string | null
+          owasp_id?: string | null
+          poc_redacted?: string | null
+          published?: boolean
+          severity?: string
+          slug: string
+          source_scan_id?: string | null
+          source_type?: string
+          summary_md?: string
+          title: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          slug?: string
-          title?: string
-          family?: string
-          owasp_id?: string | null
-          severity?: string
-          summary_md?: string
-          poc_redacted?: string | null
           attack_hash?: string
-          first_seen_at?: string
-          last_seen_at?: string
-          source_scan_id?: string | null
-          published?: boolean
-          source_type?: string
-          cve_id?: string | null
-          merged_into_id?: string | null
           created_at?: string
+          cve_id?: string | null
+          cvss_severity?: string | null
+          cvss_v3_score?: number | null
+          epss_percentile?: number | null
+          epss_score?: number | null
+          family?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          merged_into_id?: string | null
+          nvd_published?: string | null
+          owasp_id?: string | null
+          poc_redacted?: string | null
+          published?: boolean
+          severity?: string
+          slug?: string
+          source_scan_id?: string | null
+          source_type?: string
+          summary_md?: string
+          title?: string
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "vulnerability_almanac_entries_source_scan_id_fkey"
-            columns: ["source_scan_id"]
-            isOneToOne: false
-            referencedRelation: "scans"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "vulnerability_almanac_entries_merged_into_id_fkey"
             columns: ["merged_into_id"]
@@ -3018,37 +4327,14 @@ export type Database = {
             referencedRelation: "vulnerability_almanac_entries"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "vulnerability_almanac_entries_source_scan_id_fkey"
+            columns: ["source_scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
         ]
-      }
-      verification_otps: {
-        Row: {
-          code_hash: string
-          consumed: boolean
-          created_at: string
-          expires_at: string
-          id: string
-          phone: string
-          user_id: string
-        }
-        Insert: {
-          code_hash: string
-          consumed?: boolean
-          created_at?: string
-          expires_at: string
-          id?: string
-          phone: string
-          user_id: string
-        }
-        Update: {
-          code_hash?: string
-          consumed?: boolean
-          created_at?: string
-          expires_at?: string
-          id?: string
-          phone?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       war_machine_stats: {
         Row: {
@@ -3074,93 +4360,15 @@ export type Database = {
         }
         Relationships: []
       }
-      attack_lessons: {
-        Row: {
-          id: string
-          provider: string
-          model: string
-          family: string
-          lesson_text: string
-          breach_count: number
-          fail_count: number
-          last_seen_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          provider: string
-          model: string
-          family: string
-          lesson_text: string
-          breach_count?: number
-          fail_count?: number
-          last_seen_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          provider?: string
-          model?: string
-          family?: string
-          lesson_text?: string
-          breach_count?: number
-          fail_count?: number
-          last_seen_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      custom_attack_tools: {
-        Row: {
-          id: string
-          author_id: string
-          name: string
-          family: string
-          intensity_min: string
-          code: string
-          status: string
-          audit_result: string | null
-          network_allowed: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          author_id: string
-          name: string
-          family?: string
-          intensity_min?: string
-          code: string
-          status?: string
-          audit_result?: string | null
-          network_allowed?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          author_id?: string
-          name?: string
-          family?: string
-          intensity_min?: string
-          code?: string
-          status?: string
-          audit_result?: string | null
-          network_allowed?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       intel_messages_with_profile: {
         Row: {
-          content: string
-          created_at: string
+          content: string | null
+          created_at: string | null
           display_name: string | null
-          id: number
-          user_id: string
+          id: number | null
+          user_id: string | null
         }
         Relationships: []
       }
@@ -3174,24 +4382,379 @@ export type Database = {
           status: string | null
           user_id: string | null
         }
+        Insert: {
+          period_ends_at?: string | null
+          period_expired?: never
+          plan?: string | null
+          scans_allowed?: never
+          scans_used_this_period?: number | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          period_ends_at?: string | null
+          period_expired?: never
+          plan?: string | null
+          scans_allowed?: never
+          scans_used_this_period?: number | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles_public: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          clearance_tier: string | null
+          company_domain: string | null
+          company_tag: string | null
+          created_at: string | null
+          domain_verified: boolean | null
+          full_name: string | null
+          hacker_rank: string | null
+          id: string | null
+          identity_verified: boolean | null
+          is_ghost_active: boolean | null
+          job_title: string | null
+          reputation: number | null
+          sovereign_pending: boolean | null
+          work_email_verified: boolean | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          clearance_tier?: string | null
+          company_domain?: string | null
+          company_tag?: string | null
+          created_at?: string | null
+          domain_verified?: boolean | null
+          full_name?: string | null
+          hacker_rank?: string | null
+          id?: string | null
+          identity_verified?: boolean | null
+          is_ghost_active?: boolean | null
+          job_title?: string | null
+          reputation?: number | null
+          sovereign_pending?: boolean | null
+          work_email_verified?: boolean | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          clearance_tier?: string | null
+          company_domain?: string | null
+          company_tag?: string | null
+          created_at?: string | null
+          domain_verified?: boolean | null
+          full_name?: string | null
+          hacker_rank?: string | null
+          id?: string | null
+          identity_verified?: boolean | null
+          is_ghost_active?: boolean | null
+          job_title?: string | null
+          reputation?: number | null
+          sovereign_pending?: boolean | null
+          work_email_verified?: boolean | null
+        }
+        Relationships: []
+      }
+      profiles_with_rank: {
+        Row: {
+          access_level: number | null
+          account_status: string | null
+          active_view_mode: string | null
+          ai_audit_score: number | null
+          avatar_url: string | null
+          banned_until: string | null
+          bio: string | null
+          clearance_tier: string | null
+          company_domain: string | null
+          company_name: string | null
+          company_tag: string | null
+          cookie_consent_at: string | null
+          cookie_consent_version: string | null
+          created_at: string | null
+          current_persona: string | null
+          current_plan: string | null
+          data_processing_agreed: boolean | null
+          deleted_at: string | null
+          deletion_requested_at: string | null
+          domain_token: string | null
+          domain_verified: boolean | null
+          domain_verify_token: string | null
+          email: string | null
+          entitlements: Json | null
+          full_name: string | null
+          hacker_rank: string | null
+          id: string | null
+          identity_audit_notes: string | null
+          identity_audit_score: number | null
+          identity_audit_status: string | null
+          identity_document_path: string | null
+          identity_failure_reason: string | null
+          identity_proofed: boolean | null
+          identity_raw_ocr_data: Json | null
+          identity_status: string | null
+          identity_verified: boolean | null
+          is_admin: boolean | null
+          is_banned: boolean | null
+          is_ghost_active: boolean | null
+          is_verified: boolean | null
+          job_title: string | null
+          last_billing_sync_at: string | null
+          manual_verification_override: boolean | null
+          period_resets_at: string | null
+          phone: string | null
+          phone_number: string | null
+          phone_verified: boolean | null
+          profile_completeness: number | null
+          rank_ceiling: number | null
+          rank_label: string | null
+          rank_progress: number | null
+          reputation: number | null
+          revenue_simulation_mode: boolean | null
+          role: string | null
+          scans_used_this_period: number | null
+          signature_at: string | null
+          signature_data: string | null
+          sovereign_manual_verify: boolean | null
+          sovereign_pending: boolean | null
+          stripe_customer_id: string | null
+          subscription_tier: string | null
+          theme_preference: string | null
+          trust_score: number | null
+          twilio_simulation_mode: boolean | null
+          updated_at: string | null
+          user_type: string | null
+          verification_data: Json | null
+        }
+        Insert: {
+          access_level?: number | null
+          account_status?: string | null
+          active_view_mode?: string | null
+          ai_audit_score?: number | null
+          avatar_url?: string | null
+          banned_until?: string | null
+          bio?: string | null
+          clearance_tier?: string | null
+          company_domain?: string | null
+          company_name?: string | null
+          company_tag?: string | null
+          cookie_consent_at?: string | null
+          cookie_consent_version?: string | null
+          created_at?: string | null
+          current_persona?: string | null
+          current_plan?: string | null
+          data_processing_agreed?: boolean | null
+          deleted_at?: string | null
+          deletion_requested_at?: string | null
+          domain_token?: string | null
+          domain_verified?: boolean | null
+          domain_verify_token?: string | null
+          email?: string | null
+          entitlements?: Json | null
+          full_name?: string | null
+          hacker_rank?: string | null
+          id?: string | null
+          identity_audit_notes?: string | null
+          identity_audit_score?: number | null
+          identity_audit_status?: string | null
+          identity_document_path?: string | null
+          identity_failure_reason?: string | null
+          identity_proofed?: boolean | null
+          identity_raw_ocr_data?: Json | null
+          identity_status?: string | null
+          identity_verified?: boolean | null
+          is_admin?: boolean | null
+          is_banned?: boolean | null
+          is_ghost_active?: boolean | null
+          is_verified?: boolean | null
+          job_title?: string | null
+          last_billing_sync_at?: string | null
+          manual_verification_override?: boolean | null
+          period_resets_at?: string | null
+          phone?: string | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          profile_completeness?: number | null
+          rank_ceiling?: never
+          rank_label?: never
+          rank_progress?: never
+          reputation?: number | null
+          revenue_simulation_mode?: boolean | null
+          role?: string | null
+          scans_used_this_period?: number | null
+          signature_at?: string | null
+          signature_data?: string | null
+          sovereign_manual_verify?: boolean | null
+          sovereign_pending?: boolean | null
+          stripe_customer_id?: string | null
+          subscription_tier?: string | null
+          theme_preference?: string | null
+          trust_score?: number | null
+          twilio_simulation_mode?: boolean | null
+          updated_at?: string | null
+          user_type?: string | null
+          verification_data?: Json | null
+        }
+        Update: {
+          access_level?: number | null
+          account_status?: string | null
+          active_view_mode?: string | null
+          ai_audit_score?: number | null
+          avatar_url?: string | null
+          banned_until?: string | null
+          bio?: string | null
+          clearance_tier?: string | null
+          company_domain?: string | null
+          company_name?: string | null
+          company_tag?: string | null
+          cookie_consent_at?: string | null
+          cookie_consent_version?: string | null
+          created_at?: string | null
+          current_persona?: string | null
+          current_plan?: string | null
+          data_processing_agreed?: boolean | null
+          deleted_at?: string | null
+          deletion_requested_at?: string | null
+          domain_token?: string | null
+          domain_verified?: boolean | null
+          domain_verify_token?: string | null
+          email?: string | null
+          entitlements?: Json | null
+          full_name?: string | null
+          hacker_rank?: string | null
+          id?: string | null
+          identity_audit_notes?: string | null
+          identity_audit_score?: number | null
+          identity_audit_status?: string | null
+          identity_document_path?: string | null
+          identity_failure_reason?: string | null
+          identity_proofed?: boolean | null
+          identity_raw_ocr_data?: Json | null
+          identity_status?: string | null
+          identity_verified?: boolean | null
+          is_admin?: boolean | null
+          is_banned?: boolean | null
+          is_ghost_active?: boolean | null
+          is_verified?: boolean | null
+          job_title?: string | null
+          last_billing_sync_at?: string | null
+          manual_verification_override?: boolean | null
+          period_resets_at?: string | null
+          phone?: string | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          profile_completeness?: number | null
+          rank_ceiling?: never
+          rank_label?: never
+          rank_progress?: never
+          reputation?: number | null
+          revenue_simulation_mode?: boolean | null
+          role?: string | null
+          scans_used_this_period?: number | null
+          signature_at?: string | null
+          signature_data?: string | null
+          sovereign_manual_verify?: boolean | null
+          sovereign_pending?: boolean | null
+          stripe_customer_id?: string | null
+          subscription_tier?: string | null
+          theme_preference?: string | null
+          trust_score?: number | null
+          twilio_simulation_mode?: boolean | null
+          updated_at?: string | null
+          user_type?: string | null
+          verification_data?: Json | null
+        }
+        Relationships: []
+      }
+      visible_profiles: {
+        Row: {
+          clearance_tier: string | null
+          display_name: string | null
+          hacker_rank: string | null
+          id: string | null
+        }
+        Insert: {
+          clearance_tier?: string | null
+          display_name?: never
+          hacker_rank?: string | null
+          id?: string | null
+        }
+        Update: {
+          clearance_tier?: string | null
+          display_name?: never
+          hacker_rank?: string | null
+          id?: string | null
+        }
+        Relationships: []
+      }
+      war_machine_leads: {
+        Row: {
+          click_token: string | null
+          company_name: string | null
+          created_at: string | null
+          description: string | null
+          emails_sent_count: number | null
+          founder_name: string | null
+          id: string | null
+          last_email_sent_at: string | null
+          rank: string | null
+          source: string | null
+          status: string | null
+          vulnerability_summary: string | null
+          website_url: string | null
+        }
+        Insert: {
+          click_token?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          emails_sent_count?: number | null
+          founder_name?: string | null
+          id?: string | null
+          last_email_sent_at?: string | null
+          rank?: string | null
+          source?: string | null
+          status?: string | null
+          vulnerability_summary?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          click_token?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          description?: string | null
+          emails_sent_count?: number | null
+          founder_name?: string | null
+          id?: string | null
+          last_email_sent_at?: string | null
+          rank?: string | null
+          source?: string | null
+          status?: string | null
+          vulnerability_summary?: string | null
+          website_url?: string | null
+        }
         Relationships: []
       }
     }
     Functions: {
-      generate_domain_token: {
-        Args: { p_user_id: string }
-        Returns: string
-      }
       freeze_wallet: {
         Args: { p_reason?: string; p_user_id: string }
+        Returns: undefined
+      }
+      generate_domain_token: { Args: { p_user_id: string }; Returns: string }
+      increment_hacker_credits: {
+        Args: { p_credits: number; p_user_id: string }
         Returns: undefined
       }
       increment_purchase: {
         Args: { p_revenue: number; p_script_id: string }
         Returns: undefined
       }
-      increment_hacker_credits: {
-        Args: { p_user_id: string; p_credits: number }
+      increment_reputation: {
+        Args: { p_delta: number; p_user_id: string }
         Returns: undefined
       }
       increment_wallet:
@@ -3208,18 +4771,31 @@ export type Database = {
         }
         Returns: undefined
       }
+      operator_public_stats: { Args: { p_user_id: string }; Returns: Json }
       purchase_bazaar_script: {
         Args: { p_buyer_id: string; p_script_id: string }
         Returns: Json
       }
-      release_kinetic_bounty: {
-        Args: { p_escrow_id: string }
+      release_kinetic_bounty: { Args: { p_escrow_id: string }; Returns: Json }
+      submit_ctf_flag: {
+        Args: { p_challenge_id: string; p_flag: string; p_user_id: string }
         Returns: Json
       }
     }
     Enums: {
+      billing_plan: "free" | "operator" | "red_team" | "enterprise"
       scan_intensity: "recon" | "standard" | "aggressive" | "greasy"
       scan_surface_kind: "llm" | "web" | "mobile" | "code"
+      scheduled_scan_frequency: "daily" | "weekly" | "monthly"
+      subscription_status:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "unpaid"
+        | "incomplete"
+        | "incomplete_expired"
+        | "paused"
       tool_safety_status: "approved" | "rejected" | "pending"
       usage_kind:
         | "compute_seconds"
@@ -3354,8 +4930,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      billing_plan: ["free", "operator", "red_team", "enterprise"],
       scan_intensity: ["recon", "standard", "aggressive", "greasy"],
       scan_surface_kind: ["llm", "web", "mobile", "code"],
+      scheduled_scan_frequency: ["daily", "weekly", "monthly"],
+      subscription_status: [
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "unpaid",
+        "incomplete",
+        "incomplete_expired",
+        "paused",
+      ],
       tool_safety_status: ["approved", "rejected", "pending"],
       usage_kind: [
         "compute_seconds",
@@ -3367,18 +4955,3 @@ export const Constants = {
     },
   },
 } as const
-
-
-// Convenience row aliases
-export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
-export type UserWalletRow = Database["public"]["Tables"]["user_wallets"]["Row"]
-export type BazaarScriptRow = Database["public"]["Tables"]["bazaar_scripts"]["Row"]
-export type BazaarPurchaseRow = Database["public"]["Tables"]["bazaar_purchases"]["Row"]
-export type MissionRow = Database["public"]["Tables"]["missions"]["Row"]
-export type MissionProposalRow = Database["public"]["Tables"]["mission_proposals"]["Row"]
-export type MissionApplicationRow = Database["public"]["Tables"]["mission_applications"]["Row"]
-export type LegalSignatureRow = Database["public"]["Tables"]["legal_signatures"]["Row"]
-export type PlatformTransactionRow = Database["public"]["Tables"]["platform_transactions"]["Row"]
-export type BountyEscrowRow = Database["public"]["Tables"]["bounty_escrow"]["Row"]
-export type SubscriptionRow = Database["public"]["Tables"]["subscriptions"]["Row"]
-export type ScanRow = Database["public"]["Tables"]["scans"]["Row"]

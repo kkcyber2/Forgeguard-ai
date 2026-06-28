@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       id, owner_id, name, description, language, tags,
       is_public, is_archived, star_count, version, commit_count,
       created_at, updated_at,
-      owner:owner_id ( full_name, username, rank )
+      owner:owner_id ( full_name, hacker_rank )
     `, { count: "exact" })
     .order("star_count", { ascending: false })
     .range(offset, offset + limit - 1);

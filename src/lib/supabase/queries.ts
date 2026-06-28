@@ -6,8 +6,11 @@ type ServerSupabase = SupabaseClient<Database>;
 
 type ApiKeyRowMinimal = Pick<
   ApiKeyRow,
-  "id" | "name" | "key_prefix" | "created_at" | "revoked_at"
->;
+  "id" | "name" | "key_prefix"
+> & {
+  created_at: string | null;
+  revoked_at: string | null;
+};
 
 function normalizeApiKeyRow(
   row: ApiKeyRowMinimal & { last_used_at?: string | null },
@@ -16,7 +19,7 @@ function normalizeApiKeyRow(
     id: row.id,
     name: row.name,
     key_prefix: row.key_prefix,
-    created_at: row.created_at,
+    created_at: row.created_at ?? "",
     last_used_at: row.last_used_at ?? null,
     revoked_at: row.revoked_at ?? null,
   };

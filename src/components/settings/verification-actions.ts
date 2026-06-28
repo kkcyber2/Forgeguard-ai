@@ -300,7 +300,7 @@ export async function verifyOTP(
 
   if (!row) return { error: "No OTP pending. Request a new code." };
   if (row.consumed) return { error: "Code already used." };
-  if (new Date(row.expires_at) < new Date()) {
+  if (row.expires_at && new Date(row.expires_at) < new Date()) {
     await writeOtpLog(admin, {
       user_id: user.id,
       phone: normalized,

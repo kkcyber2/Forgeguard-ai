@@ -89,7 +89,7 @@ function CommunityChat() {
       .limit(50)
       .then(async ({ data }) => {
         if (!data?.length) return;
-        const userIds = Array.from(new Set(data.map((m) => m.user_id)));
+        const userIds = Array.from(new Set(data.map((m) => m.user_id).filter((u): u is string => !!u)));
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, is_ghost_active, hacker_rank, full_name")
@@ -97,12 +97,12 @@ function CommunityChat() {
         const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
         setMessages(
           data.map((m) => {
-            const prof = profileMap.get(m.user_id);
+            const prof = profileMap.get(m.user_id ?? "");
             return {
               ...m,
               id: String(m.id),
               display_name: resolvePublicDisplayName(
-                m.user_id,
+                m.user_id ?? "",
                 m.display_name,
                 prof?.is_ghost_active,
                 prof?.hacker_rank,

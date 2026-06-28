@@ -6,7 +6,7 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
 import { hasSovereignBypass } from "@/lib/access/sovereign-bypass";
-import { isPathAllowed, resolveAccessRank } from "@/lib/access/ranks";
+import { isPathAllowed, resolveAccessRank, type UserType } from "@/lib/access/ranks";
 import { getCurrentProfile, getSessionUser } from "@/lib/supabase/server";
 
 export default async function ForgeLayout({
@@ -23,7 +23,7 @@ export default async function ForgeLayout({
 
   if (
     !hasSovereignBypass(user.email) &&
-    !isPathAllowed("/dashboard/forge", rank, userType)
+    !isPathAllowed("/dashboard/forge", rank, userType as UserType)
   ) {
     redirect("/dashboard?gate=forge");
   }

@@ -1,6 +1,7 @@
 /**
  * Unit tests for the Aegis closed-loop proof engine (pure, no server-only).
- * Run with: node --test --experimental-strip-types src/lib/aegis/closed-loop-match.test.ts
+ * Run with: npm run test:unit
+ * (closed-loop tests use tsx due to extensionless transitive imports)
  */
 
 import { test } from "node:test";

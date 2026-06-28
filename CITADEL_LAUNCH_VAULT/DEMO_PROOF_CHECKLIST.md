@@ -90,10 +90,13 @@ signal. Do not demo until every box is checked.
 | 1 | `npm run build` in `forgeguard-ai` | **PASS** (no type errors from new Aegis code) |
 | 2 | `forgeguard-ai` `.github/workflows/ci.yml` | Green check on GitHub `main` |
 | 3 | `AI-red-team` `.github/workflows/ci.yml` | Green check on GitHub `main` |
-| 4 | `pytest tests/test_health.py` in AI-red-team | All tests pass (health, auth, SSRF) |
+| 4 | `pytest tests/ -q` in AI-red-team | All 48 tests pass (full suite) |
 | 5 | Vercel prod deploy | Green, matches latest `main` SHA |
 | 6 | Railway engine `curl https://engine.forgeguard-ai.com/health` | `{"status":"healthy",...}` |
 | 7 | Supabase migration `20260704_aegis_closed_loop.sql` | `aegis_rules` has `verified_blocks_attack` + `cloudflare_rule_id` columns live |
+| 8 | Developer sandbox (rank ≥3) | `/dashboard/developer` → **Test in sandbox** returns stdout or clear Docker error |
+
+**Optional (Real Developer System):** Author submits probe → sandbox test → admin approves → greasy scan lists tool in Brain kickoff → `run_operator_tool` executes (requires engine Docker on Railway).
 
 ---
 

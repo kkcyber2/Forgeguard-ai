@@ -1,7 +1,7 @@
 # ROADMAP_PROGRESS — CONDITIONAL GO → 10/10 Product
 
 **Started:** 2026-06-17 · **Supabase:** `nlginrukltrwpkyujzzx`  
-**Last updated:** 2026-06-27 (Stabilize, Prove & Finish pass)
+**Last updated:** 2026-06-28 (Build Fix Test Push sprint)
 
 ---
 
@@ -17,14 +17,14 @@ proof checklist. See `DEMO_PROOF_CHECKLIST.md`.
 | S.2 | Closed-loop API route (owner/sovereign/admin auth, 404 on leak) | **DONE** | `src/app/api/aegis/verify-closed-loop/route.ts` |
 | S.3 | Aegis verification panel wired into findings report | **DONE** | `src/app/dashboard/scans/[id]/aegis-verification-panel.tsx` (imported by `findings-report.tsx`) |
 | S.4 | Migration: `aegis_rules` schema alignment + proof cols | **DONE** | `20260704_aegis_closed_loop.sql` (scan_id, rule_id, pattern, action, `verified_blocks_attack`, `cloudflare_rule_id`) |
-| S.5 | Apply closed-loop migration live | **PENDING** | Supabase `nlginrukltrwpkyujzzx` via MCP |
+| S.5 | Apply closed-loop migration live | **DONE** | Applied + verified via Supabase MCP |
 | S.6 | AI-red-team dead-code purge (legacy entry files + duplicates) | **DONE** | Removed `comprehensive_test.py`, `elite_launch.py`, `run_redteam.py`, `probing_grounds_strike.py`, `vulnerable_fortress.py`, `target_bot.py`, `cli.py`, `risk_quantifier.py`, `social_swarm.py`, `reasoning_hijacker.py`, `discovery_engine.py`, `alignment_auditor.py`, `patch_generator.py`, `cost_protector.py`, `vulnerability_logic_tester.py`, `redteam.log` |
 | S.7 | CI workflow — `forgeguard-ai` | **DONE** | `.github/workflows/ci.yml` (lint + tsc + build) |
 | S.8 | CI workflow — `AI-red-team` | **DONE** | `.github/workflows/ci.yml` (ruff + pytest) |
 | S.9 | Engine health tests | **DONE** | `AI-red-team/tests/test_health.py` (health, auth, SSRF) |
 | S.10 | `DEMO_PROOF_CHECKLIST.md` (D1–D6 manual smoke list) | **DONE** | `CITADEL_LAUNCH_VAULT/DEMO_PROOF_CHECKLIST.md` |
 | S.11 | `npm run build` PASS with new Aegis code | **DONE** | 2026-06-27, 34 routes, exit 0 |
-| S.12 | Push + Vercel/Railway green | **IN PROGRESS** | Operator |
+| S.12 | Push + Vercel/Railway green | **IN PROGRESS** | Local @ `2d60e68` / `bd118f4`; push this sprint |
 
 ### Acceptance
 
@@ -228,7 +228,7 @@ buyers. See `SCOPE_ENFORCEMENT_SPEC.md` and `AUDIT_CHAIN_SPEC.md`.
 | 4.3 | `runIntelVaultQuery()` + rate limits + audit log | **DONE** | `vault-actions.ts`, `osint-runners.ts` |
 | 4.4 | Intel Hub **Intel Vault** tab (domain, query types, results) | **DONE** | `intel-vault-panel.tsx`, `intel-hub.tsx` |
 | 4.5 | Scan detail **Recon context** linkage | **DONE** | `scan-recon-context.tsx` on `/dashboard/scans/[id]` |
-| 4.6 | Push + Vercel deploy | **PENDING** | Local only until commit/push |
+| 4.6 | Push + Vercel deploy | **IN PROGRESS** | `2d60e68` includes Real Developer System |
 
 **Phase 4: DONE** (code complete — no live scan or OpenRouter required).
 
@@ -243,7 +243,7 @@ buyers. See `SCOPE_ENFORCEMENT_SPEC.md` and `AUDIT_CHAIN_SPEC.md`.
 | 5.3 | Public `/resources/almanac` SSR + filters | **DONE** | `app/resources/almanac/` |
 | 5.4 | Admin publish / unpublish / merge | **DONE** | `/admin/almanac` |
 | 5.5 | Optional CVE cron (CISA KEV keywords) | **DONE** | `/api/cron/almanac-cve`, `vercel.json` |
-| 5.6 | Apply migration live | **PENDING** | Supabase `nlginrukltrwpkyujzzx` |
+| 5.6 | Apply migration live | **DONE** | `operator_tool_executions` live on Supabase |
 
 **Phase 5: DONE** (code complete).
 

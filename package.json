@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:unit": "node --test --experimental-strip-types src/lib/scans/scope.test.ts src/lib/compliance/audit-chain.test.ts && npx tsx --test src/lib/aegis/closed-loop-match.test.ts",
     "test:ai-audit": "node scripts/test-ai-audit.mjs",
     "launch:db": "node scripts/run-launch-all.mjs",
     "launch:db:verify": "node scripts/run-launch-all.mjs --verify-only"

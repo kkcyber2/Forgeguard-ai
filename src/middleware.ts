@@ -66,6 +66,7 @@ const KNOWN_DASHBOARD_PREFIXES = [
   "/dashboard/bazaar",
   "/dashboard/bounties",
   "/dashboard/billing",
+  "/dashboard/developer",
   "/dashboard/forge",
   "/dashboard/intel",
   "/dashboard/missions",

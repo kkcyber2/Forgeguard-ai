@@ -37,6 +37,22 @@ function isIntensity(v: string): v is Intensity {
   return (TOOL_INTENSITIES as readonly string[]).includes(v);
 }
 
+async function authorAccessLevel(userId: string, email: string | undefined) {
+  const sovereign = isSovereignOperator(email);
+  if (sovereign) return { ok: true as const, accessLevel: 5 };
+  const supabase = await createServerSupabase();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("access_level")
+    .eq("id", userId)
+    .maybeSingle();
+  const accessLevel = (profile?.access_level as number | undefined) ?? 1;
+  if (accessLevel < 3) {
+    return { ok: false as const, error: "Rank 3+ required to author attack tools." };
+  }
+  return { ok: true as const, accessLevel };
+}
+
 export async function createCustomAttackTool(
   _prev: ToolFormState,
   formData: FormData,
@@ -47,16 +63,8 @@ export async function createCustomAttackTool(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorised." };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("access_level")
-    .eq("id", user.id)
-    .maybeSingle();
-  const accessLevel = (profile?.access_level as number | undefined) ?? 1;
-  const sovereign = isSovereignOperator(user.email);
-  if (!sovereign && accessLevel < 2) {
-    return { ok: false, error: "Rank 2+ required to author attack tools." };
-  }
+  const gate = await authorAccessLevel(user.id, user.email);
+  if (!gate.ok) return { ok: false, error: gate.error };
 
   const name = String(formData.get("name") ?? "").trim();
   const familyRaw = String(formData.get("family") ?? "").trim();
@@ -72,6 +80,15 @@ export async function createCustomAttackTool(
     return { ok: false, error: "Tool source must be 10–50,000 characters." };
 
   const audit = auditToolCode(code, networkAllowed);
+  if (audit.verdict === "rejected") {
+    return {
+      ok: false,
+      error: `Static audit rejected this probe (${audit.summary}). Remove sandbox-escape primitives before submitting.`,
+      auditSummary: audit.summary,
+      verdict: audit.verdict,
+      riskScore: audit.risk_score,
+    };
+  }
 
   const { data: tool, error } = await supabase
     .from("custom_attack_tools")
@@ -131,9 +148,30 @@ export async function resubmitCustomAttackTool(toolId: string): Promise<{ ok: bo
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorised." };
 
+  const { data: existing } = await supabase
+    .from("custom_attack_tools")
+    .select("code, network_allowed")
+    .eq("id", toolId)
+    .eq("author_id", user.id)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, error: "Tool not found." };
+
+  const audit = auditToolCode(String(existing.code ?? ""), Boolean(existing.network_allowed));
+  if (audit.verdict === "rejected") {
+    return {
+      ok: false,
+      error: `Static audit still rejects this probe (${audit.summary}). Edit the source before resubmitting.`,
+    };
+  }
+
   const { error } = await supabase
     .from("custom_attack_tools")
-    .update({ status: "pending", audit_result: "resubmitted by author", updated_at: new Date().toISOString() })
+    .update({
+      status: "pending",
+      audit_result: audit.summary,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", toolId)
     .eq("author_id", user.id);
 

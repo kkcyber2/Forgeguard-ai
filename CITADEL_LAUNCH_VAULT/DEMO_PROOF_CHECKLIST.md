@@ -37,17 +37,22 @@ signal. Do not demo until every box is checked.
 
 ---
 
-## D3 — Billing: Sovereign Vault crypto deposit
+## D3 — Billing: Sovereign Vault crypto deposit (invoice redirect)
+
+> **2026-06-28:** Checkout uses NOWPayments **hosted invoice redirect** (not on-site QR modal).
+> Click **Buy now** → redirects to NOWPayments → returns via success URL after payment.
 
 | # | Step | PASS signal |
 |---|------|-------------|
-| 1 | Open `/dashboard/billing` → Sovereign Vault → buy a pack | Modal opens |
-| 2 | Wait for NOWPayments call | A **fresh** `pay_address` + `pay_amount` per click (not static) |
-| 3 | Inspect QR data | Starts with `tron:<address>?amount=<pay_amount>` (protocol prefix present) |
-| 4 | Scan QR with Bybit / TronLink | Wallet opens pre-filled to the **correct network + amount** — **not** "invalid QR" |
-| 5 | Check Supabase `crypto_deposits` | Row has `pay_amount` populated |
-| 6 | Polling | Modal polls payment status (~10s) and flips to "confirmed" on `finished` |
-| 7 | On confirmation | Subscription / credits granted; dashboard reflects new plan |
+| 1 | Open `/dashboard/billing` → Credit Pack or plan **Buy now** | Redirects to NOWPayments hosted invoice |
+| 2 | Wait for invoice creation | **Fresh** `crypto_deposits` row with `order_id` + `invoice_url` |
+| 3 | Complete payment on NOWPayments page | User picks crypto on hosted page |
+| 4 | Pay exact amount on-chain | Wallet sends to address shown on NOWPayments |
+| 5 | Check Supabase `crypto_deposits` | Row has `payment_id`, `invoice_url`; moves to `confirmed` after IPN |
+| 6 | Vercel logs | IPN received at `/api/webhooks/nowpayments` (no persistent 401) |
+| 7 | On confirmation | Wallet +$10 (credit pack) or subscription granted; dashboard reflects plan |
+
+**Automated pre-check (2026-06-28):** Pending rows with `invoice_url` + `payment_id` exist — checkout initiation **PASS**. Live IPN **OPERATOR PENDING**.
 
 ---
 
@@ -104,11 +109,13 @@ signal. Do not demo until every box is checked.
 
 ## Sign-off
 
-- [ ] D1 tenant isolation
-- [ ] D2 sovereign / admin
-- [ ] D3 billing crypto
-- [ ] D4 scope + audit
-- [ ] D5 Aegis closed-loop
-- [ ] D6 CI / build / deploys
+- [ ] D1 tenant isolation — **OPERATOR** (RLS pre-verified; needs incognito signup)
+- [ ] D2 sovereign / admin — **PARTIAL** (launch-check 404 without auth ✓; sovereign session pending)
+- [ ] D3 billing crypto — **PARTIAL** (checkout rows + invoice ✓; live IPN pending)
+- [ ] D4 scope + audit — **PARTIAL** (scope unit tests ✓; audit chain needs new scan)
+- [ ] D5 Aegis closed-loop — **OPERATOR** (needs new sealed scan with findings)
+- [x] D6 CI / build / deploys — **PASS** (Vercel `da2e36d`, engine healthy, migrations live, pytest 13/13)
 
 **Demo-ready only when all six are checked.**
+
+See [`LAUNCH_PROOF_REPORT.md`](LAUNCH_PROOF_REPORT.md) for full automated evidence (2026-06-28).

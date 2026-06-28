@@ -260,7 +260,7 @@ buyers. See `SCOPE_ENFORCEMENT_SPEC.md` and `AUDIT_CHAIN_SPEC.md`.
 | 8 | E2EE (scoped) | NOT STARTED |
 | 9 | Forge Terminal v2 | NOT STARTED |
 | 10 | Beat Fable UX (CLI, leaderboard, demo) | NOT STARTED (deferred per user — Phase 4 first) |
-| 11 | Full verification + deploy | IN PROGRESS |
+| 11 | Full verification + deploy | **IN PROGRESS** — D6 PASS; operator smoke pending (see `LAUNCH_PROOF_REPORT.md`) |
 
 ---
 

@@ -5,12 +5,14 @@ import { useActionState } from "react";
 import { Boxes, Sparkles, Loader2 } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { buttonStyles } from "@/components/ui/button";
+import { PROBE_TEMPLATE } from "@/lib/developer/probe-template";
 import {
   createCustomAttackTool,
   TOOL_FAMILIES,
   TOOL_INTENSITIES,
   type ToolFormState,
 } from "./actions";
+import { DeveloperToolTester } from "./developer-tool-tester";
 
 const inputClass =
   "flex w-full rounded-sm bg-obsidian-800/70 px-3 py-2 text-sm border-hairline border-white/10 text-foreground placeholder:text-foreground-subtle focus:border-acid/60 focus:bg-obsidian-800 focus:outline-none focus-visible:ring-1 focus-visible:ring-acid/40";
@@ -19,6 +21,8 @@ const initial: ToolFormState = { ok: false };
 
 export function DeveloperToolForm() {
   const [state, formAction, pending] = useActionState(createCustomAttackTool, initial);
+  const [code, setCode] = React.useState(PROBE_TEMPLATE);
+  const [networkAllowed, setNetworkAllowed] = React.useState(false);
   const verdict = state.verdict;
 
   return (
@@ -58,7 +62,16 @@ export function DeveloperToolForm() {
       </div>
 
       <div className="mt-4">
-        <Label htmlFor="code">Tool source (Python)</Label>
+        <div className="mb-1.5 flex items-center justify-between">
+          <Label htmlFor="code">Tool source (Python probe.py)</Label>
+          <button
+            type="button"
+            onClick={() => setCode(PROBE_TEMPLATE)}
+            className={buttonStyles({ variant: "ghost", size: "sm" })}
+          >
+            Use template
+          </button>
+        </div>
         <textarea
           id="code"
           name="code"
@@ -66,25 +79,31 @@ export function DeveloperToolForm() {
           spellCheck={false}
           minLength={10}
           maxLength={50_000}
-          placeholder={
-            "async def run(ctx, target):\n" +
-            "    # ctx has: llm, http, log, target_url, intensity\n" +
-            "    return {\"finding\": None}\n"
-          }
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
           className={`${inputClass} h-56 font-mono text-xs leading-relaxed resize-y`}
         />
         <p className="mt-1.5 text-[11px] text-foreground-subtle">
-          Executed inside the Agathon Docker sandbox. Approved tools become callable by the
-          Brain via <code className="font-mono">run_operator_tool</code>.
+          Runs as <code className="font-mono">python3 probe.py</code> in Docker with env vars{" "}
+          <code className="font-mono">TARGET_URL</code>,{" "}
+          <code className="font-mono">TARGET_MODEL</code>,{" "}
+          <code className="font-mono">TARGET_API_KEY</code>. Approved tools are invoked by the Brain
+          via <code className="font-mono">run_operator_tool(name)</code>.
         </p>
       </div>
 
       <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-foreground-muted">
-        <input type="checkbox" name="network_allowed" className="h-4 w-4 accent-acid" />
+        <input
+          type="checkbox"
+          name="network_allowed"
+          checked={networkAllowed}
+          onChange={(e) => setNetworkAllowed(e.target.checked)}
+          className="h-4 w-4 accent-acid"
+        />
         Network access permitted (probes that contact the target)
       </label>
 
-      <div className="mt-5 flex items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={pending}
@@ -93,6 +112,12 @@ export function DeveloperToolForm() {
           {pending ? <Loader2 size={13} strokeWidth={1.75} className="animate-spin" /> : <Sparkles size={13} strokeWidth={1.75} />}
           Submit for audit
         </button>
+
+        <DeveloperToolTester
+          initialCode={code}
+          initialNetwork={networkAllowed}
+          triggerLabel="Test in sandbox"
+        />
 
         {state.error ? (
           <p className="text-xs text-threat">{state.error}</p>

@@ -7,7 +7,7 @@ import { createServerSupabase, getCurrentProfile, getSessionUser } from "@/lib/s
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { redirect } from "next/navigation";
 import { DeveloperToolForm } from "./developer-tool-form";
-import { DeveloperToolList, type DeveloperToolRow } from "./developer-tool-list";
+import { DeveloperToolList } from "./developer-tool-list";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,12 +41,29 @@ export default async function DeveloperConsolePage() {
   const { data: tools } = await supabase
     .from("custom_attack_tools")
     .select(
-      "id, name, family, intensity_min, status, network_allowed, audit_result, created_at, updated_at",
+      "id, name, family, intensity_min, status, network_allowed, audit_result, code, created_at, updated_at",
     )
     .eq("author_id", profile.id)
     .order("created_at", { ascending: false });
 
-  const rows = (tools ?? []) as unknown as DeveloperToolRow[];
+  const rows = (tools ?? []) as unknown as import("./developer-tool-list").DeveloperToolRow[];
+
+  const toolIds = rows.map((t) => t.id);
+  let executionsByTool: Record<string, import("./developer-tool-list").ToolExecutionRow[]> = {};
+  if (toolIds.length > 0) {
+    const { data: executions } = await supabase
+      .from("operator_tool_executions")
+      .select("id, tool_id, exit_code, stdout_preview, stderr_preview, created_at, scan_id")
+      .in("tool_id", toolIds)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    for (const ex of executions ?? []) {
+      const row = ex as import("./developer-tool-list").ToolExecutionRow;
+      if (!executionsByTool[row.tool_id]) executionsByTool[row.tool_id] = [];
+      const list = executionsByTool[row.tool_id];
+      if (list.length < 5) list.push(row);
+    }
+  }
 
   const approved = rows.filter((t) => t.status === "approved").length;
   const pending = rows.filter((t) => t.status === "pending").length;
@@ -96,7 +113,7 @@ export default async function DeveloperConsolePage() {
               {rows.length} total
             </Badge>
           </div>
-          <DeveloperToolList tools={rows} />
+          <DeveloperToolList tools={rows} executionsByTool={executionsByTool} />
         </div>
       </div>
     </>

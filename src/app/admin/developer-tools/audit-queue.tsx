@@ -6,6 +6,7 @@ import { Check, X, Ban, Loader2, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { buttonStyles } from "@/components/ui/button";
+import { DeveloperToolTester } from "@/app/dashboard/developer/developer-tool-tester";
 import { approveCustomAttackTool, rejectCustomAttackTool, disableCustomAttackTool } from "./actions";
 
 export interface AuditToolRow {
@@ -101,6 +102,11 @@ function AuditCard({ tool }: { tool: AuditToolRow }) {
           </pre>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <DeveloperToolTester
+              initialCode={tool.code}
+              initialNetwork={tool.network_allowed}
+              triggerLabel="Run sandbox test"
+            />
             <button
               disabled={pending || tool.status === "approved"}
               onClick={() => start(async () => { await approveCustomAttackTool(tool.id); })}

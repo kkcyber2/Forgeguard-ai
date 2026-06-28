@@ -1274,6 +1274,61 @@ export type Database = {
         }
         Relationships: []
       }
+      operator_tool_executions: {
+        Row: {
+          author_id: string | null
+          created_at: string
+          exit_code: number | null
+          id: string
+          scan_id: string | null
+          stderr_preview: string | null
+          stdout_preview: string | null
+          tool_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          created_at?: string
+          exit_code?: number | null
+          id?: string
+          scan_id?: string | null
+          stderr_preview?: string | null
+          stdout_preview?: string | null
+          tool_id: string
+        }
+        Update: {
+          author_id?: string | null
+          created_at?: string
+          exit_code?: number | null
+          id?: string
+          scan_id?: string | null
+          stderr_preview?: string | null
+          stdout_preview?: string | null
+          tool_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_tool_executions_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "custom_attack_tools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_tool_executions_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_tool_executions_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_tools: {
         Row: {
           created_at: string

@@ -19,6 +19,10 @@ import {
   isSessionFortressBlocked,
 } from "@/services/fortress-perimeter.service";
 import { isIpBlocked, ipHashFromRequest } from "@/lib/perimeter/ip-blocklist";
+import {
+  ensureSovereignCitadelBootstrap,
+  isAgencyMemberService,
+} from "@/lib/citadel/membership-edge";
 import { recordPerimeterViolation } from "@/lib/perimeter/record-violation";
 import { applyTarPitIfFlagged } from "@/lib/perimeter/tarpit";
 import { THREAT_DELTAS } from "@/lib/perimeter/threat-score";
@@ -66,6 +70,7 @@ const KNOWN_DASHBOARD_PREFIXES = [
   "/dashboard/bazaar",
   "/dashboard/bounties",
   "/dashboard/billing",
+  "/dashboard/client-home",
   "/dashboard/developer",
   "/dashboard/forge",
   "/dashboard/intel",
@@ -292,6 +297,48 @@ function buildCsp(nonce: string, isDev: boolean): string {
 function defaultAllowedOrigin(isDev: boolean): string {
   if (process.env.ALLOWED_ORIGINS) return process.env.ALLOWED_ORIGINS;
   return isDev ? "http://localhost:3000" : "https://www.forgeguard-ai.com";
+}
+
+async function enforceCitadelGate(
+  request: NextRequest,
+): Promise<NextResponse | null> {
+  const { pathname } = request.nextUrl;
+  if (!pathname.startsWith("/citadel") && !pathname.startsWith("/api/citadel")) {
+    return null;
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll() {},
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  let member = await isAgencyMemberService(user.id);
+  if (!member && isSovereignOperator(user.email)) {
+    member = await ensureSovereignCitadelBootstrap(user.id);
+  }
+  if (!member) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  return null;
 }
 
 async function enforceAdminSovereignGate(
@@ -530,6 +577,9 @@ export async function middleware(request: NextRequest) {
 
   const sovereignBlock = await enforceAdminSovereignGate(request);
   if (sovereignBlock) return sovereignBlock;
+
+  const citadelBlock = await enforceCitadelGate(request);
+  if (citadelBlock) return citadelBlock;
 
   const sovereignBypass = await isSovereignRequest(request);
 

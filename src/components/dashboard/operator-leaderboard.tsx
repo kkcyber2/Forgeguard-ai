@@ -6,17 +6,16 @@ import {
   resolveTrustTier,
   resolveVerifiedCompanyTag,
 } from "@/lib/trust/identity";
-import { hasSovereignBypass } from "@/lib/access/sovereign-bypass";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
   try {
     await connection();
     const supabase = await createServerSupabase();
-    const { data: rows, error } = await supabase
-      .from("profiles")
+    const { data: rows, error } = await (supabase as any)
+      .from("profiles_public")
       .select(
-        "id, email, full_name, hacker_rank, reputation, identity_verified, company_tag, domain_verified, company_domain, work_email_verified, sovereign_pending, clearance_tier",
+        "id, full_name, hacker_rank, reputation, identity_verified, company_tag, domain_verified, company_domain, work_email_verified, sovereign_pending, clearance_tier",
       )
       .order("reputation", { ascending: false })
       .limit(limit);
@@ -42,7 +41,19 @@ export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
 
     return (
       <ol className="space-y-2">
-        {operators.map((op, i) => {
+        {operators.map((op: {
+          id: string;
+          full_name: string | null;
+          hacker_rank: string | null;
+          reputation: number | null;
+          identity_verified: boolean | null;
+          company_tag: string | null;
+          domain_verified: boolean | null;
+          company_domain: string | null;
+          work_email_verified: boolean | null;
+          sovereign_pending: boolean | null;
+          clearance_tier: string | null;
+        }, i: number) => {
           const trustFields = {
             company_tag: op.company_tag,
             domain_verified: op.domain_verified,
@@ -51,10 +62,10 @@ export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
             identity_verified: op.identity_verified,
             sovereign_pending: op.sovereign_pending,
             clearance_tier: op.clearance_tier,
-            email: op.email,
+            email: null as string | null,
           };
           const verifiedTag = resolveVerifiedCompanyTag(trustFields);
-          const trustTier = resolveTrustTier(trustFields, hasSovereignBypass(op.email));
+          const trustTier = resolveTrustTier(trustFields, false);
 
           return (
           <li key={op.id} className="flex items-center gap-3">
@@ -67,7 +78,7 @@ export async function OperatorLeaderboard({ limit = 8 }: { limit?: number }) {
             >
               <HackerProfile
                 fullName={op.full_name}
-                email={op.email}
+                email=""
                 hackerRank={normalizeHackerRankLabel(op.hacker_rank)}
                 reputation={op.reputation ?? 0}
                 identityVerified={op.identity_verified ?? false}

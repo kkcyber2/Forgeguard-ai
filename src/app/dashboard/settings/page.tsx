@@ -21,6 +21,9 @@ import { GhostProtocolToggle } from "@/components/dashboard/ghost-protocol-toggl
 import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { DeleteAccountButton } from "@/components/settings/delete-account-button";
+import { TrainingCorpusOptOut } from "@/components/settings/training-corpus-opt-out";
+import { MfaSettingsStub } from "@/components/settings/mfa-settings-stub";
+import { TeamE2eeStub } from "@/components/settings/team-e2ee-stub";
 
 /**
  * /dashboard/settings — operator profile management.
@@ -114,6 +117,13 @@ export default async function SettingsPage() {
           >
             <NotificationsForm initialPrefs={notifPrefs} />
           </Section>
+
+          <TrainingCorpusOptOut
+            userId={user.id}
+            initialOptOut={Boolean(data.profile?.training_corpus_opt_out)}
+          />
+          <MfaSettingsStub />
+          <TeamE2eeStub />
 
           <Section
             id="domain"

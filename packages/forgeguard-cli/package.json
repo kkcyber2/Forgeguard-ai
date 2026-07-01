@@ -1,0 +1,9 @@
+{
+  "name": "@forgeguard/cli",
+  "version": "0.1.0-stub",
+  "private": true,
+  "description": "ForgeGuard CLI stub — Phase 9",
+  "bin": {
+    "fg": "./bin/fg.js"
+  }
+}

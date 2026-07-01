@@ -51,6 +51,35 @@ export function recordPerimeterViolation(
   });
 
   if (url && key) {
+    const isHoneypot =
+      options.reason.includes("honeypot") || options.source === "honeypot";
+    if (isHoneypot) {
+      void fetch(`${url}/rest/v1/black_hole_telemetry`, {
+        method: "POST",
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          ip_address: ip,
+          user_agent: request.headers.get("user-agent"),
+          reason: options.reason,
+          path: request.nextUrl.pathname,
+          metadata: {
+            method: request.method,
+            ip_hash: ipHash,
+            geo_country: geo.country,
+            threat_delta: delta,
+            source: options.source ?? "fortress",
+          },
+        }),
+      }).catch(() => {
+        /* never block the edge */
+      });
+    }
+
     void fetch(`${url}/rest/v1/blacklisted_entities`, {
       method: "POST",
       headers: {

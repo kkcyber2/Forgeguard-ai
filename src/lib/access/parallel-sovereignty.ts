@@ -94,17 +94,21 @@ export function buildDevNav(): { primary: NavItem[]; secondary: NavItem[] } {
 }
 
 /** Unified nav for ksk805763@gmail.com — all System + Hacker + Client routes. */
-export function buildSovereignMasterNav(): {
+export function buildSovereignMasterNav(options?: { showCitadel?: boolean }): {
   primary: NavItem[];
   secondary: NavItem[];
   sections: Record<string, NavItem[]>;
 } {
+  const showCitadel = options?.showCitadel !== false;
   const system: NavItem[] = [
     { href: "/admin", label: "Command Center", icon: "layout-dashboard", section: "SYSTEM" },
     { href: "/admin/threats", label: "Live Map", icon: "globe", section: "SYSTEM" },
     { href: "/admin/threat-console", label: "Threat Console", icon: "shield-alert", section: "SYSTEM" },
     { href: "/admin/users", label: "User Management", icon: "users", section: "SYSTEM" },
     { href: "/admin/threats", label: "Global Threats", icon: "shield-alert", section: "SYSTEM" },
+    ...(showCitadel
+      ? [{ href: "/citadel", label: "Citadel", icon: "shield-check" as const, section: "SYSTEM" as const }]
+      : []),
   ];
   const hacker: NavItem[] = [
     { href: "/dashboard/hacker-home", label: "Hacker Home", icon: "swords", section: "HACKER" },
@@ -115,6 +119,7 @@ export function buildSovereignMasterNav(): {
     { href: "/dashboard/intel", label: "Leaderboard", icon: "zap", section: "HACKER" },
   ];
   const client: NavItem[] = [
+    { href: "/dashboard/client-home", label: "Client Home", icon: "layout-dashboard", section: "CLIENT" },
     { href: "/dashboard/aegis", label: "Aegis Shield", icon: "shield-check", section: "CLIENT" },
     { href: "/dashboard/bounties", label: "Bounty Management", icon: "shield-alert", section: "CLIENT" },
     { href: "/dashboard/scans", label: "Scans", icon: "radar", section: "CLIENT" },
@@ -169,6 +174,7 @@ export function buildSovereignNav(
     viewMode === "client"
       ? [
           { href: "/dashboard", label: "Overview", icon: "layout-dashboard", section: "Stronghold" },
+          { href: "/dashboard/client-home", label: "Client Home", icon: "layout-dashboard", section: "Stronghold" },
           { href: "/dashboard/analytics", label: "Analytics", icon: "activity", section: "Operations" },
           { href: "/dashboard/aegis", label: "Aegis Shield", icon: "shield-check", section: "Operations" },
           { href: "/dashboard/bounties", label: "Bounty Management", icon: "shield-alert", section: "Operations" },

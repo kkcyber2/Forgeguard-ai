@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { cn } from "@/lib/utils";
+import { ForgeTerminalXterm } from "@/components/forge/forge-terminal-xterm";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -711,48 +712,8 @@ export default function ForgePage() {
             </div>
           </div>
 
-          {/* Terminal body */}
-          <div
-            ref={termRef}
-            className={cn(
-              "h-[480px] overflow-y-auto rounded-sm border border-white/[0.07]",
-              "bg-obsidian-950/90 py-2",
-              "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-steel-900",
-            )}
-          >
-            {events.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xs border border-white/[0.06] bg-obsidian-800/60">
-                  <Terminal size={14} strokeWidth={1.5} className="text-foreground-subtle" />
-                </div>
-                <p className="text-sm font-medium text-foreground-muted">
-                  Awaiting execution
-                </p>
-                <p className="max-w-[200px] font-mono text-[10px] uppercase tracking-[0.12em] text-foreground-subtle">
-                  Select a script and press Run
-                </p>
-              </div>
-            ) : (
-              <AnimatePresence initial={false}>
-                {events.map((ev, i) => (
-                  <TerminalLine key={i} ev={ev} index={i} />
-                ))}
-                {running && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2 px-4 py-[3px] font-mono text-[12px]"
-                  >
-                    <span className="text-acid select-none">▸</span>
-                    <span className="text-acid">
-                      <span className="inline-block animate-[blink_1s_step-end_infinite]">█</span>
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-          </div>
+          {/* Terminal body — xterm.js v2 */}
+          <ForgeTerminalXterm events={events} running={running} />
 
           {/* STDIN input bar — visible while running or waiting for input */}
           <AnimatePresence>

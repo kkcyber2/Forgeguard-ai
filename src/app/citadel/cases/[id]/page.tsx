@@ -1,9 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CaseNoteForm } from "@/components/citadel/case-note-form";
 import { runFusionIngestForCase } from "@/lib/citadel/actions";
 import { fetchCaseDetail } from "@/lib/citadel/queries";
 
 export const dynamic = "force-dynamic";
+
+const ADMIRALTY_LABELS: Record<string, string> = {
+  A: "A — Reliable",
+  B: "B — Usually reliable",
+  C: "C — Fairly reliable",
+  D: "D — Not usually reliable",
+  E: "E — Unreliable",
+  F: "F — Cannot be judged",
+};
 
 export default async function CitadelCasePage({
   params,
@@ -11,7 +21,8 @@ export default async function CitadelCasePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { case: caseRow, entities, notes } = await fetchCaseDetail(id);
+  const { case: caseRow, entities, notes, timeline, corpusEvents } =
+    await fetchCaseDetail(id);
   if (!caseRow) notFound();
 
   return (
@@ -39,6 +50,25 @@ export default async function CitadelCasePage({
       )}
 
       <section className="rounded-sm border border-white/[0.06] p-5">
+        <h3 className="font-mono text-xs uppercase text-zinc-400">Case timeline</h3>
+        <ul className="mt-4 space-y-2 text-sm">
+          {timeline.map((ev: { id: string; action: string; created_at: string; meta?: { source_reliability?: string } }) => (
+            <li key={ev.id} className="flex justify-between gap-4 border-b border-white/[0.04] py-2">
+              <span className="text-zinc-400">{ev.action}</span>
+              <span className="font-mono text-[10px] text-zinc-600">
+                {ev.meta?.source_reliability
+                  ? ADMIRALTY_LABELS[ev.meta.source_reliability] ?? ev.meta.source_reliability
+                  : new Date(ev.created_at).toLocaleString()}
+              </span>
+            </li>
+          ))}
+          {timeline.length === 0 && (
+            <li className="text-zinc-500">No audit events yet.</li>
+          )}
+        </ul>
+      </section>
+
+      <section className="rounded-sm border border-white/[0.06] p-5">
         <h3 className="font-mono text-xs uppercase text-zinc-400">Entities ({entities.length})</h3>
         <ul className="mt-4 space-y-2 text-sm">
           {entities.map((e) => (
@@ -55,9 +85,10 @@ export default async function CitadelCasePage({
         </ul>
       </section>
 
-      {notes.length > 0 && (
-        <section className="rounded-sm border border-white/[0.06] p-5">
-          <h3 className="font-mono text-xs uppercase text-zinc-400">Notes</h3>
+      <section className="rounded-sm border border-white/[0.06] p-5">
+        <h3 className="font-mono text-xs uppercase text-zinc-400">Analyst notes</h3>
+        <CaseNoteForm caseId={id} />
+        {notes.length > 0 && (
           <ul className="mt-4 space-y-3 text-sm text-zinc-400">
             {notes.map((n: { id: string; body_md: string; created_at: string }) => (
               <li key={n.id}>
@@ -65,6 +96,20 @@ export default async function CitadelCasePage({
                 <time className="font-mono text-[10px] text-zinc-600">
                   {new Date(n.created_at).toLocaleString()}
                 </time>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {corpusEvents.length > 0 && (
+        <section className="rounded-sm border border-white/[0.06] p-5">
+          <h3 className="font-mono text-xs uppercase text-zinc-400">Training corpus (redacted)</h3>
+          <ul className="mt-4 space-y-2 text-xs text-zinc-500">
+            {corpusEvents.map((c: { id: string; event_type: string; redacted_summary: string | null; created_at: string }) => (
+              <li key={c.id}>
+                <span className="text-cyan-600/80">{c.event_type}</span>
+                {c.redacted_summary ? ` — ${c.redacted_summary}` : null}
               </li>
             ))}
           </ul>

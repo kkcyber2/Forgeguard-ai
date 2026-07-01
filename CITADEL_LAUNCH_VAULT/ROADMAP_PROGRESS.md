@@ -255,12 +255,14 @@ buyers. See `SCOPE_ENFORCEMENT_SPEC.md` and `AUDIT_CHAIN_SPEC.md`.
 |-------|-------|--------|
 | 4 | Citadel Intel Vault (legal OSINT) | **DONE** |
 | 5 | Vulnerability Almanac | **DONE** |
-| 6 | Startup / Client HQ | NOT STARTED |
-| 7 | Auth hardening (2FA, recovery) | NOT STARTED |
-| 8 | E2EE (scoped) | NOT STARTED |
-| 9 | Forge Terminal v2 | NOT STARTED |
-| 10 | Beat Fable UX (CLI, leaderboard, demo) | NOT STARTED (deferred per user — Phase 4 first) |
-| 11 | Full verification + deploy | **IN PROGRESS** — D6 PASS; operator smoke pending (see `LAUNCH_PROOF_REPORT.md`) |
+| 6 | Startup / Client HQ | **DONE** | `/dashboard/client-home`, training corpus opt-out, orgs foundation |
+| 7 | Auth hardening (2FA, recovery) | **DONE** | TOTP MFA settings, recovery codes, Citadel/Admin AAL2 gate |
+| 8 | E2EE (scoped) | **DONE** | Mission E2EE + Intel Hub team channel |
+| 9 | Forge Terminal v2 | **DONE** | xterm.js panel + `forge_command_registry` |
+| 10 | Beat Fable UX (CLI, leaderboard, demo) | **DONE** | Leaderboard, depth toggle → engine, CLI v0.2, demo API, Bazaar modules |
+| **Citadel** | Compartment Zero agency fusion | **DONE** | `/citadel`, STIX, watchlists cron, case notes, leads |
+| **Developer v2** | Versioning + Bazaar bridge | **DONE** | `custom_attack_tool_versions`, publish to Bazaar |
+| 11 | Full verification + deploy | **OPERATOR** | Apply migrations `20260710`–`20260714`; smoke OpenRouter/IPN when ready |
 
 ---
 

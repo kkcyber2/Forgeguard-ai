@@ -62,7 +62,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
   const { data: scan, error: scanErr } = (await admin
     .from("scans")
     .select(
-      "id, user_id, target_model, target_url, target_credential_encrypted, intensity, surface_kind, asset_value_usd, scope_host, scope_verified_at",
+      "id, user_id, target_model, target_url, target_credential_encrypted, intensity, surface_kind, asset_value_usd, scope_host, scope_verified_at, target_vector",
     )
     .eq("id", scanId)
     .maybeSingle()) as {
@@ -77,6 +77,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       asset_value_usd: number | null;
       scope_host: string | null;
       scope_verified_at: string | null;
+      target_vector: string | null;
     } | null;
     error: { message: string } | null;
   };
@@ -178,6 +179,9 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       } | null;
     };
 
+    const depthMatch = scan.target_vector?.match(/^depth:(shallow|standard|deep)$/);
+    const scanDepth = depthMatch?.[1] ?? "standard";
+
     const dispatchBody = {
       scan_id: scan.id,
       user_id: scan.user_id,
@@ -186,6 +190,7 @@ export async function runScan({ scanId, userId }: RunScanOptions): Promise<void>
       target_api_key: targetApiKey,
       api_key: targetApiKey,
       intensity: scan.intensity ?? "standard",
+      scan_depth: scanDepth,
       surface_kind: scan.surface_kind ?? "llm",
       target_type: scan.surface_kind ?? "llm",
       asset_value_usd:

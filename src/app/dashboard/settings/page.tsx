@@ -22,8 +22,8 @@ import { OperatorLeaderboard } from "@/components/dashboard/operator-leaderboard
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { DeleteAccountButton } from "@/components/settings/delete-account-button";
 import { TrainingCorpusOptOut } from "@/components/settings/training-corpus-opt-out";
-import { MfaSettingsStub } from "@/components/settings/mfa-settings-stub";
-import { TeamE2eeStub } from "@/components/settings/team-e2ee-stub";
+import { MfaSettings } from "@/components/settings/mfa-settings";
+import { TeamE2eeSettings } from "@/components/settings/team-e2ee-settings";
 
 /**
  * /dashboard/settings — operator profile management.
@@ -122,8 +122,8 @@ export default async function SettingsPage() {
             userId={user.id}
             initialOptOut={Boolean(data.profile?.training_corpus_opt_out)}
           />
-          <MfaSettingsStub />
-          <TeamE2eeStub />
+          <MfaSettings />
+          <TeamE2eeSettings />
 
           <Section
             id="domain"

@@ -87,7 +87,7 @@ export async function fetchCaseDetail(caseId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  const [caseRes, entitiesRes, notesRes] = await Promise.all([
+  const [caseRes, entitiesRes, notesRes, auditRes, corpusRes] = await Promise.all([
     db.from("agency_cases").select("*").eq("id", caseId).maybeSingle(),
     db
       .from("agency_entities")
@@ -99,12 +99,25 @@ export async function fetchCaseDetail(caseId: string) {
       .select("*")
       .eq("case_id", caseId)
       .order("created_at", { ascending: false }),
+    db
+      .from("agency_audit_events")
+      .select("*")
+      .eq("target_id", caseId)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    db
+      .from("training_corpus_events")
+      .select("id, event_type, redacted_summary, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   return {
     case: caseRes.data as AgencyCase | null,
     entities: (entitiesRes.data as AgencyEntity[]) ?? [],
     notes: notesRes.data ?? [],
+    timeline: auditRes.data ?? [],
+    corpusEvents: corpusRes.data ?? [],
   };
 }
 

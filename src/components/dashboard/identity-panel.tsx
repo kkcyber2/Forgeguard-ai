@@ -256,7 +256,7 @@ function ClientPanel({
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Link
           href="/dashboard/aegis"
           className="flex items-center justify-between rounded-[3px] border-[0.5px] border-white/[0.07] px-3 py-2 text-white/40 transition-colors hover:border-white/15 hover:text-white/70"
@@ -269,6 +269,13 @@ function ClientPanel({
           className="flex items-center justify-between rounded-[3px] border-[0.5px] border-white/[0.07] px-3 py-2 text-white/40 transition-colors hover:border-white/15 hover:text-white/70"
         >
           <span className="font-mono text-[10px] uppercase tracking-widest">Post Bounty</span>
+          <ChevronRight size={11} strokeWidth={1.5} />
+        </Link>
+        <Link
+          href="/dashboard/settings#api-keys"
+          className="flex items-center justify-between rounded-[3px] border-[0.5px] border-white/[0.07] px-3 py-2 text-white/40 transition-colors hover:border-white/15 hover:text-white/70"
+        >
+          <span className="font-mono text-[10px] uppercase tracking-widest">Audit Export</span>
           <ChevronRight size={11} strokeWidth={1.5} />
         </Link>
       </div>

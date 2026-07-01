@@ -132,6 +132,10 @@ export async function createScan(
   };
   const intensity = intensityMap[rawIntensity] ?? "standard";
 
+  const rawDepth = String(formData.get("scanDepth") ?? "standard");
+  const scanDepth =
+    rawDepth === "shallow" || rawDepth === "deep" ? rawDepth : "standard";
+
   const legalAuthId = String(formData.get("legal_auth_id") ?? "").trim();
   if (!sovereign && (intensity === "aggressive" || intensity === "greasy")) {
     if (!legalAuthId) {
@@ -251,6 +255,7 @@ export async function createScan(
       progress_pct: 0,
       intensity,
       surface_kind: parsed.data.surface_kind,
+      target_vector: `depth:${scanDepth}`,
       notes: parsed.data.notes ?? null,
       asset_value_usd:
         parsed.data.asset_value_usd != null && parsed.data.asset_value_usd > 0

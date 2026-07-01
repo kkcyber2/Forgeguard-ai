@@ -182,3 +182,107 @@ export async function resubmitCustomAttackTool(toolId: string): Promise<{ ok: bo
   revalidatePath("/dashboard/developer");
   return { ok: true };
 }
+
+export async function saveToolVersion(
+  toolId: string,
+  code: string,
+  changelog?: string,
+): Promise<{ ok: boolean; error?: string; version?: number }> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Unauthorised." };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: tool } = await (supabase as any)
+    .from("custom_attack_tools")
+    .select("id, version, author_id, code")
+    .eq("id", toolId)
+    .eq("author_id", user.id)
+    .maybeSingle();
+
+  if (!tool) return { ok: false, error: "Tool not found." };
+
+  const currentVersion = (tool.version as number | undefined) ?? 1;
+  const nextVersion = currentVersion + 1;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: histErr } = await (supabase as any).from("custom_attack_tool_versions").insert({
+    tool_id: toolId,
+    version: currentVersion,
+    code: tool.code,
+    changelog: changelog ?? null,
+    created_by: user.id,
+  });
+
+  if (histErr) {
+    console.error("[developer] version history:", histErr);
+    return { ok: false, error: "Could not save version history." };
+  }
+
+  const { error } = await (supabase as any)
+    .from("custom_attack_tools")
+    .update({ code, version: nextVersion, updated_at: new Date().toISOString() })
+    .eq("id", toolId)
+    .eq("author_id", user.id);
+
+  if (error) return { ok: false, error: "Could not update tool." };
+
+  revalidatePath("/dashboard/developer");
+  return { ok: true, version: nextVersion };
+}
+
+export async function publishApprovedToolToBazaar(
+  toolId: string,
+): Promise<{ ok: boolean; error?: string; scriptId?: string }> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Unauthorised." };
+
+  const { data: tool } = await supabase
+    .from("custom_attack_tools")
+    .select("id, name, family, code, status, author_id, intensity_min")
+    .eq("id", toolId)
+    .eq("author_id", user.id)
+    .maybeSingle();
+
+  if (!tool) return { ok: false, error: "Tool not found." };
+  if (tool.status !== "approved") {
+    return { ok: false, error: "Only approved tools can publish to Bazaar." };
+  }
+
+  const family = String(tool.family ?? "prompt");
+  const tags = [family, String(tool.intensity_min ?? "standard")];
+
+  const { data: script, error } = await supabase
+    .from("bazaar_scripts")
+    .insert({
+      author_id: user.id,
+      name: tool.name,
+      title: tool.name,
+      description: `Developer probe — ${family} module`,
+      language: "python",
+      tags,
+      code: tool.code,
+      code_content: tool.code,
+      price_usd: 0,
+      is_free: true,
+      audit_verdict: "cleared",
+      is_published: true,
+      metadata: { source: "custom_attack_tools", tool_id: tool.id, module_category: family },
+    })
+    .select("id")
+    .single();
+
+  if (error || !script) {
+    console.error("[developer] bazaar publish:", error);
+    return { ok: false, error: error?.message ?? "Publish failed." };
+  }
+
+  revalidatePath("/dashboard/developer");
+  revalidatePath("/dashboard/bazaar");
+  return { ok: true, scriptId: script.id as string };
+}

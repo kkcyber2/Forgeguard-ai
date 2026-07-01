@@ -17,6 +17,7 @@ import {
   type UiIntensity,
 } from "@/lib/scans/intensity-budget";
 import type { ProbeSuggestion } from "@/lib/training/corpus-suggest";
+import { ScanDepthToggle } from "@/components/scans/scan-depth-toggle";
 
 /**
  * NewScanForm — client-side wrapper around the `createScan` Server Action.
@@ -573,6 +574,8 @@ export function NewScanForm({
             </p>
           </div>
         </div>
+
+        <ScanDepthToggle />
 
         {probeSuggestion && (
           <div className="rounded-sm border border-violet-400/20 bg-violet-400/5 p-4">

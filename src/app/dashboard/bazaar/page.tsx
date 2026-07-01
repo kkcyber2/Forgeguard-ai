@@ -19,6 +19,7 @@ import { purchaseScript } from "@/components/bazaar/actions";
 import { notifyWalletRefresh } from "@/lib/wallet-events";
 import { isSovereignOperator } from "@/lib/access/sovereign-operator";
 import { fetchBazaarCatalog } from "@/lib/bazaar/fetch-catalog";
+import { BAZAAR_MODULE_CATEGORIES } from "@/lib/bazaar/module-categories";
 import { createClient } from "@/lib/supabase/client";
 import {
   ShoppingCart, Upload, Search, Filter, Zap,
@@ -730,6 +731,7 @@ export default function BazaarPage() {
   const [loading, setLoading]         = React.useState(true);
   const [search, setSearch]           = React.useState("");
   const [filterLang, setFilterLang]   = React.useState("all");
+  const [filterCategory, setFilterCategory] = React.useState("all");
   const [filterFree, setFilterFree]   = React.useState(false);
   const [uploading, setUploading]     = React.useState(false);
   const [purchasing, setPurchasing]   = React.useState<string | null>(null);
@@ -830,6 +832,7 @@ export default function BazaarPage() {
 
   const filtered = scripts.filter((s) => {
     if (certifiedIds.has(s.id)) return false;
+    if (filterCategory !== "all" && !s.tags.includes(filterCategory)) return false;
     const q = search.toLowerCase();
     return (
       s.name.toLowerCase().includes(q) ||
@@ -962,6 +965,24 @@ export default function BazaarPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+          </div>
+
+          {/* Module category filter (Metasploit-style) */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-transparent py-2 pl-3 pr-8 font-mono text-[11px] text-[#9CA3AF] focus:outline-none cursor-pointer"
+              style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+            >
+              <option value="all" className="bg-[#0A0A0A]">All Modules</option>
+              {BAZAAR_MODULE_CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id} className="bg-[#0A0A0A]">
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={10} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#4B5563]" />
           </div>
 
           {/* Language filter */}

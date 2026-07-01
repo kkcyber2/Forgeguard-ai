@@ -21,6 +21,40 @@ const CreateCaseSchema = z.object({
   priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
 });
 
+export async function addCaseNote(formData: FormData) {
+  const { userId } = await requireCitadelAccess();
+  const caseId = String(formData.get("caseId") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+  if (!caseId || body.length < 3) {
+    return { ok: false as const, error: "Invalid note." };
+  }
+
+  const supabase = await createServerSupabase();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from("agency_case_notes").insert({
+    case_id: caseId,
+    author_id: userId,
+    body_md: body,
+  });
+
+  if (error) return { ok: false as const, error: error.message };
+
+  await (supabase as any).from("agency_audit_events").insert({
+    compartment_id: DEFAULT_COMPARTMENT_ID,
+    actor_id: userId,
+    action: "case_note_added",
+    target_type: "case",
+    target_id: caseId,
+  });
+
+  revalidatePath(`/citadel/cases/${caseId}`);
+  return { ok: true as const };
+}
+
+export async function addCaseNoteAction(formData: FormData): Promise<void> {
+  await addCaseNote(formData);
+}
+
 export async function createCase(formData: FormData) {
   const { userId } = await requireCitadelAccess();
   const parsed = CreateCaseSchema.safeParse({

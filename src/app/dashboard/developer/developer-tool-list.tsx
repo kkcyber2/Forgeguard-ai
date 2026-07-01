@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import { useTransition } from "react";
-import { Trash2, RefreshCw, Loader2, History } from "lucide-react";
+import { Trash2, RefreshCw, Loader2, History, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
-import { deleteCustomAttackTool, resubmitCustomAttackTool } from "./actions";
+import { deleteCustomAttackTool, publishApprovedToolToBazaar, resubmitCustomAttackTool } from "./actions";
 import { DeveloperToolTester } from "./developer-tool-tester";
 
 export interface DeveloperToolRow {
@@ -99,6 +99,7 @@ function ToolRow({
   const [testOpen, setTestOpen] = React.useState(false);
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const canResubmit = tool.status === "rejected" || tool.status === "disabled";
+  const canPublish = tool.status === "approved";
 
   return (
     <>
@@ -142,6 +143,21 @@ function ToolRow({
             >
               Test
             </button>
+            {canPublish ? (
+              <button
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    const r = await publishApprovedToolToBazaar(tool.id);
+                    if (!r.ok) alert(r.error);
+                  })
+                }
+                className={buttonStyles({ variant: "ghost", size: "sm" })}
+                title="Publish to Bazaar"
+              >
+                <Package size={13} strokeWidth={1.75} />
+              </button>
+            ) : null}
             {canResubmit ? (
               <button
                 disabled={pending}

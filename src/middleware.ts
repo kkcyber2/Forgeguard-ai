@@ -299,6 +299,64 @@ function defaultAllowedOrigin(isDev: boolean): string {
   return isDev ? "http://localhost:3000" : "https://www.forgeguard-ai.com";
 }
 
+function jwtPayload(accessToken: string): Record<string, unknown> | null {
+  try {
+    const part = accessToken.split(".")[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(b64)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function sessionAuthenticatorLevel(accessToken: string | undefined): "aal1" | "aal2" {
+  if (!accessToken) return "aal1";
+  const payload = jwtPayload(accessToken);
+  return payload?.aal === "aal2" ? "aal2" : "aal1";
+}
+
+async function enforcePrivilegedMfaGate(
+  request: NextRequest,
+): Promise<NextResponse | null> {
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/api/citadel/cron")) return null;
+
+  const needsMfa =
+    pathname.startsWith("/citadel") ||
+    pathname.startsWith("/api/citadel") ||
+    pathname.startsWith("/admin");
+  if (!needsMfa) return null;
+  if (pathname.startsWith("/auth/mfa-challenge")) return null;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll() {},
+    },
+  });
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) return null;
+
+  if (isSovereignOperator(session.user.email)) return null;
+
+  const aal = sessionAuthenticatorLevel(session.access_token);
+  if (aal === "aal2") return null;
+
+  const challenge = new URL("/auth/mfa-challenge", request.url);
+  challenge.searchParams.set("next", pathname);
+  return NextResponse.redirect(challenge);
+}
+
 async function enforceCitadelGate(
   request: NextRequest,
 ): Promise<NextResponse | null> {
@@ -580,6 +638,9 @@ export async function middleware(request: NextRequest) {
 
   const citadelBlock = await enforceCitadelGate(request);
   if (citadelBlock) return citadelBlock;
+
+  const mfaBlock = await enforcePrivilegedMfaGate(request);
+  if (mfaBlock) return mfaBlock;
 
   const sovereignBypass = await isSovereignRequest(request);
 

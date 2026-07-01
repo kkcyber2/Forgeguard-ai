@@ -35,6 +35,7 @@ import {
   listTeamPosts,
   type TeamRow,
 } from "@/lib/teams/team-actions";
+import { TeamE2eeChannel } from "@/components/intel/team-e2ee-channel";
 
 type Tab = "chat" | "feed" | "teams" | "vault";
 
@@ -468,7 +469,19 @@ function TeamsPanel() {
       <div>
         {selected ? (
           <>
-            <p className="mb-2 font-mono text-[10px] uppercase text-foreground-subtle">Team feed</p>
+            <TeamE2eeChannel
+              teamId={selected}
+              posts={teamPosts.map((p) => ({
+                id: p.id,
+                content: p.content,
+                created_at: p.created_at,
+                author_name: p.author_name,
+              }))}
+              onRefresh={() => void listTeamPosts(selected).then(setTeamPosts)}
+            />
+            <p className="mb-2 mt-6 font-mono text-[10px] uppercase text-foreground-subtle">
+              Team feed (plaintext)
+            </p>
             <textarea
               value={postBody}
               onChange={(e) => setPostBody(e.target.value)}
